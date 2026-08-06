@@ -1,9 +1,10 @@
 async function screenProfile(){
   const a=state.active; const age=ageFrom(a.birthdate);
-  const [{data:sports},{data:access},{data:invites}] = await Promise.all([
+  const [{data:sports},{data:access},{data:invites},{data:trainer}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('athlete_access').select('*').eq('athlete_id',a.id).is('revoked_at',null),
     sb.from('athlete_invites').select('*').eq('athlete_id',a.id).is('accepted_at',null).is('revoked_at',null),
+    sb.from('trainer_profiles').select('status').eq('id',state.user.id).maybeSingle(),
   ]);
   const _primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=_primary?.sport_key||state.activeSportKey||'general'; setAppBg();
@@ -34,6 +35,16 @@ async function screenProfile(){
             <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button></div>`).join('')}
       </div>
 
+      <div class="sec-title">Coaching</div>
+      ${trainer ? H`<div class="card app-pad">
+        <div class="grow"><div class="gi">🏅</div><div class="gt"><b>Pro Trainer application</b><span>${esc(trainerStatusLabel(trainer.status))}</span></div>
+          <button class="btn sm ghost" id="trainerStatus">View</button></div>
+      </div>`
+      : H`<div class="card app-pad">
+        <div class="grow"><div class="gi">🏅</div><div class="gt"><b>Become a Pro Trainer</b><span>Get verified and coach families for pay.</span></div></div>
+        <button class="btn sm" id="beTrainer" style="margin-top:10px">Start application</button>
+      </div>`}
+
       ${isOwner?H`<div class="sec-title">Manage</div>
       <div class="card app-pad">
         <button class="btn ghost" id="addChild" style="margin-bottom:10px">+ Add another athlete</button>
@@ -45,7 +56,10 @@ async function screenProfile(){
   { const iv=$("#invite"); if(iv) iv.onclick=openInvite; }
   { const ac=$("#addChild"); if(ac) ac.onclick=startAddChild; }
   { const dl=$("#del"); if(dl) dl.onclick=confirmDelete; }
+  { const bt=$("#beTrainer"); if(bt) bt.onclick=startTrainerOnboarding; }
+  { const ts=$("#trainerStatus"); if(ts) ts.onclick=()=>trainerStatusScreen(); }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
 }
 function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }
+function trainerStatusLabel(s){ return ({draft:'In progress — tap to finish',submitted:'Submitted — under review',in_review:'Under review',needs_info:'Needs your attention',approved:'Approved ✓',suspended:'Paused',rejected:'Not approved'})[s]||'Submitted'; }
 
