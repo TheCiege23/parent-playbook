@@ -16,7 +16,7 @@ async function loadAthletes(){
 // ===================================================================
 //  AUTH
 // ===================================================================
-function renderAuth(mode='signup'){
+function renderAuth(mode='login', prefill=''){
   document.body.classList.add('auth'); setAppBg();
   root.innerHTML = H`
   <div class="authwrap">
@@ -33,7 +33,7 @@ function renderAuth(mode='signup'){
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">
         ${mode==='signup'?'You create the account. Your child gets a profile you own and control.':'Log in to your dashboard.'}
       </p>
-      <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com"/></div>
+      <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
       <div class="field"><label>Password</label><input id="pw" type="password" autocomplete="${mode==='signup'?'new-password':'current-password'}" placeholder="At least 8 characters"/></div>
       <div class="err" id="autherr"></div>
       <button class="btn" id="go">${mode==='signup'?'Create account':'Log in'}</button>
@@ -55,11 +55,20 @@ function renderAuth(mode='signup'){
     const btn=$("#go"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
     try{
       let res;
-      if(mode==='signup') res = await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:location.origin+location.pathname+location.search}});
-      else res = await sb.auth.signInWithPassword({email,password:pw});
-      if(res.error) throw res.error;
-      if(!res.data.session){ // email confirmation on
-        errEl.textContent=""; renderConfirmNotice(email); return;
+      if(mode==='signup'){
+        res = await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});
+        if(res.error) throw res.error;
+        const u=res.data.user;
+        // Supabase returns a user with an EMPTY identities array when the email is
+        // already registered (enumeration protection). Send them to log in instead.
+        if(u && Array.isArray(u.identities) && u.identities.length===0){
+          toast('You already have an account — please log in');
+          return renderAuth('login', email);
+        }
+        if(!res.data.session){ renderConfirmNotice(email); return; }
+      } else {
+        res = await sb.auth.signInWithPassword({email,password:pw});
+        if(res.error) throw res.error;
       }
       state.user = res.data.user;
       const token=inviteTokenFromUrl();
@@ -67,6 +76,7 @@ function renderAuth(mode='signup'){
       await afterLogin();
     }catch(err){
       errEl.textContent = friendlyAuthErr(err.message);
+      if(/confirm/i.test(err.message||'')) addResend(email, errEl);
       btn.innerHTML=label; btn.disabled=false;
     }
   };
@@ -74,8 +84,18 @@ function renderAuth(mode='signup'){
 function friendlyAuthErr(m){
   if(/already registered/i.test(m)) return "That email already has an account. Try logging in.";
   if(/invalid login/i.test(m)) return "Email or password is incorrect.";
+  if(/not confirmed|confirm/i.test(m)) return "Please confirm your email first — check your inbox and spam folder.";
   if(/rate/i.test(m)) return "Too many tries — wait a moment and retry.";
   return m;
+}
+function addResend(email, errEl){
+  const b=document.createElement('button');
+  b.className='btn ghost'; b.style.marginTop='8px'; b.textContent='Resend confirmation email';
+  b.onclick=async()=>{ b.disabled=true; b.textContent='Sending…';
+    const { error }=await sb.auth.resend({ type:'signup', email });
+    toast(error?'Could not resend — try again shortly':'Sent — check your inbox and spam');
+    b.textContent='Resend confirmation email'; b.disabled=false; };
+  errEl.appendChild(b);
 }
 function renderConfirmNotice(email){
   root.innerHTML = H`<div class="app-pad" style="padding-top:70px;text-align:center">
