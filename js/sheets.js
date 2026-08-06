@@ -48,6 +48,7 @@ function openLogGame(){
     d.innerHTML=`<input class="sk" placeholder="Stat (e.g. Goals)" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/><input class="sv" placeholder="Value" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/>`;
     statsEl.appendChild(d); };
   bg.querySelector('#addStat').onclick=addStatRow;
+  let gid=null; // keep one id across retries so a failed media upload can't create a 2nd game
   bg.querySelector('#save').onclick=async(e)=>{
     const errEl=bg.querySelector('#gerr'); errEl.textContent='';
     const gd=bg.querySelector('#gd').value; if(!gd){ errEl.textContent='Pick the game date.'; return; }
@@ -58,12 +59,12 @@ function openLogGame(){
     const big=oversize(files); if(big){ errEl.textContent=`“${big.name}” is over 100 MB — trim it and try again.`; return; }
     e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
     try{
-      const gid=uuid();
+      if(!gid) gid=uuid();
       let result='na'; if(our!=null&&their!=null) result=our>their?'win':our<their?'loss':'tie';
-      const { error }=await sb.from('games').insert({ id:gid, athlete_id:state.active.id, game_date:gd,
+      const { error }=await sb.from('games').upsert({ id:gid, athlete_id:state.active.id, game_date:gd,
         season:bg.querySelector('#gs').value.trim()||null, opponent:bg.querySelector('#go').value.trim()||null,
         home_away:ha||null, our_score:our, their_score:their, result,
-        notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id });
+        notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id },{ onConflict:'id' });
       if(error) throw error;
       if(files.length){ e.target.innerHTML='<span class="spinner"></span> Uploading…'; await uploadMedia(files,{gameId:gid,takenOn:gd}); }
       bg.remove(); toast('Game logged 🏅'); renderApp('journey');
@@ -142,9 +143,17 @@ function openMediaViewer(m,url){
 // ---------- sheets / modals ----------
 function sheet(html){
   const bg=document.createElement('div');bg.className='modal-bg';
-  bg.innerHTML=`<div class="sheet"><div class="grab"></div>${html}</div>`;
+  bg.innerHTML=`<div class="sheet" tabindex="-1" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  // Esc-to-close + focus. Override remove() so every existing bg.remove() call
+  // also tears down the key listener (no dangling handlers).
+  const _remove=bg.remove.bind(bg);
+  const onKey=e=>{ if(e.key==='Escape') bg.remove(); };
+  bg.remove=()=>{ document.removeEventListener('keydown',onKey); _remove(); };
   bg.onclick=e=>{ if(e.target===bg) bg.remove(); };
-  document.body.appendChild(bg); return bg;
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(bg);
+  const card=bg.querySelector('.sheet'); if(card) card.focus();
+  return bg;
 }
 function openSwitch(){
   const bg=sheet(H`<h3>Switch athlete</h3><div style="margin-top:10px">

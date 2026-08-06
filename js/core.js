@@ -15,7 +15,12 @@ function toast(msg){
   const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
   setTimeout(()=>t.remove(),2600);
 }
-function ageFrom(bd){ if(!bd) return null; const d=new Date(bd),n=new Date();
+function ageFrom(bd){ if(!bd) return null;
+  // Parse 'YYYY-MM-DD' as a LOCAL date (new Date('YYYY-MM-DD') is UTC midnight,
+  // which reads back as the previous day in western timezones → age off by one).
+  const p=String(bd).slice(0,10).split('-');
+  const d=(p.length===3)?new Date(+p[0],+p[1]-1,+p[2]):new Date(bd);
+  const n=new Date();
   let a=n.getFullYear()-d.getFullYear(); if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--; return a; }
 
 // ---------- app state ----------

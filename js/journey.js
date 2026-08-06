@@ -60,7 +60,7 @@ async function screenJourney(){
   const urlMap={};
   const paths=(media||[]).map(m=>m.path);
   if(paths.length){
-    const { data:signed } = await sb.storage.from('athlete-media').createSignedUrls(paths,3600);
+    const { data:signed } = await sb.storage.from('athlete-media').createSignedUrls(paths,21600); // 6h — survives a long Journey session
     (signed||[]).forEach(s=>{ if(s.signedUrl && !s.error) urlMap[s.path]=s.signedUrl; });
   }
   const mediaById={}; (media||[]).forEach(m=>mediaById[m.id]=m);
