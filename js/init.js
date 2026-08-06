@@ -1,10 +1,14 @@
 // ===================================================================
 //  BOOT
 // ===================================================================
+// Capture a password-recovery link before Supabase clears the URL hash.
+const PP_RECOVERY = (typeof location!=='undefined' && location.hash && location.hash.indexOf('type=recovery')!==-1);
+
 (async function boot(){
   try{
     const { data:{ session } } = await sb.auth.getSession();
     state.user = session?.user || null;
+    if(PP_RECOVERY){ return renderResetPassword(); }
     const token = inviteTokenFromUrl();
     if(token){ return renderRedeem(token); }
     if(!state.user) return renderAuth();
@@ -20,5 +24,8 @@ function bootError(){
   const r=document.getElementById('ppReload'); if(r) r.onclick=()=>location.reload();
 }
 
-sb.auth.onAuthStateChange((_e,session)=>{ state.user = session?.user || null; });
+sb.auth.onAuthStateChange((event,session)=>{
+  state.user = session?.user || null;
+  if(event==='PASSWORD_RECOVERY') renderResetPassword(); // backup for the reset-link flow
+});
 

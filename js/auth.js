@@ -42,11 +42,13 @@ function renderAuth(mode='login', prefill=''){
           ? `Already have an account? <a href="#" id="swap">Log in</a>`
           : `New here? <a href="#" id="swap">Create an account</a>`}
       </p>
+      ${mode==='login' ? `<p class="muted-note" style="margin-top:2px"><a href="#" id="forgot">Forgot password?</a></p>` : ''}
     </div>
     <p class="authlegal">By continuing you agree that you are the parent or legal guardian and consent to creating a profile for your child.</p>
   </div>`;
 
   $("#swap").onclick = e=>{e.preventDefault();renderAuth(mode==='signup'?'login':'signup');};
+  { const f=$("#forgot"); if(f) f.onclick=e=>{ e.preventDefault(); renderForgot($("#email").value.trim()); }; }
   $("#go").onclick = async ()=>{
     const email=$("#email").value.trim(), pw=$("#pw").value;
     const errEl=$("#autherr"); errEl.textContent="";
@@ -97,6 +99,75 @@ function addResend(email, errEl){
     b.textContent='Resend confirmation email'; b.disabled=false; };
   errEl.appendChild(b);
 }
+// ---- Forgot password: request a reset link ----
+function renderForgot(prefill=''){
+  document.body.classList.add('auth'); setAppBg();
+  root.innerHTML = H`
+  <div class="authwrap">
+    <div class="authbrand">
+      <div class="avatar" style="width:58px;height:58px;border-radius:16px;font-size:22px;margin:0 auto 14px;box-shadow:0 6px 18px rgba(0,0,0,.35)">PP</div>
+      <h1 style="font-size:27px">Parent Playbook</h1>
+    </div>
+    <div class="glass">
+      <h2 style="font-size:20px;margin-bottom:2px">Reset your password</h2>
+      <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">Enter your email and we'll send you a link to set a new password.</p>
+      <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
+      <div class="err" id="autherr"></div>
+      <button class="btn" id="send">Send reset link</button>
+      <p class="muted-note"><a href="#" id="back">Back to log in</a></p>
+    </div>
+  </div>`;
+  $("#back").onclick=e=>{ e.preventDefault(); renderAuth('login', $("#email").value.trim()); };
+  $("#send").onclick=async()=>{
+    const email=$("#email").value.trim(), errEl=$("#autherr"); errEl.textContent="";
+    if(!email){ errEl.textContent="Enter your email."; return; }
+    const btn=$("#send"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
+    // Always show success (don't reveal whether an account exists).
+    if(error && /rate/i.test(error.message)){ errEl.textContent="Too many tries — wait a moment."; btn.innerHTML=label; btn.disabled=false; return; }
+    root.innerHTML = H`<div class="app-pad" style="padding-top:70px;text-align:center">
+      <div class="avatar" style="width:56px;height:56px;border-radius:16px;font-size:24px;margin:0 auto 16px;background:var(--amber)">✉️</div>
+      <h2 style="font-size:22px">Check your email</h2>
+      <p style="color:var(--muted);margin:10px auto 0;max-width:320px">If an account exists for <b>${esc(email)}</b>, a password reset link is on its way. Open it, set a new password, and you'll be logged in.</p>
+      <div style="max-width:300px;margin:26px auto 0"><button class="btn ghost" id="back2">Back to log in</button></div>
+    </div>`;
+    $("#back2").onclick=()=>renderAuth('login', email);
+  };
+}
+
+// ---- Set a new password (landed here from the reset link) ----
+function renderResetPassword(){
+  document.body.classList.add('auth'); setAppBg();
+  try{ history.replaceState({},'',location.pathname); }catch(e){}
+  root.innerHTML = H`
+  <div class="authwrap">
+    <div class="authbrand">
+      <div class="avatar" style="width:58px;height:58px;border-radius:16px;font-size:22px;margin:0 auto 14px;box-shadow:0 6px 18px rgba(0,0,0,.35)">PP</div>
+      <h1 style="font-size:27px">Parent Playbook</h1>
+    </div>
+    <div class="glass">
+      <h2 style="font-size:20px;margin-bottom:2px">Set a new password</h2>
+      <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">Choose a new password for your account.</p>
+      <div class="field"><label>New password</label><input id="np" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
+      <div class="field"><label>Confirm password</label><input id="np2" type="password" autocomplete="new-password" placeholder="Re-enter it"/></div>
+      <div class="err" id="autherr"></div>
+      <button class="btn" id="save">Update password</button>
+    </div>
+  </div>`;
+  $("#save").onclick=async()=>{
+    const p=$("#np").value, p2=$("#np2").value, errEl=$("#autherr"); errEl.textContent="";
+    if(p.length<8){ errEl.textContent="Password must be at least 8 characters."; return; }
+    if(p!==p2){ errEl.textContent="Passwords don't match."; return; }
+    const btn=$("#save"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const { data, error }=await sb.auth.updateUser({ password:p });
+    if(error){ errEl.textContent=friendlyAuthErr(error.message); btn.innerHTML=label; btn.disabled=false; return; }
+    state.user=data.user||state.user;
+    toast('Password updated 🔒');
+    document.body.classList.remove('auth');
+    await afterLogin();
+  };
+}
+
 function renderConfirmNotice(email){
   root.innerHTML = H`<div class="app-pad" style="padding-top:70px;text-align:center">
     <div class="avatar" style="width:56px;height:56px;border-radius:16px;font-size:24px;margin:0 auto 16px;background:var(--amber)">✓</div>
