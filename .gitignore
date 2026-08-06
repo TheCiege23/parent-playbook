@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# local env / secrets — never commit these
+.env
+.env.local
+.env.*.local
+
+# vercel link (machine-specific)
+.vercel
+
+# os / editor cruft
+.DS_Store
+Thumbs.db
+*.log

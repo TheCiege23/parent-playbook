@@ -1,0 +1,14 @@
+{
+  "name": "Parent Playbook",
+  "short_name": "Playbook",
+  "description": "Help your young athlete grow — weekly plans, at-home activities, and parent guidance.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF8F3",
+  "theme_color": "#12695a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
