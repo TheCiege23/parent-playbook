@@ -1,11 +1,13 @@
 async function screenProfile(){
   const a=state.active; const age=ageFrom(a.birthdate);
-  const [{data:sports},{data:access},{data:invites},{data:trainer}] = await Promise.all([
+  const [{data:sports},{data:access},{data:invites},{data:trainer},{data:adminRows}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('athlete_access').select('*').eq('athlete_id',a.id).is('revoked_at',null),
     sb.from('athlete_invites').select('*').eq('athlete_id',a.id).is('accepted_at',null).is('revoked_at',null),
     sb.from('trainer_profiles').select('status').eq('id',state.user.id).maybeSingle(),
+    sb.from('app_admins').select('guardian_id').limit(1),   // RLS: returns a row only if the viewer is an admin
   ]);
+  const isAdmin = !!(adminRows && adminRows.length);
   const _primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=_primary?.sport_key||state.activeSportKey||'general'; setAppBg();
   const myAccess=(access||[]).find(x=>x.guardian_id===state.user.id);
@@ -44,6 +46,19 @@ async function screenProfile(){
         <div class="grow"><div class="gi">🏅</div><div class="gt"><b>Become a Pro Trainer</b><span>Get verified and coach families for pay.</span></div></div>
         <button class="btn sm" id="beTrainer" style="margin-top:10px">Start application</button>
       </div>`}
+      <div class="card app-pad">
+        <div class="grow"><div class="gi">🔎</div><div class="gt"><b>Find a Pro Trainer</b><span>Book a verified coach for ${esc(a.first_name)}.</span></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn sm" id="findTrainer">Browse trainers</button>
+          <button class="btn sm ghost" id="myBookings">My bookings</button>
+        </div>
+      </div>
+
+      ${isAdmin?H`<div class="sec-title">Admin</div>
+      <div class="card app-pad">
+        <div class="grow"><div class="gi">🛡️</div><div class="gt"><b>Trainer review queue</b><span>Review and approve Pro Trainer applications.</span></div></div>
+        <button class="btn sm" id="adminQueue" style="margin-top:10px">Open review queue</button>
+      </div>`:''}
 
       ${isOwner?H`<div class="sec-title">Manage</div>
       <div class="card app-pad">
@@ -58,6 +73,9 @@ async function screenProfile(){
   { const dl=$("#del"); if(dl) dl.onclick=confirmDelete; }
   { const bt=$("#beTrainer"); if(bt) bt.onclick=startTrainerOnboarding; }
   { const ts=$("#trainerStatus"); if(ts) ts.onclick=()=>trainerStatusScreen(); }
+  { const aq=$("#adminQueue"); if(aq) aq.onclick=openAdminQueue; }
+  { const ft=$("#findTrainer"); if(ft) ft.onclick=openMarketplace; }
+  { const mb=$("#myBookings"); if(mb) mb.onclick=openMyBookings; }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
 }
 function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }
