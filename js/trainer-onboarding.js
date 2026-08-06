@@ -380,13 +380,14 @@ async function trainerStatusScreen(prof){
         return H`<div class="mrow"><span>${esc(KIND_LABEL[k])}</span>${badge(v?v.status:'not_started')}</div>`; }).join('')}
     </div>
     <div style="margin-top:18px;display:grid;gap:10px">
-      ${prof.status==='approved'?`<button class="btn" id="svcs">Manage my services</button><button class="btn ghost" id="bkgs">Booking requests</button>`:''}
+      ${prof.status==='approved'?`<button class="btn" id="svcs">Manage my services</button><button class="btn ghost" id="bkgs">Booking requests</button><button class="btn ghost" id="payout">Set up / manage payouts</button>`:''}
       ${canEdit?`<button class="btn" id="edit">Edit & resubmit</button>`:''}
       <button class="btn ghost" id="done">Back to app</button>
     </div>
   </div>`;
   { const el=$("#svcs"); if(el) el.onclick=openTrainerServices; }
   { const el=$("#bkgs"); if(el) el.onclick=openTrainerBookings; }
+  { const el=$("#payout"); if(el) el.onclick=startPayout; }
   const ed=$("#edit"); if(ed) ed.onclick=startTrainerOnboarding;
   $("#done").onclick=()=>renderApp('profile');
 }

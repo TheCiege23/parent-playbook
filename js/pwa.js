@@ -1,5 +1,39 @@
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
+// ---- Web Push ----
+const VAPID_PUBLIC = 'BN_7PR-B4kxktA8fKWiVo60DP-SXv_A888D3MxMHhPe4_Cr29UjAapot7sdbCdh1_HhjAt0-gVwUSb1tYRfcgps';
+function urlB64ToUint8Array(b){ const pad='='.repeat((4-b.length%4)%4); const s=(b+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(s); const out=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
+function pushSupported(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+async function enablePush(){
+  if(!pushSupported()){ toast('Notifications aren’t supported on this device'); return; }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ toast('Turn on notifications in your browser settings'); return; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToUint8Array(VAPID_PUBLIC) });
+    const j=sub.toJSON();
+    const { error }=await sb.from('push_subscriptions').upsert(
+      { user_id:state.user.id, endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth },
+      { onConflict:'endpoint', ignoreDuplicates:true });
+    if(error){ console.error(error); toast('Could not turn on notifications'); return; }
+    toast('Notifications on 🔔');
+  }catch(e){ console.error(e); toast('Could not turn on notifications'); }
+}
+
+// ---- return from Stripe (Checkout / Connect) ----
+(function(){
+  var p; try{ p=new URLSearchParams(location.search); }catch(e){ return; }
+  var paid=p.get('paid'), cancel=p.get('paycancel'), st=p.get('stripe');
+  if(!paid && !cancel && !st) return;
+  try{ history.replaceState({},'',location.pathname); }catch(e){}
+  setTimeout(function(){
+    if(paid){ try{ toast('Payment complete 🎉'); }catch(e){} if(typeof notifyBooking==='function') notifyBooking(paid,'paid'); }
+    else if(cancel){ try{ toast('Payment canceled'); }catch(e){} }
+    else if(st==='return'){ try{ toast('Stripe payout setup updated'); }catch(e){} }
+  }, 900);
+})();
+
 // ---- Add to Home Screen (install without an app store) ----
 (function(){
   var KEY='pp_a2hs_dismissed';

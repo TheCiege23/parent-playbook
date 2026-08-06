@@ -1,8 +1,9 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v3';
+const CACHE = 'pp-v4';
 const ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/css/app.css',
   '/js/core.js','/js/background.js','/js/reference.js','/js/auth.js','/js/onboarding.js',
   '/js/program.js','/js/shell.js','/js/screen-week.js','/js/screen-growth.js','/js/screen-profile.js',
+  '/js/trainer-onboarding.js','/js/admin.js','/js/marketplace.js','/js/trainer-services.js',
   '/js/journey.js','/js/sheets.js','/js/invites.js','/js/pwa.js','/js/init.js'];
 
 self.addEventListener('install', (e) => {
@@ -34,4 +35,23 @@ self.addEventListener('fetch', (e) => {
   }
   // cross-origin (fonts, Supabase): pass through — never cache API/data or private media
   e.respondWith(caches.match(req).then((cached) => cached || fetch(req)));
+});
+
+// ---- Web Push ----
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
+  const title = d.title || 'Parent Playbook';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '', icon: '/icon.svg', badge: '/icon.svg',
+    data: { url: d.url || '/' },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
+    for (const w of ws) { if ('focus' in w) { w.navigate && w.navigate(url); return w.focus(); } }
+    return clients.openWindow(url);
+  }));
 });

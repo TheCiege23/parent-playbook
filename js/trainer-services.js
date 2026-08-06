@@ -36,10 +36,14 @@ async function openTrainerServices(){
       : `<div class="card app-pad"><div class="empty">No services yet. Add your first session so parents can book you.</div></div>`}
     <button class="btn" id="addSvc" style="margin-top:6px">＋ Add a service</button>
     <button class="btn ghost" id="toBookings" style="margin-top:10px">View booking requests</button>
+    <div class="teach" style="margin-top:14px"><div class="ic">💳</div><div><h4>Get paid</h4>
+      <p>Set up secure payouts with Stripe so parents can pay you in-app. You keep your earnings minus the platform fee.</p></div></div>
+    <button class="btn ghost" id="payout" style="margin-top:8px">Set up / manage payouts</button>
   </div>`;
   $("#done").onclick=()=>renderApp('profile');
   $("#addSvc").onclick=()=>serviceSheet(null);
   $("#toBookings").onclick=openTrainerBookings;
+  $("#payout").onclick=startPayout;
   root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>serviceSheet(svcs.find(s=>s.id===b.dataset.edit)));
   root.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>trainerToggleService(b.dataset.toggle,b.dataset.on!=='1'));
   root.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>trainerDeleteService(b.dataset.del));
@@ -144,6 +148,7 @@ async function openTrainerBookings(){
 async function trainerSetBooking(id,status){
   const { error }=await sb.from('bookings').update({ status, updated_at:new Date().toISOString() }).eq('id',id);
   if(error){ console.error(error); toast('Could not update'); return; }
+  notifyBooking(id,status); // 'confirmed' | 'declined' | 'completed' → parent
   toast(status==='confirmed'?'Confirmed ✅':status==='completed'?'Marked completed':'Declined');
   openTrainerBookings();
 }

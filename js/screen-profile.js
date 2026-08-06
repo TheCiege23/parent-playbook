@@ -53,6 +53,10 @@ async function screenProfile(){
           <button class="btn sm ghost" id="myBookings">My bookings</button>
         </div>
       </div>
+      <div class="card app-pad">
+        <div class="grow"><div class="gi">🔔</div><div class="gt"><b>Notifications</b><span>Get alerts for bookings and messages.</span></div>
+          <button class="btn sm ghost" id="enableNotif">Turn on</button></div>
+      </div>
 
       ${isAdmin?H`<div class="sec-title">Admin</div>
       <div class="card app-pad">
@@ -76,6 +80,7 @@ async function screenProfile(){
   { const aq=$("#adminQueue"); if(aq) aq.onclick=openAdminQueue; }
   { const ft=$("#findTrainer"); if(ft) ft.onclick=openMarketplace; }
   { const mb=$("#myBookings"); if(mb) mb.onclick=openMyBookings; }
+  { const en=$("#enableNotif"); if(en) en.onclick=enablePush; }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
 }
 function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }

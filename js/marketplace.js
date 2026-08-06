@@ -13,6 +13,26 @@ const BK_STATUS={ requested:['var(--line)','var(--ink)','Requested'], confirmed:
   completed:['#E9F1EF','var(--good)','Completed'], no_show:['#FBE9DC','var(--danger)','No-show'] };
 function bkPill(s){ const [bg,col,txt]=BK_STATUS[s]||BK_STATUS.requested; return `<span class="pill" style="background:${bg};color:${col}">${txt}</span>`; }
 
+// ---- Stripe + push helpers (shared) ----
+async function fnError(error,fallback){ let m=fallback; try{ const j=await error.context.json(); if(j&&j.error) m=j.error; }catch(_){} return m; }
+async function notifyBooking(bookingId,kind){ try{ await sb.functions.invoke('notify-booking',{ body:{ booking_id:bookingId, kind } }); }catch(e){ console.error(e); } }
+async function payBooking(bookingId){
+  toast('Opening secure checkout…');
+  try{
+    const { data, error }=await sb.functions.invoke('stripe-checkout',{ body:{ booking_id:bookingId } });
+    if(error){ toast(await fnError(error,'Payment unavailable')); return; }
+    if(data&&data.url){ location.href=data.url; } else { toast((data&&data.error)||'Payment unavailable'); }
+  }catch(e){ console.error(e); toast('Payment unavailable'); }
+}
+async function startPayout(){
+  toast('Opening Stripe…');
+  try{
+    const { data, error }=await sb.functions.invoke('stripe-connect',{ body:{} });
+    if(error){ toast(await fnError(error,'Could not open Stripe')); return; }
+    if(data&&data.url){ location.href=data.url; } else { toast('Could not open Stripe'); }
+  }catch(e){ console.error(e); toast('Could not open Stripe'); }
+}
+
 // ---------- browse ----------
 async function openMarketplace(){
   document.body.classList.remove('auth'); setAppBg();
@@ -165,6 +185,7 @@ function openBookingSheet(service,trainer){
         await sb.from('trainer_athlete_grants').insert({ booking_id:bookingId, trainer_id:trainer.id, athlete_id:child.id,
           scope:{first_name:true,sport:true,age_band:true}, granted_by:state.user.id, expires_at:exp });
       }catch(ge){ console.error(ge); }
+      notifyBooking(bookingId,'new_request');
       bg.remove(); toast('Request sent 🎉'); openMyBookings();
     }catch(err){ console.error(err); errEl.textContent='Could not send. '+(err.message||''); e.target.innerHTML='Send request'; e.target.disabled=false; }
   };
@@ -194,8 +215,10 @@ async function openMyBookings(){
             <div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(b.services?.title||'Session')} · ${fmtWhen(b.scheduled_at)}</div>
           </div>${bkPill(b.status)}
         </div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
           <button class="btn sm ghost" data-msg="${esc(b.id)}">Messages</button>
+          ${(b.status==='confirmed'&&!b.paid_at)?`<button class="btn sm" data-pay="${esc(b.id)}">Pay ${money(b.price_cents)}</button>`:''}
+          ${b.paid_at?`<span class="pill" style="background:#E9F1EF;color:var(--good)">Paid ✓</span>`:''}
           ${(b.status==='requested'||b.status==='confirmed')?`<button class="btn sm ghost" data-cancel="${esc(b.id)}">Cancel</button>`:''}
           ${canReview?`<button class="btn sm" data-review="${esc(b.id)}" data-tid="${esc(b.trainer_id)}">Leave review</button>`:''}
         </div></div>`;}).join('')
@@ -203,6 +226,7 @@ async function openMyBookings(){
   </div>`;
   $("#done").onclick=()=>renderApp('profile');
   root.querySelectorAll('[data-msg]').forEach(b=>b.onclick=()=>openBookingThread(b.dataset.msg,()=>openMyBookings()));
+  root.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>payBooking(b.dataset.pay));
   root.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>parentCancelBooking(b.dataset.cancel));
   root.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>leaveReview(b.dataset.review,b.dataset.tid));
 }
@@ -259,6 +283,7 @@ async function openBookingThread(bookingId,onClose){
     inp.value='';
     const { error }=await sb.from('booking_messages').insert({ booking_id:bookingId, sender_id:state.user.id, body });
     if(error){ console.error(error); toast('Could not send'); inp.value=body; return; }
+    notifyBooking(bookingId,'message');
     load();
   };
   bg.querySelector('#msgsend').onclick=send;
