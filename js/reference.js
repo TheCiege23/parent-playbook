@@ -5,6 +5,8 @@ async function loadRef(){
     sb.from('positions').select('*').order('sort'),
     sb.from('metrics').select('*').order('sort'),
   ]);
+  const err = sports.error||positions.error||metrics.error;
+  if(err){ console.error(err); throw err; }   // don't cache a failed load — allow a retry this session
   state.ref = { sports:sports.data||[], positions:positions.data||[], metrics:metrics.data||[] };
   return state.ref;
 }

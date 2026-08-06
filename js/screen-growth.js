@@ -28,9 +28,11 @@ async function screenGrowth(){
           const latest=list[0]; const name=state.ref?.metrics.find(m=>m.key===k)?.name||k;
           const prev=list[1];
           let trend=''; if(prev){ const lower=state.ref?.metrics.find(m=>m.key===k)?.lower_is_better;
-            const better = lower ? latest.value<prev.value : latest.value>prev.value;
-            trend = `<span class="pill" style="background:${better?'#E9F1EF':'#FBE9DC'};color:${better?'var(--good)':'#9a4a12'}">${better?'▲ better':'▼'} ${Math.abs(latest.value-prev.value)}</span>`; }
-          return H`<div class="mrow"><span>${esc(name)}</span><span style="display:flex;gap:8px;align-items:center">${trend}<b>${latest.value}${latest.unit?' '+esc(latest.unit):''}</b></span></div>`;
+            const cur=Number(latest.value), prv=Number(prev.value);        // numeric comes back as string — coerce
+            const better = lower ? cur<prv : cur>prv;
+            const diff = Math.round(Math.abs(cur-prv)*100)/100;
+            trend = `<span class="pill" style="background:${better?'#E9F1EF':'#FBE9DC'};color:${better?'var(--good)':'#9a4a12'}">${better?'▲ better':'▼'} ${diff}</span>`; }
+          return H`<div class="mrow"><span>${esc(name)}</span><span style="display:flex;gap:8px;align-items:center">${trend}<b>${(+latest.value)}${latest.unit?' '+esc(latest.unit):''}</b></span></div>`;
         }).join(''):`<p style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">No measurements yet. Record a height, weight, or a 40 time to start a trend line.</p>`}
       </div>
       <div class="teach" style="margin-top:16px"><div class="ic">🎓</div><div>

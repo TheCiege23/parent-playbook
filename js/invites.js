@@ -54,7 +54,7 @@ async function acceptAndEnter(token){
     return;
   }
   toast('Access granted 🎉');
-  await afterLogin();
+  try{ await afterLogin(); }catch(e){ console.error(e); bootError(); }
 }
 function friendlyAcceptErr(m){
   if(/expired/i.test(m)) return 'This invite has expired. Ask for a new link.';

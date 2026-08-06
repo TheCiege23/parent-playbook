@@ -9,10 +9,20 @@ async function renderApp(tab){
       ${navBtn('profile','Profile','M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0')}
     </nav>`;
   bindNav(tab);
-  if(tab==='week') await screenWeek();
-  else if(tab==='growth') await screenGrowth();
-  else if(tab==='journey') await screenJourney();
-  else await screenProfile();
+  try{
+    if(tab==='week') await screenWeek();
+    else if(tab==='growth') await screenGrowth();
+    else if(tab==='journey') await screenJourney();
+    else await screenProfile();
+  }catch(err){ console.error(err); screenError(tab); }
+}
+function screenError(tab){
+  const s=$("#screen"); if(!s) return;
+  s.innerHTML = H`<div class="center-screen" style="min-height:60dvh">
+    <div style="font-size:32px">😕</div>
+    <div style="text-align:center;color:var(--muted);max-width:260px;line-height:1.5">Couldn't load this screen. Check your connection and retry.</div>
+    <button class="btn" id="ppRetry" style="max-width:200px">Retry</button></div>`;
+  const r=$("#ppRetry"); if(r) r.onclick=()=>renderApp(tab);
 }
 function navBtn(id,label,path){ return H`<button data-t="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>${label}</button>`; }
 function bindNav(active){

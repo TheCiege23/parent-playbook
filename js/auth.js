@@ -9,7 +9,7 @@ async function loadAthletes(){
   const { data, error } = await sb.from('athletes')
     .select('id,first_name,nickname,birthdate,dominant_hand,family_id,created_at')
     .order('created_at');
-  if(error){ console.error(error); state.athletes=[]; return; }
+  if(error){ console.error(error); throw error; }   // surface load failures instead of faking an empty list (which would misroute to onboarding)
   state.athletes = data||[];
 }
 

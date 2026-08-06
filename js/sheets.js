@@ -246,7 +246,7 @@ function confirmDelete(){
 
 // add another athlete into the household currently being viewed
 async function startAddChild(){
-  await loadRef();
+  try{ await loadRef(); }catch(err){ console.error(err); toast('Could not load — check your connection'); return; }
   const familyId = state.active?.family_id;
   if(!familyId){ return renderOnboarding(); }
   obReset({ mode:'addChild', familyId });

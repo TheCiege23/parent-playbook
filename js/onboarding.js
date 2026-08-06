@@ -6,7 +6,7 @@ function obReset(patch){ Object.assign(ob,{ i:0, mode:'create', familyId:null, f
 
 async function renderOnboarding(){
   document.body.classList.remove('auth'); setAppBg();
-  await loadRef();
+  try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   obReset();
   obStep();
 }
