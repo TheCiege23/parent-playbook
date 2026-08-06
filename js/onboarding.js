@@ -222,41 +222,25 @@ async function finishOnboarding(){
   if(missing.length){ errEl.textContent="Please check the required consent boxes."; return; }
   const btn=$("#n"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
   try{
-    // 1) family — new household on first run; reuse the existing one when adding a sibling.
-    //    Generate the id client-side and DON'T use .select() (INSERT...RETURNING would fail RLS).
-    let familyId = ob.familyId;
-    if(ob.mode!=='addChild' || !familyId){
-      familyId = uuid();
-      const { error:e1 } = await sb.from('families')
-        .insert({ id:familyId, name:ob.familyName||'My Family', created_by:state.user.id });
-      if(e1) throw e1;
-    }
-    // 2) athlete (client-side id, no RETURNING)
-    const athleteId = uuid();
-    const { error:e2 } = await sb.from('athletes').insert({
-      id:athleteId, family_id:familyId, first_name:ob.athlete.first, birthdate:ob.athlete.bd,
-      dominant_hand:ob.athlete.hand||null, created_by:state.user.id
+    // One transactional RPC: family + athlete + sport + goals + consent are saved
+    // together or not at all. Guarantees the COPPA consent record is never dropped.
+    const newFamily = (ob.mode!=='addChild' || !ob.familyId);
+    const { data:athleteId, error } = await sb.rpc('create_athlete_onboarding', {
+      p_new_family: newFamily,
+      p_family_id: newFamily ? null : ob.familyId,
+      p_family_name: ob.familyName || 'My Family',
+      p_first: ob.athlete.first,
+      p_birthdate: ob.athlete.bd,
+      p_hand: ob.athlete.hand || null,
+      p_sport: ob.sport,
+      p_positions: ob.positions,
+      p_level: ob.level,
+      p_goals: ob.goals.map(g=>({ type:g.type, key:g.key, label:g.label })),
+      p_consents: Object.entries(ob.consents).filter(([,v])=>v).map(([k])=>({
+        consent_type: (k==='account'?'account':k==='media'?'media':'child_data')
+      })),
     });
-    if(e2) throw e2;
-    // 3) sport
-    const { error:e3 } = await sb.from('athlete_sports').insert({
-      athlete_id:athleteId, sport_key:ob.sport, positions:ob.positions, level:ob.level, is_primary:true
-    });
-    if(e3) throw e3;
-    // 4) goals
-    if(ob.goals.length){
-      const { error:e4 } = await sb.from('goals').insert(ob.goals.map(g=>({
-        athlete_id:athleteId, type:g.type, sport_key:ob.sport, key:g.key, label:g.label, created_by:state.user.id
-      })));
-      if(e4) throw e4;
-    }
-    // 5) consent records (audit)
-    const consentRows = Object.entries(ob.consents).filter(([,v])=>v).map(([k])=>({
-      guardian_id:state.user.id, athlete_id:athleteId, consent_type:(k==='account'?'account':k==='media'?'media':'child_data'),
-      granted:true, method:'onboarding_checkbox'
-    }));
-    if(consentRows.length){ await sb.from('consent_records').insert(consentRows); }
-
+    if(error) throw error;
     await loadAthletes();
     state.active = state.athletes.find(a=>a.id===athleteId) || state.athletes[0];
     toast('Profile created 🎉');

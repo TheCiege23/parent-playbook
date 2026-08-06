@@ -234,8 +234,10 @@ function confirmDelete(){
   bg.querySelector('#no').onclick=()=>bg.remove();
   bg.querySelector('#yes').onclick=async(e)=>{
     e.target.innerHTML='<span class="spinner"></span>';e.target.disabled=true;
-    const { error }=await sb.from('athletes').delete().eq('id',a.id);
-    if(error){toast('Could not delete');return;}
+    // Server-side: verifies ownership, deletes the athlete (cascades all rows),
+    // AND purges the child's photos/videos from storage so nothing is left behind.
+    const { data, error }=await sb.functions.invoke('delete-athlete',{ body:{ athlete_id:a.id } });
+    if(error||(data&&data.error)){ toast('Could not delete'); e.target.innerHTML='Yes, delete permanently'; e.target.disabled=false; return; }
     bg.remove(); await loadAthletes();
     if(state.athletes.length===0){ state.active=null; return renderOnboarding(); }
     state.active=state.athletes[0]; toast('Deleted'); renderApp('week');
