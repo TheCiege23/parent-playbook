@@ -38,6 +38,12 @@ async function screenWeek(){
         <h4>Safe by design</h4>
         <p>Built for ${esc(bandAges)} — age-appropriate and rest-first. Tap any item for how-to, what to say, and when to stop.</p></div></div>
 
+      <div class="card app-pad" id="mpBanner" style="cursor:pointer;margin-top:14px">
+        <div class="grow"><div class="gi">🔎</div>
+          <div class="gt"><b>Find a Pro Trainer</b><span>Book a verified coach for ${esc(a.first_name)}.</span></div>
+          <span class="pill">Browse ›</span></div>
+      </div>
+
       <div class="sec-title">The week</div>
       ${prog.days.map((w,idx)=>H`
         <div class="day" data-act="${esc(w.act?w.act.title:'')}" style="cursor:pointer;${idx===todayIdx?'border-color:var(--green);box-shadow:0 0 0 2px #E9F1EF':''}">
@@ -56,6 +62,7 @@ async function screenWeek(){
       <p class="muted-note" style="margin-top:18px">Parent Playbook gives general, age-appropriate guidance — not medical or nutrition advice. Check with your pediatrician, a registered dietitian, or your child's coach before starting new training, and stop any activity that causes pain.</p>
     </div>`;
   bindTop();
+  { const mp=$("#mpBanner"); if(mp) mp.onclick=openMarketplace; }
   $("#screen").querySelectorAll('[data-act]').forEach(el=>{ const k=el.getAttribute('data-act'); if(k&&cards[k]) el.onclick=()=>openActivity(cards[k]); });
 }
 
