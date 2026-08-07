@@ -24,6 +24,14 @@ async function screenProfile(){
           return H`<div class="mrow"><span>${esc(nm)}${s.is_primary?' (primary)':''}</span><b>${esc((s.positions||[]).join('/'))} · ${esc(s.level||'')}</b></div>`;}).join('')}
       </div>
 
+      ${_primary?H`<div class="sec-title">Coach's Corner</div>
+      <div class="card app-pad">
+        <div class="grow"><div class="gi">🧠</div><div class="gt"><b>Did you play ${esc(state.ref?.sports.find(s=>s.key===_primary.sport_key)?.name||'this sport')}?</b><span>Get peer coaching notes on drills you already know.</span></div></div>
+        <div class="chipgrid" id="pexpEdit" style="grid-template-columns:repeat(3,1fr);margin-top:10px">
+          ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" data-e="${v}">${esc(l)}</div>`).join('')}
+        </div>
+      </div>`:''}
+
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">Who can help</div>
         ${isOwner?'<button class="btn sm ghost" id="invite">+ Invite</button>':''}
@@ -81,6 +89,13 @@ async function screenProfile(){
   { const ft=$("#findTrainer"); if(ft) ft.onclick=openMarketplace; }
   { const mb=$("#myBookings"); if(mb) mb.onclick=openMyBookings; }
   { const en=$("#enableNotif"); if(en) en.onclick=enablePush; }
+  { const pe=$("#pexpEdit"); if(pe&&_primary) pe.querySelectorAll('.chip').forEach(c=>c.onclick=async()=>{
+      const v=c.dataset.e; pe.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
+      const { error }=await sb.from('athlete_sports').update({ parent_experience:v||null }).eq('athlete_id',a.id).eq('sport_key',_primary.sport_key);
+      if(error){ console.error(error); toast('Could not save'); return; }
+      state.coach = v ? { sportKey:_primary.sport_key, level:v } : null;
+      toast(v?'Coach\'s Corner on 🧠':'Coach\'s Corner off');
+    }); }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
 }
 function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }

@@ -24,4 +24,4 @@ function ageFrom(bd){ if(!bd) return null;
   let a=n.getFullYear()-d.getFullYear(); if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--; return a; }
 
 // ---------- app state ----------
-const state = { user:null, ref:null, athletes:[], active:null, activeSportKey:null };
+const state = { user:null, ref:null, athletes:[], active:null, activeSportKey:null, coach:null };

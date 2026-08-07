@@ -50,11 +50,183 @@ const SKILLS={
   baseball:{mid:[{title:'Throwing & fielding', dur:'15 min', why:'Accurate throws and soft hands are the base of infield/outfield play.', how:['Warm up the arm gradually','20 accurate throws to a target','Field 15 grounders — glove out front, soft hands'], say:'"Line up, step, and throw to the chest."', mistake:'Rushing the throw before securing the catch.', stop:'Respect arm fatigue — no over-throwing.'}]},
   softball:{mid:[{title:'Fielding & hitting', dur:'15 min', why:'Clean fielding and a balanced swing build all-around players.', how:['Field 15 grounders — soft hands, glove out front','Tee work — 20 balanced swings, level path','Accurate throws to a target'], say:'"Watch it into the glove, then throw."', mistake:'Standing up too early on grounders.', stop:'Stop if the swing or arm gets tired and sloppy.'}]},
   track:{mid:[{title:'Sprint form & drills', dur:'15 min', why:'Good mechanics make every athlete faster and safer.', how:['A-skips and high-knees — 2× each','4 × 20-yard build-ups (accelerate, then relax)','Full walk-back recovery'], say:'"Tall posture, quick feet, relaxed face."', mistake:'Sprinting hard with no warm-up.', stop:'Full recovery between runs; stop if hamstrings tighten.'}]},
+  tennis:{
+    young:[{title:'Rally & control', dur:'8–10 min', why:'Lots of easy contact builds feel and confidence.', how:['Bounce-and-hit with a parent or wall, soft and controlled','Split-step and move to the ball','Contact out front, both sides'], say:'"Watch it, meet it out front, smooth swing."', mistake:'Swinging too hard.', stop:'Keep rallies playful; hydrate.'}],
+    mid:[{title:'Groundstrokes & movement', dur:'15 min', why:'Consistency and footwork win youth tennis.', how:['20 forehands and 20 backhands to targets, low-to-high','Split-step and recover to the middle','Serve toss and a smooth motion'], say:'"Prepare early, low to high, recover."', mistake:'Standing still and reaching.', stop:'Rest the shoulder on serves; warm up first.'}],
+    old:[{title:'Serve +1 & point play', dur:'20 min', why:'Linking a serve to the next ball and building points is how matches are won.', how:['Warm up thoroughly','Serve to targets, then play the first ball with intent','Patterns: serve wide, then hit the open court','Live points to a set score'], say:'"Serve with a plan, then take the first ball."', mistake:'No plan after the serve.', stop:'Warm up the shoulder; stop on any joint pain.'}],
+  },
+  swimming:{
+    young:[{title:'Body position & kick (with a lifeguard)', dur:'8–10 min', why:'A long, flat body and a steady kick are the base of every stroke.', how:['Streamline push-offs, arms by the ears','Flutter kick with a board, small fast kicks','Rhythmic breathing and bubbles'], say:'"Long and flat, small fast kicks, blow bubbles."', mistake:'Kicking from the knees or lifting the head.', stop:'Always with a lifeguard; never swim alone or hold your breath for games.'}],
+    mid:[{title:'Stroke technique (with a lifeguard)', dur:'15 min', why:'Clean technique and relaxed breathing make swimming efficient.', how:['Stroke drills (catch-up freestyle, 6-kick switch)','Bilateral or rhythmic breathing','Easy laps on one cue'], say:'"Long strokes, steady breathing, relax."', mistake:'Short, choppy strokes.', stop:'Always supervised; get out if cold or tired.'}],
+    old:[{title:'Sets, pacing & turns (with a lifeguard)', dur:'20–30 min', why:'Structured sets, pacing, and clean turns build a real swimmer — with recovery.', how:['Warm up','Technique and aerobic sets on an interval','Flip turns and streamline off every wall','Cool down'], say:'"Hold your technique when it gets tired — that is the work."', mistake:'Junk yardage with sloppy form.', stop:'Always with a lifeguard; respect fatigue and never do breath-holding sets.'}],
+  },
+  wrestling:{
+    young:[{title:'Stance & motion', dur:'8–10 min', why:'A good stance and moving well are the safe base of wrestling.', how:['Athletic stance: knees bent, hands ready, head up','Move: forward, back, circle','Level changes, back straight'], say:'"Low stance, head up, quick feet."', mistake:'Bending at the waist.', stop:'No live wrestling or takedowns at home.'}],
+    mid:[{title:'Shots, sprawls & conditioning', dur:'15 min', why:'Shot footwork and a strong base translate to the mat — trained solo, safely.', how:['Penetration step to a pad (no partner)','Sprawl and recover to the stance','Bodyweight conditioning: bear crawls, squats, planks'], say:'"Change levels, drive on balance, back to your stance."', mistake:'Dropping the head or lunging.', stop:'Live wrestling only at practice with a coach and mats.'}],
+    old:[{title:'Drilling & conditioning', dur:'20–25 min', why:'Repeating positions and hard conditioning build a varsity wrestler — live goes at practice.', how:['Solo drill shots, level changes, and stance-to-base','Hard bodyweight and core conditioning circuit','Hip and shoulder mobility'], say:'"Perfect reps solo, then live it up at practice."', mistake:'Trying live moves on hard ground at home.', stop:'No slamming or live wrestling at home — coach, partner, and mats only.'}],
+  },
 };
 // ---- position-specific skill work (keyed by sport → position code → band bucket) ----
 // When an athlete has positions selected, the weekly plan pulls drills for THOSE
 // positions first (e.g. a QB/RB gets a QB drill and an RB drill), then falls back
-// to the sport's general skills, then to GENERIC_SKILL. Football is built out first.
+// to the sport's general skills, then to GENERIC_SKILL.
+// Shared sets first, for positions that train alike:
+const _FB_DB={ // football defensive backs (CB, S)
+  young:[
+    {title:'Backpedal & break', dur:'8–10 min', why:'A smooth backpedal and a quick break on the ball are the base of every defensive back.', how:['Backpedal 5 yards staying low, then break forward on a clap','Catch a soft toss at the break','5 reps each way, full walk-back'], say:'"Stay low, eyes up, break on the ball."', mistake:'Standing tall or crossing the feet.', stop:'Non-contact and fun.'},
+    {title:'Mirror & react', dur:'6–8 min', why:'Staying in front of a moving target builds the footwork every DB needs.', how:['Face a parent and shuffle to mirror them left and right','React to a point and sprint 5 yards','Rest and repeat'], say:'"Feet ready, mirror me, then go."', mistake:'Lunging instead of shuffling.', stop:'Full rest between reps.'},
+  ],
+  mid:[
+    {title:'Coverage footwork', dur:'15 min', why:'Clean backpedal, hip-turn, and break let a DB stay on top of routes.', how:['Backpedal, open the hips, and run — both directions','Break on a thrown ball and high-point the catch','5–6 reps with full recovery'], say:'"On top, in phase, play the ball."', mistake:'Opening the hips late or grabbing.', stop:'Non-contact; rest between reps.'},
+    {title:'Ball skills', dur:'10 min', why:'Interceptions come from tracking and catching — DBs are athletes who can catch.', how:['High-point 15 thrown balls at the top of a break','Track over-the-shoulder catches, both shoulders','Tuck every one away'], say:'"Find it, high-point it, tuck it."', mistake:'Batting the ball down instead of catching.', stop:'Rest if focus fades.'},
+  ],
+  old:[
+    {title:'Press, zone & film', dur:'20 min', why:'Advanced DBs win with press technique, zone eyes, and studying tendencies on film.', how:['Press footwork: patient hands, mirror the release','Zone drops with eyes on the QB, break on the throw','Film a route concept and call the coverage'], say:'"Patient hands, eyes on your key, drive on the throw."', mistake:'Grabbing early or peeking without leverage.', stop:'Non-contact; care for hamstrings with a full warm-up.'},
+  ],
+};
+const _BB_IF={ // baseball infield (1B, 2B, 3B, SS, UTIL)
+  young:[
+    {title:'Soft-hands grounders', dur:'8–10 min', why:'Fielding a ground ball with soft hands out front is the first infield skill.', how:['Roll 15 grounders; field with the glove out front, funnel to the belly','Athletic stance, butt down','Say "ball" and watch it into the glove'], say:'"Glove out front, watch it in, soft hands."', mistake:'Reaching back or standing straight up.', stop:'Use a soft ball for young infielders.'},
+    {title:'Field & flip', dur:'6–8 min', why:'Fielding then making a quick, accurate flip builds infield rhythm.', how:['Field a grounder and flip to a parent at a base','Step toward the target','5 reps, alternate directions'], say:'"Field, step, throw to the chest."', mistake:'Throwing before securing the ball.', stop:'Easy throws — protect young arms.'},
+  ],
+  mid:[
+    {title:'Field, footwork & throw', dur:'15 min', why:'Getting into a good throwing position quickly turns fielding into outs.', how:['Field 15 grounders, working through the ball with the feet','Set the feet and throw accurately to a target','Add a few backhands and short-hops'], say:'"Round it off, work through it, throw on line."', mistake:'Fielding flat-footed and throwing off balance.', stop:'Warm up first; respect arm fatigue.'},
+    {title:'Double-play footwork', dur:'10 min', why:'Quick, clean feet at the bag turn two — footwork before speed.', how:['Practice the pivot and feed at a base','Catch, tag the bag, and clear','Slow and correct, then a bit quicker'], say:'"Catch it clean, then quick feet."', mistake:'Rushing the feed and dropping the exchange.', stop:'Non-contact; no sliding into anyone.'},
+  ],
+  old:[
+    {title:'Range, exchanges & double plays', dur:'20 min', why:'Varsity infield is about range, clean exchanges, and turning two under pressure.', how:['Field to both sides with crossover reads','Fast, clean glove-to-hand exchanges','Turn the double play from both bags with quick feet'], say:'"Get to it early, clean exchange, quick and accurate."', mistake:'Slow exchange or throwing off balance.', stop:'Warm up the arm fully; respect volume.'},
+  ],
+};
+const _BK_BIG={ // basketball bigs (PF, C)
+  young:[
+    {title:'Layups & rebounds', dur:'8–10 min', why:'Finishing at the rim and grabbing the ball are what young bigs do best.', how:['10 layups each side, soft off the glass','Toss the ball off the backboard and rebound it strong','Chin the ball after every grab'], say:'"Two hands, chin it, finish high."', mistake:'Bringing the ball down low after a rebound.', stop:'Keep it fun; no contact under the rim.'},
+    {title:'Box out & post-up', dur:'6–8 min', why:'Getting position early is a big-man superpower — and it starts with feet, not muscle.', how:['Practice a box-out turn and hold position','Post up, receive a pass, pivot','Finish with a layup'], say:'"Find your man, turn, and hold your spot."', mistake:'Pushing with the arms instead of using the body.', stop:'Non-contact reps at home.'},
+  ],
+  mid:[
+    {title:'Post footwork & finishing', dur:'15 min', why:'Drop steps and up-and-unders let a big score without jumping over anyone.', how:['Drop step to the middle and the baseline','Up-and-under counter','10 finishes each move, both hands'], say:'"Read the defender, counter, finish soft."', mistake:'Rushing into a jump hook with no footwork.', stop:'Rest if the shot gets forced.'},
+    {title:'Rebounding & outlet', dur:'10 min', why:'Securing the board and starting the break makes a big valuable at both ends.', how:['Rebound off the backboard, land balanced, chin it','Pivot and make a strong outlet pass','8–10 reps'], say:'"Grab it high, chin it, outlet quick."', mistake:'Bringing the ball down where guards can strip it.', stop:'Controlled effort; rest as needed.'},
+  ],
+  old:[
+    {title:'Post moves, face-up & pick-and-roll', dur:'20 min', why:'A complete big scores with the back to the basket, faces up, and finishes the roll.', how:['Counter series: drop step, up-and-under, jump hook both hands','Face-up jab and one-dribble finish','Roll to the rim and finish off two feet'], say:'"Read the defender, counter, finish strong."', mistake:'Predictable moves with no counter.', stop:'Warm up the knees; stop if a finish gets reckless.'},
+  ],
+};
+const _SOC_ATT={ // soccer attackers (FW, WING)
+  young:[
+    {title:'Dribble & finish', dur:'8–10 min', why:'Dribbling with control and shooting on goal are the fun heart of attacking play.', how:['Dribble through 4 cones with close touches','Finish into a small goal or target','Both feet, 8–10 reps'], say:'"Small touches, then pick your spot."', mistake:'Big kicks that lose the ball.', stop:'Keep it playful.'},
+    {title:'First touch to shot', dur:'6–8 min', why:'A good first touch sets up a quick shot before defenders recover.', how:['Receive a pass, take one settling touch, then shoot','Both feet','5–6 reps'], say:'"Touch, look, finish."', mistake:'Taking too many touches before shooting.', stop:'Rest if touches get sloppy.'},
+  ],
+  mid:[
+    {title:'Finishing & 1v1', dur:'15 min', why:'Beating a defender and finishing calmly is what separates attackers.', how:['1v1 moves (cut, step-over) past a cone or parent','Finish low and placed, both feet','Near-post and far-post finishes'], say:'"Commit the defender, then finish calm."', mistake:'Blasting every shot instead of placing it.', stop:'Warm up first; rest between reps.'},
+    {title:'Crossing & runs', dur:'10 min', why:'Timing runs and serving good balls create goals for wingers and forwards.', how:['Dribble the wing and cross to a target zone','Near-post and cut-back crosses','Time a run to finish a served ball'], say:'"Head up, pick the pass, time your run."', mistake:'Crossing with the head down.', stop:'Hydrate and rest as needed.'},
+  ],
+  old:[
+    {title:'Finishing under pressure & movement', dur:'20 min', why:'Advanced attackers create separation, finish first-time, and read the last defender.', how:['First-time finishes from crosses and cut-backs','Check-away and spin to create space','Read offside and time runs in behind'], say:'"Move to create space, finish first-time, stay onside."', mistake:'Static movement and heavy touches near goal.', stop:'Full warm-up; rest between reps.'},
+  ],
+};
+const _CHEER_STUNT={ // cheer bases & backspots (BASE, BACK)
+  young:[
+    {title:'Strong body & motions', dur:'8–10 min', why:'Bases and backspots build the strength and sharp motions every stunt is built on — safely, on the ground.', how:['Sharp High-V, T, and Touchdown motions, held still','Wall sits and plank holds for a strong base','Squat-and-stand with tall posture'], say:'"Strong legs, sharp arms, steady base."', mistake:'Trying to lift or stunt at home.', stop:'No stunting at home — stunts belong at the gym with a coach and mats.'},
+    {title:'Grips & counts (no lift)', dur:'6–8 min', why:'Clean hand grips and timing on the ground prepare a base with no risk.', how:['Practice hand positions and timing counts on the ground','Load-in footwork with no flyer','Call the counts out loud together'], say:'"Feet set, grips ready, hit on the count."', mistake:'Practicing lifts without a coach or spotter.', stop:'Absolutely no stunting or tossing at home.'},
+  ],
+  mid:[
+    {title:'Stunt conditioning', dur:'15 min', why:'A strong core, shoulders, and legs keep bases and backspots safe as stunts get harder.', how:['Hollow-body holds 3×20s','Wall handstand holds 3×15–20s','Squats and calf raises for the legs'], say:'"Strong body first, then safe skills at the gym."', mistake:'Attempting new stunts outside of practice.', stop:'Stunting only at the gym with coaches and mats — never at home.'},
+    {title:'Motions, voice & timing', dur:'10 min', why:'Synced, sharp motions and loud counts are what make a stunt group work.', how:['Run motion sequences in a mirror, freezing each hit','Call counts loudly and in sync','Film one and review'], say:'"Hit it, hold it, call it loud."', mistake:'Soft motions or off-count timing.', stop:'Rest the voice if hoarse; hydrate.'},
+  ],
+  old:[
+    {title:'Advanced stunt conditioning', dur:'20 min', why:'Varsity bases and backspots need serious core, shoulder, and leg strength plus dialed timing — the strength work is done at home, the stunts at the gym.', how:['Core circuit: hollow rocks, planks, hip thrusts','Overhead and shoulder stability holds','Footwork and count timing on the ground with the group'], say:'"Own the strength here, own the stunt at the gym."', mistake:'Practicing tosses or new stunts anywhere but coached practice.', stop:'All stunting and tumbling only at the gym with coaches and mats — never at home.'},
+  ],
+};
+const _VB_HIT={ // volleyball hitters (OH, OPP)
+  young:[
+    {title:'Approach & swing', dur:'8–10 min', why:'A rhythmic 3-step approach and full arm swing are the base of every hitter.', how:['Practice the approach steps, arms swinging back and up','Swing at a ball held high or a gentle self-toss','Land on two feet, balanced'], say:'"Approach, jump, swing tall — reach for the sky."', mistake:'One-foot landings or a short-arm swing.', stop:'Use a soft/beach ball; jump onto a soft surface.'},
+    {title:'Hands & control', dur:'6–8 min', why:'Ball control makes a hitter versatile.', how:['Forearm bumps to yourself, 10 in a row','Toss-and-catch in ready position','Simple pass to a parent'], say:'"Flat platform, use your legs."', mistake:'Swinging the arms instead of the legs.', stop:'Soft ball to protect young forearms.'},
+  ],
+  mid:[
+    {title:'Attack approach & arm swing', dur:'15 min', why:'Timing the approach and a fast arm swing turn a hit into a kill.', how:['Approach and swing at a tossed ball to a target zone','Practice hitting line and cross-court','Cover after every swing'], say:'"High point, snap the wrist, aim for the floor."', mistake:'Approaching too early or a slow arm swing.', stop:'Jump onto a good surface; rest the shoulder.'},
+    {title:'Serving & serve-receive', dur:'10 min', why:'Consistent serving and clean passing win youth volleyball.', how:['10 serves to zones (underhand or float by age)','Forearm passes from a toss to a target','Move the feet to the ball'], say:'"Toss steady, contact firm, aim your serve."', mistake:'Reaching instead of moving the feet.', stop:'Rest wrists and forearms if sore.'},
+  ],
+  old:[
+    {title:'Shot selection, tooling & serving', dur:'20 min', why:'Elite hitters vary shots, tool the block, and serve aggressively with control.', how:['Hit line, cross, and high-hands off the block','Roll shots and tips to open zones','Jump or float serve to targets under control'], say:'"See the block, pick your shot, finish smart."', mistake:'Swinging the same shot every time.', stop:'Land soft; protect the shoulder and knees.'},
+  ],
+};
+const _VB_BACK={ // volleyball back row (L, DS)
+  young:[
+    {title:'Passing & ready position', dur:'8–10 min', why:'Back-row players live in a low, ready stance and pass the ball steady.', how:['Hold a low ready stance, weight forward','Forearm pass a soft toss to a target, 10 reps','Shuffle to the ball, do not reach'], say:'"Low and ready, beat the ball to the spot."', mistake:'Standing tall or swinging the arms.', stop:'Soft ball for young forearms.'},
+  ],
+  mid:[
+    {title:'Passing & digging', dur:'15 min', why:'A libero or defensive specialist controls the back row with platform passing and quick digs.', how:['Platform passes to a target from tosses and hits','Practice a dig and a sprawl on a soft floor','Read the hitter and move early'], say:'"Angle your platform, quiet arms, move your feet."', mistake:'Late feet and swinging at the ball.', stop:'Dig on a soft surface; rest as needed.'},
+  ],
+  old:[
+    {title:'Serve-receive systems & digging', dur:'20 min', why:'A varsity libero anchors serve-receive and reads hitters to dig hard-driven balls.', how:['Serve-receive passing to a setter target from tough serves','Read the hitter and dig line and cross','Pursuit and up-ball to a target under control'], say:'"Read early, platform to target, pursue everything."', mistake:'Guessing instead of reading the hitter.', stop:'Dig on a good surface; rest as needed.'},
+  ],
+};
+const _TR_ENDUR={ // track middle/distance (MID, DIST)
+  young:[
+    {title:'Easy runs & games', dur:'8–10 min', why:'Young distance runners build a love of running through easy, fun movement.', how:['Easy jog with a parent, chatting the whole time','Mix in skipping and a few playful pickups','Keep it comfortable and fun'], say:'"Easy and breezy — we can talk the whole way."', mistake:'Running too hard, too young.', stop:'Stop if it stops being fun; hydrate.'},
+  ],
+  mid:[
+    {title:'Pacing & aerobic base', dur:'15 min', why:'Learning to run relaxed at an easy pace builds the engine for middle and distance events.', how:['Easy continuous run at a talking pace','Add 3–4 relaxed 20-second pickups','Cool down with an easy jog and stretch'], say:'"Relaxed and steady beats fast and gassed."', mistake:'Turning every run into a race.', stop:'Respect fatigue; build mileage gradually.'},
+  ],
+  old:[
+    {title:'Structured runs & pacing', dur:'25–30 min', why:'Middle and distance runners build fitness with easy volume plus controlled quality — dosed with recovery.', how:['Easy run at conversational pace','A controlled tempo or cruise-interval segment','Strides and a cool-down; log the effort'], say:'"Easy days easy, hard days controlled — never all-out."', mistake:'Running every day hard.', stop:'Build mileage about 10% at a time; back off on pain or heavy fatigue.'},
+  ],
+};
+const _GYM_BASE={ // gymnastics — safe at-home shapes/flexibility/conditioning (all events)
+  young:[
+    {title:'Shapes & flexibility', dur:'8–10 min', why:'Tight shapes and flexibility are the foundation of every gymnastics skill — built safely on the floor.', how:['Hollow and arch holds, 3×15s','Bridge and a gentle backbend','Straddle and pike stretches'], say:'"Squeeze tight, point your toes, hold it still."', mistake:'Forcing flexibility or bouncing.', stop:'Beam, bars, and vault skills belong at the gym with coaches and mats — not at home.'},
+    {title:'Handstand & balance', dur:'6–8 min', why:'Handstand shape and balance carry into everything.', how:['Wall handstand holds, 3×10–15s','Tall relevé balance, 10s each foot','Straight jump to a soft landing'], say:'"Tall, tight, and squeezed — like a pencil."', mistake:'Arched (banana) handstand.', stop:'Handstands against a wall or on soft ground only.'},
+  ],
+  mid:[
+    {title:'Strength & flexibility', dur:'15 min', why:'Core, shoulder, and leg strength plus flexibility keep gymnasts safe as skills advance.', how:['Hollow-body and arch holds, 3×20s','Wall handstand holds, 3×15–20s','Splits progressions and bridge, both sides'], say:'"Strong and flexible first, then skills at the gym."', mistake:'Training new skills at home without mats or a coach.', stop:'All apparatus and tumbling skills belong at the gym with coaches and mats.'},
+  ],
+  old:[
+    {title:'Advanced conditioning & flexibility', dur:'20 min', why:'Elite gymnasts need serious strength and flexibility — safely trainable at home, while skills stay at the gym.', how:['Hollow and arch leg lifts and rocks, 3 sets','Press-shape and handstand strength against a wall','Oversplit progressions and shoulder flexibility, controlled'], say:'"Strength and flexibility here; skills on the equipment at the gym."', mistake:'Attempting beam, bar, or vault skills at home.', stop:'All apparatus and tumbling belong at the gym with coaches and mats.'},
+  ],
+};
+const _DANCE_TECH={ // dance technique base (BALLET-adjacent styles)
+  young:[
+    {title:'Positions & motions', dur:'8–10 min', why:'Clean positions and staying on the beat are the base of every dance style.', how:['Practice foot and arm positions','Simple steps on the count','Hold each pose still and tall'], say:'"Tall posture, sharp on the beat."', mistake:'Rushing the counts.', stop:'Keep it fun.'},
+  ],
+  mid:[
+    {title:'Technique & combos', dur:'15 min', why:'Clean technique and control make any routine look effortless.', how:['Warm up, then a combo slowly, then up to tempo','Balance holds, relevé 10s each side','Practice one turn or leap with good form'], say:'"Control it — dance is strength you cannot see."', mistake:'Skipping the warm-up before big movements.', stop:'Sharp joint pain (ankles or knees), stop and rest.'},
+  ],
+  old:[
+    {title:'Technique, turns & performance', dur:'20 min', why:'Advanced dancers refine clean lines, multiple turns, and performance quality.', how:['Full warm-up and center work','Turn progressions (doubles) and controlled leaps','Run a combo full-out for performance quality, then film and refine'], say:'"Clean lines, strong core, dance it full-out."', mistake:'Marking instead of committing to performance quality.', stop:'Warm up fully; sharp ankle or knee pain, stop.'},
+  ],
+};
+const _TEN={ // tennis base (singles-adjacent)
+  young:[
+    {title:'Ready, rally & control', dur:'8–10 min', why:'Young players build feel with lots of easy contact and movement.', how:['Bounce-and-hit against a wall or with a parent, soft and controlled','Ready position, split-step, move to the ball','Forehand and backhand contact out front'], say:'"Watch the ball, meet it out front, smooth swing."', mistake:'Swinging too hard and missing.', stop:'Keep rallies playful; hydrate.'},
+  ],
+  mid:[
+    {title:'Groundstrokes & movement', dur:'15 min', why:'Consistent forehands and backhands plus good footwork win youth tennis.', how:['20 forehands and 20 backhands to targets, low-to-high swing','Split-step and recover to the middle after each shot','Practice a smooth serve toss and motion'], say:'"Prepare early, low to high, recover to the middle."', mistake:'Standing still and reaching.', stop:'Rest the shoulder on serves; warm up first.'},
+  ],
+  old:[
+    {title:'Point patterns & serve +1', dur:'20 min', why:'Advanced singles is built on serve +1, consistent depth, and smart patterns.', how:['Warm up thoroughly','Serve to targets, then attack the first ball','Rally with depth and change direction with purpose','Play live points with a pattern in mind'], say:'"Heavy, deep, and patient — then attack the short ball."', mistake:'Going for too much with no pattern.', stop:'Warm up the shoulder; stop on joint pain.'},
+  ],
+};
+const _SWIM_BASE={ // swimming — always supervised; stroke technique base (all strokes)
+  young:[
+    {title:'Body position & kick', dur:'8–10 min (with a lifeguard)', why:'A long, flat body and a steady kick are the base of every stroke.', how:['Streamline push-offs, arms squeezed by the ears','Flutter kick with a board, small fast kicks','Blow bubbles and practice rhythmic breathing'], say:'"Long and flat, small fast kicks, blow your bubbles."', mistake:'Kicking from the knees or lifting the head.', stop:'Always with a lifeguard or adult; never swim alone and never hold your breath for games.'},
+  ],
+  mid:[
+    {title:'Stroke technique & breathing', dur:'15 min (with a lifeguard)', why:'Clean technique and relaxed breathing make swimming efficient and fun.', how:['Drills for your stroke (catch-up freestyle, 6-kick switch, and similar)','Bilateral or rhythmic breathing','Easy laps focusing on one cue'], say:'"Long strokes, steady breathing, relax."', mistake:'Rushing with short, choppy strokes.', stop:'Always supervised by a lifeguard; get out if cold or tired — no breath-holding games.'},
+  ],
+  old:[
+    {title:'Sets, pacing & turns (with a lifeguard)', dur:'20–30 min', why:'Advanced swimmers hold technique through structured sets, pace, and race turns — always supervised.', how:['Warm up','Technique and aerobic sets on an interval','Flip turns, streamline, and underwater kick off every wall','Cool down'], say:'"Hold your stroke when it gets hard — that is racing."', mistake:'Junk yardage with breaking form.', stop:'Always with a lifeguard; respect fatigue and never breath-hold.'},
+  ],
+};
+const _WR={ // wrestling — stance/motion/conditioning; no live contact at home (all styles)
+  young:[
+    {title:'Stance & motion', dur:'8–10 min', why:'A good stance and moving well are the safe foundation of wrestling — no live contact needed.', how:['Athletic stance: knees bent, hands ready, head up','Move in the stance: forward, back, circle','Level changes: bend the knees, keep the back straight'], say:'"Low stance, head up, quick feet."', mistake:'Standing tall or bending at the waist.', stop:'No live wrestling or takedowns at home — stance and motion only.'},
+  ],
+  mid:[
+    {title:'Level change, penetration & conditioning', dur:'15 min', why:'Shot footwork and a strong base translate to the mat — trained safely without a partner.', how:['Level change and penetration step to a pad (no partner)','Sprawl and return to the stance','Bodyweight conditioning: bear crawls, squats, planks'], say:'"Change levels, drive on balance, back to your stance."', mistake:'Dropping the head or lunging off balance.', stop:'Live wrestling belongs at practice with a coach and mats — never wrestle on hard ground.'},
+  ],
+  old:[
+    {title:'Solo drilling & hard conditioning', dur:'20–25 min', why:'Varsity wrestlers groove positions solo and build a big engine — live goes at practice.', how:['Drill shots, level changes, and stance-to-base solo','Hard bodyweight and core conditioning circuit','Gentle, controlled neck, hip, and shoulder mobility'], say:'"Perfect solo reps, then wrestle live at practice."', mistake:'Live moves or slamming on hard ground at home.', stop:'No live wrestling at home — coach, partner, and mats only.'},
+  ],
+};
 const POSITION_SKILLS={
   football:{
     QB:{
@@ -91,7 +263,311 @@ const POSITION_SKILLS={
         {title:'Routes & releases', dur:'15 min', why:'Sharp cuts and a clean release get a receiver open — footwork wins routes.', how:['Run simple routes (slant, out, hitch), planting hard at the top','Catch 15 on-the-move balls, eyes to the tuck','Add a quick release step off the line'], say:'"Sell it, snap the cut, look it in."', mistake:'Rounding cuts or drifting.', stop:'Rest if legs or hands get tired and sloppy.'},
       ],
     },
+    TE:{
+      young:[
+        {title:'Catch & tuck', dur:'8–10 min', why:'A tight end is a big receiver first — reliable hands and a quick tuck.', how:['15 soft catches, look it in','Catch and tuck, then jog 5 yards','A few catches over each shoulder'], say:'"Look it in, tuck it away."', mistake:'Body catches or early turns upfield.', stop:'Light and fun; no contact.'},
+        {title:'Block stance & steps (no contact)', dur:'6–8 min', why:'Good stance and first steps are the safe foundation of blocking.', how:['Athletic stance, hands ready','Short choppy first steps to a hand shield a parent holds lightly','Stay square and balanced'], say:'"Low, square, hands inside."', mistake:'Standing tall or lunging.', stop:'No live contact — footwork and shields only.'},
+      ],
+      mid:[
+        {title:'Routes & sealing', dur:'15 min', why:'Tight ends win with sharp short routes and by sealing defenders.', how:['Run stick, out, and seam routes, planting hard','Catch 15 on-the-move balls','Practice a seal turn against a bag'], say:'"Sharp cut, catch, and seal your man."', mistake:'Rounding routes.', stop:'Non-contact; rest between reps.'},
+      ],
+    },
+    K:{
+      young:[
+        {title:'Kick off a tee', dur:'8–10 min', why:'A clean strike off a tee builds the contact and confidence a young kicker needs.', how:['Line up 2–3 steps back and to the side','Strike through the bottom third with the instep','10 kicks at a target, reset each time'], say:'"Plant, strike through it, follow through to the target."', mistake:'Toe-poking or looking up early.', stop:'Keep the volume low for young legs.'},
+      ],
+      mid:[
+        {title:'Plant & follow-through', dur:'15 min', why:'A consistent plant foot and follow-through make field goals repeatable.', how:['Measure steps (back and over)','Plant beside the ball, strike, follow through to the target','10–15 kicks, track your makes'], say:'"Same steps, same strike, every time."', mistake:'Inconsistent plant or decelerating through the ball.', stop:'Rest the leg; stop if the hip or knee aches.'},
+      ],
+    },
+    ATH:{
+      young:[
+        {title:'All-around athlete', dur:'10 min', why:'Young all-purpose players win by being great movers — run, catch, and change direction.', how:['Catch 10 tosses, then sprint to a cone','Weave through cones with the ball high and tight','A few quick change-of-direction races'], say:'"Do a little of everything — have fun moving fast."', mistake:'Over-specializing too young.', stop:'Keep it playful; full rest.'},
+      ],
+      mid:[
+        {title:'Multi-skill circuit', dur:'15 min', why:'Versatile players train catching, ball security, and agility together.', how:['3 stations: catching, ball-security cone runs, agility ladder','2 rounds, walk-back rest','Finish with a fun 1-on-1 move'], say:'"Sharp at everything — that is your edge."', mistake:'Skipping ball security when catching.', stop:'Non-contact; rest between rounds.'},
+      ],
+    },
+    CB:_FB_DB,
+    S:_FB_DB,
+    LB:{
+      young:[
+        {title:'Shuffle & react', dur:'8–10 min', why:'Linebackers read and move — shuffling and reacting is the safe base to train young.', how:['Shuffle side to side staying low','React to a point and sprint 5 yards','Practice a soft form-wrap on a bag or pillow, no contact'], say:'"Stay low, read, and go — wrap up soft."', mistake:'Crossing the feet or ducking the head.', stop:'No tackling at home — form and footwork only.'},
+      ],
+      mid:[
+        {title:'Read, fill & pursuit', dur:'15 min', why:'Taking good angles and filling gaps is the thinking part of linebacker play.', how:['Shuffle, read a key, and fill a gap (cones)','Practice pursuit angles to a moving parent','Form-tackle a bag at walking speed, head up and to the side'], say:'"Eyes on your key, right angle, head up."', mistake:'Over-running the play or dropping the head.', stop:'No live contact; heads-up form only — save tackling for coached practice.'},
+      ],
+    },
+    DL:{
+      young:[
+        {title:'Get-off & hands', dur:'8–10 min', why:'The first step and good hands are what young defensive linemen win with.', how:['Explode off the line on "GO" for 5 yards','Two-hand punch on a bag a parent holds lightly','Reset and repeat'], say:'"First step wins — hands ready, explode."', mistake:'Standing up out of the stance.', stop:'Bag work only — no live contact.'},
+      ],
+      mid:[
+        {title:'Stance, first-step & shed', dur:'15 min', why:'A powerful stance, quick first step, and hand use let a lineman shed blocks.', how:['3-point stance, explode on the snap','Punch and shed a bag','Practice a swim or rip move on a stand-up bag'], say:'"Low, fast, hands inside, then shed and go."', mistake:'Rising up and losing leverage.', stop:'Bags and shields only; no live contact at home.'},
+      ],
+    },
+    OL:{
+      young:[
+        {title:'Stance & steps (no contact)', dur:'8–10 min', why:'Balance and footwork come first for young linemen — before any contact.', how:['Balanced stance, weight on the balls of the feet','Short kick-slide and drive steps','Hands inside, eyes up'], say:'"Low base, quick feet, hands inside."', mistake:'Leaning or crossing the feet.', stop:'Footwork only — no contact.'},
+      ],
+      mid:[
+        {title:'Pass-set & drive footwork', dur:'15 min', why:'Clean pass sets and drive steps are the foundation of blocking.', how:['Kick-slide pass sets, staying square','Drive-block footwork into a bag','Punch timing on a held shield'], say:'"Set square, punch on time, move your feet."', mistake:'Lunging and getting off balance.', stop:'Shields and bags only; save live contact for coached practice.'},
+      ],
+    },
   },
+  baseball:{
+    P:{
+      young:[
+        {title:'Balance & throw', dur:'8–10 min', why:'Young pitchers build a smooth motion from balance, not speed.', how:['Balance on the back leg, then stride and throw','15 easy throws to a target, hit the glove','Reset each time'], say:'"Balance, stride, and throw to the glove."', mistake:'Rushing forward off balance.', stop:'Limit throws — protect young arms; no chasing velocity.'},
+      ],
+      mid:[
+        {title:'Mechanics & control', dur:'15 min', why:'Repeatable mechanics build control — control matters far more than speed at this age.', how:['Warm up the arm gradually','Work the motion: balance, stride, land, release to spots','Throw to inside and outside targets, track strikes'], say:'"Same motion, hit your spots — control over speed."', mistake:'Overthrowing for velocity.', stop:'Respect pitch counts and rest days; any elbow or shoulder pain, stop and rest.'},
+      ],
+    },
+    C:{
+      young:[
+        {title:'Receiving & blocking (soft ball)', dur:'8–10 min', why:'Catching and blocking start with a relaxed, ready stance and soft hands.', how:['Receive soft tosses, giving a target','Practice dropping to block a ball in front','Use a soft ball to stay safe'], say:'"Give a target, receive it soft, block it in front."', mistake:'Stabbing at the ball.', stop:'Soft ball only for young catchers; full gear at practice.'},
+      ],
+      mid:[
+        {title:'Framing & footwork', dur:'15 min', why:'Quiet receiving and quick feet make a catcher a difference-maker.', how:['Frame borderline pitches quietly to the zone','Throw-down footwork: catch, replace the feet, throw','Blocking drops to both sides'], say:'"Quiet glove, quick feet, strong throw."', mistake:'Jabbing the glove or slow feet.', stop:'Warm up the arm; rest to protect it.'},
+      ],
+    },
+    "1B":_BB_IF, "2B":_BB_IF, "3B":_BB_IF, SS:_BB_IF, UTIL:_BB_IF,
+    OF:{
+      young:[
+        {title:'Fly balls & drop step', dur:'8–10 min', why:'Tracking fly balls and a good first step are the outfielder basics.', how:['Catch 10 soft fly balls with two hands overhead','Practice a drop step and go on a point','Get behind the ball'], say:'"Two hands up, catch it over your head."', mistake:'Backpedaling instead of turning and running.', stop:'Soft balls; keep it fun.'},
+      ],
+      mid:[
+        {title:'Reads & throws', dur:'15 min', why:'Good routes and strong, accurate throws turn hits into outs.', how:['Take routes to fly balls, catch on the throwing side','Crow-hop and throw to a cut-off target','Field grounders and throw on line'], say:'"Good route, catch it moving, crow-hop and throw."', mistake:'Lazy routes or throwing flat-footed.', stop:'Warm up the arm; respect fatigue.'},
+      ],
+    },
+  },
+  basketball:{
+    PG:{
+      young:[
+        {title:'Handle both hands', dur:'8–10 min', why:'A point guard is comfortable with the ball — built through lots of touches.', how:['Dribble 30s right, 30s left, eyes up','Walk and dribble to targets','Simple crossover between cones'], say:'"Fingertips, eyes up, ball on a string."', mistake:'Slapping with the palm and staring down.', stop:'Keep it playful.'},
+      ],
+      mid:[
+        {title:'Handle, passing & pick-and-roll', dur:'15 min', why:'Guards run the team — handling under control and passing on time.', how:['Two-ball or crossover dribble series','Chest and bounce passes to targets on the move','Walk through a basic pick-and-roll read'], say:'"Change speeds, head up, deliver on time."', mistake:'Killing the dribble with no plan.', stop:'Rest if handles get sloppy.'},
+      ],
+    },
+    SG:{
+      young:[
+        {title:'Form shooting', dur:'8–10 min', why:'Clean form up close now becomes a real shot later.', how:['Form shots 3 feet from the rim, perfect arc','One hand, then add the guide hand','20 makes with a good follow-through'], say:'"Balance, eyes, elbow in, follow through."', mistake:'Shooting from too far with broken form.', stop:'Stop if the shot gets flat or heaved.'},
+      ],
+      mid:[
+        {title:'Catch-and-shoot & footwork', dur:'15 min', why:'Shooting guards score by being ready to shoot on the catch.', how:['Hop or 1-2 into the shot on the catch','Catch-and-shoot from 5 spots','Add a shot fake into one-dribble pull-up'], say:'"Feet ready before the catch, same shot every time."', mistake:'Catching flat-footed and rushing.', stop:'Rest to keep form clean.'},
+      ],
+    },
+    SF:{
+      young:[
+        {title:'All-around wing', dur:'8–10 min', why:'Small forwards do a bit of everything — handle, shoot, and drive.', how:['Layups both sides','Form shots up close','Dribble a cone slalom, both hands'], say:'"A little of everything, under control."', mistake:'Only using the strong hand.', stop:'Keep it fun and varied.'},
+      ],
+      mid:[
+        {title:'Wing scoring & defense', dur:'15 min', why:'Wings score off the catch and drive, and guard the other team\'s best player.', how:['Catch-and-shoot and drive-to-finish from the wing','One-to-two-dribble pull-ups','Defensive slides and closeouts'], say:'"Score it or defend it — be the two-way wing."', mistake:'Standing still on defense.', stop:'Rest between reps; hydrate.'},
+      ],
+    },
+    PF:_BK_BIG, C:_BK_BIG,
+  },
+  soccer:{
+    GK:{
+      young:[
+        {title:'Hands & ready stance', dur:'8–10 min', why:'A goalkeeper catches with confidence from a balanced, ready stance.', how:['Set the feet, hands ready, catch soft rolls and tosses','Make a "W" with the hands for high balls, scoop low balls','Hug every catch into the body'], say:'"Set, watch it in, and hug it tight."', mistake:'Catching with stiff, flat hands.', stop:'Soft balls; no diving onto hard ground.'},
+      ],
+      mid:[
+        {title:'Shot-stopping & distribution', dur:'15 min', why:'Set feet, good angles, and clean distribution are the keeper core.', how:['Set-and-catch on shots to both sides','Low dives onto a soft surface only','Roll and throw to a target, then a short goal kick'], say:'"Set feet, big body, catch and start the attack."', mistake:'Diving before setting the feet.', stop:'Dive only on soft ground or mats; protect the wrists and hips.'},
+      ],
+    },
+    DF:{
+      young:[
+        {title:'Contain & clear', dur:'8–10 min', why:'Young defenders learn to stay goal-side and clear the ball.', how:['Shuffle to stay in front of a dribbler, do not dive in','Clear the ball firmly with both feet','Jog back to a goal-side position'], say:'"Stay in front, be patient, then clear it."', mistake:'Diving in and getting beaten.', stop:'Non-contact; keep it fun.'},
+      ],
+      mid:[
+        {title:'Defending & playing out', dur:'15 min', why:'Good 1v1 defending plus calm passing out of the back make a modern defender.', how:['1v1 contain and jockey, win the ball clean','Pass out under light pressure, both feet','Defensive header on a soft tossed ball'], say:'"Patient, goal-side, win it clean, then play."', mistake:'Rushing the tackle.', stop:'Soft ball for headers; rest as needed.'},
+      ],
+    },
+    MF:{
+      young:[
+        {title:'Dribble & pass', dur:'8–10 min', why:'Midfielders touch the ball most — comfort dribbling and passing is key.', how:['Dribble a cone slalom, close touches, both feet','Pass to a wall or parent, cushion the return','Freeze on stop, go on go'], say:'"Small touches, head up, find the pass."', mistake:'Only using the strong foot.', stop:'Keep it playful.'},
+      ],
+      mid:[
+        {title:'First touch, vision & range', dur:'15 min', why:'A great first touch and passing range let a midfielder control the game.', how:['Receive across the body and play the next pass','Short and long passing to targets, both feet','Turn out of pressure (cone), then pass'], say:'"Touch away from pressure, head up, pick the pass."', mistake:'A heavy first touch under pressure.', stop:'Rest if touches get sloppy.'},
+      ],
+    },
+    FW:_SOC_ATT, WING:_SOC_ATT,
+  },
+  cheer:{
+    BASE:_CHEER_STUNT, BACK:_CHEER_STUNT,
+    FLY:{
+      young:[
+        {title:'Tight body & flexibility', dur:'8–10 min', why:'Flyers stay safe by being tight and flexible — trained on the ground, never in the air at home.', how:['Hollow-body holds for total-body tightness, 3×15s','Stretch for a straight jump and scale','Balance on one foot, tall and squeezed'], say:'"Tight everywhere, toes pointed, still as a statue."', mistake:'Being loose or practicing lifts at home.', stop:'No stunting or being lifted at home — gym, coach, and mats only.'},
+      ],
+      mid:[
+        {title:'Flyer strength & flexibility', dur:'15 min', why:'Core strength and flexibility let a flyer hold body positions safely.', how:['Hollow and arch holds, 3×20s','Splits and scale flexibility work','Single-leg balance and tightness holds'], say:'"Strong core, tight body — safe skills at the gym."', mistake:'Practicing stunts outside coached practice.', stop:'Stunting only at the gym with coaches and mats.'},
+      ],
+    },
+    JUMP:{
+      young:[
+        {title:'Mini-jumps & motions', dur:'8–10 min', why:'Sharp arm motions and small jumps onto a soft surface are the base of every jump.', how:['High-V, T, Touchdown — sharp and held','5 tuck jumps onto grass or a mat','Tall, strong stance between jumps'], say:'"Sharp arms, big smile, soft landing."', mistake:'Floppy arms or hard landings.', stop:'Jump onto soft ground; no tumbling at home.'},
+      ],
+      mid:[
+        {title:'Jump technique', dur:'15 min', why:'Higher toe-touches and pikes come from core strength and clean form.', how:['5 tuck jumps — knees up, land soft and quiet','Seated toe-touch stretch for hip flexibility','3× jump straight into a motion'], say:'"Lift from the core, point the toes, land soft."', mistake:'Leading with the head or crashing the landing.', stop:'Tumbling and stunting only at the gym with a coach and mats.'},
+      ],
+    },
+    DANCE:{
+      young:[
+        {title:'Motions & rhythm', dur:'8–10 min', why:'Clean motions and staying on the beat are the base of cheer dance.', how:['Practice sharp motions to a count','Add simple steps on the beat','Hold each pose still'], say:'"Hit every count, sharp and together."', mistake:'Rushing ahead of the beat.', stop:'Keep it fun.'},
+      ],
+      mid:[
+        {title:'Technique & across-the-floor', dur:'15 min', why:'Clean technique and control make a routine look effortless.', how:['Warm up, then a combo slowly, then up to tempo','Balance holds, relevé 10s each side','Sharp, synced motions in a mirror'], say:'"Control it — dance is strength you cannot see."', mistake:'Skipping the warm-up.', stop:'Sharp joint pain — stop and rest.'},
+      ],
+    },
+    TUMB:{
+      young:[
+        {title:'Shapes & flexibility', dur:'8–10 min', why:'Tight body shapes and flexibility are the foundation of every tumbling skill — built safely on the ground.', how:['Hollow and arch holds, 3×15s','Bridge hold and a gentle backbend','Handstand kick-ups against a wall'], say:'"Squeeze everything tight, like a superhero."', mistake:'Forcing flexibility or bouncing.', stop:'Tumbling belongs at the gym with a coach and mats — not on hard ground.'},
+      ],
+      mid:[
+        {title:'Tumbling conditioning', dur:'15 min', why:'Strong core, shoulders, and wrists keep tumblers safe as skills progress.', how:['Hollow-body and arch holds, 3×20s','Wall handstand holds, 3×15–20s','Wrist and shoulder prep'], say:'"Strong and tight first, then skills at the gym."', mistake:'Trying new passes without a coach and mats.', stop:'Never tumble on hard ground; gym, coach, and mats only.'},
+      ],
+    },
+    AA:{
+      young:[
+        {title:'Motions, jumps & voice', dur:'8–10 min', why:'All-around cheerleaders build sharp motions, small jumps, and a loud voice together.', how:['Motion sequence, sharp and held','5 tuck jumps onto a soft surface','Call the chant loud and clear'], say:'"Sharp, loud, and full of energy."', mistake:'Soft motions or a quiet voice.', stop:'Soft landings; no stunting or tumbling at home.'},
+      ],
+      mid:[
+        {title:'All-around skills', dur:'15 min', why:'Bringing motions, jumps, voice, and conditioning together builds a complete cheerleader.', how:['Jump technique reps','Motion and chant in a mirror, synced','Core and shoulder conditioning'], say:'"Do it all — sharp, strong, and loud."', mistake:'Neglecting conditioning.', stop:'Stunting and tumbling only at the gym with a coach and mats.'},
+      ],
+    },
+  },
+  softball:{
+    P:{
+      young:[
+        {title:'Windmill basics', dur:'8–10 min', why:'The windmill motion is different from overhand — a smooth arm circle and a firm wrist snap.', how:['Practice the arm circle slowly, brushing the hip','Wrist snaps for spin, 15 easy pitches to a target','Step and release together'], say:'"Big smooth circle, snap at the hip."', mistake:'Muscling it instead of a relaxed circle.', stop:'Keep volume low; protect young arms and shoulders.'},
+      ],
+      mid:[
+        {title:'Windmill mechanics & control', dur:'15 min', why:'A repeatable windmill and hitting spots matter far more than speed.', how:['Warm up the arm gradually','Full windmill to inside and outside targets','Track strikes; add a change-up feel'], say:'"Same circle, snap, and spot — control first."', mistake:'Overthrowing for speed.', stop:'Respect pitch counts and rest; any shoulder pain, stop.'},
+      ],
+    },
+    C:{
+      young:[
+        {title:'Receiving & blocking', dur:'8–10 min', why:'Catching and blocking start with a ready stance and soft, secure hands.', how:['Receive soft tosses, giving a target','Drop and block a ball in front','Secure with two hands'], say:'"Give a target, receive it soft, block it in front."', mistake:'Stabbing at the ball.', stop:'Soft ball for young catchers; full gear at practice.'},
+      ],
+      mid:[
+        {title:'Framing & throw-downs', dur:'15 min', why:'Quiet receiving and quick feet control the running game.', how:['Frame borderline pitches quietly','Throw-down footwork: catch, replace the feet, throw to a base','Blocks to both sides'], say:'"Quiet glove, quick feet, strong throw."', mistake:'Slow feet on throw-downs.', stop:'Warm up the arm; rest it.'},
+      ],
+    },
+    IF:_BB_IF, UTIL:_BB_IF,
+    OF:{
+      young:[
+        {title:'Fly balls & drop step', dur:'8–10 min', why:'Tracking fly balls and a good first step are the outfield basics.', how:['Catch soft fly balls with two hands overhead','Drop step and go on a point','Get behind the ball'], say:'"Two hands up, catch it over your head."', mistake:'Backpedaling instead of turning and running.', stop:'Soft balls; keep it fun.'},
+      ],
+      mid:[
+        {title:'Reads & throws', dur:'15 min', why:'Good routes and strong, accurate throws turn hits into outs.', how:['Routes to fly balls, catch on the throwing side','Crow-hop and throw to a cut-off','Field grounders and throw on line'], say:'"Good route, catch it moving, crow-hop and throw."', mistake:'Lazy routes or flat-footed throws.', stop:'Warm up the arm; respect fatigue.'},
+      ],
+    },
+  },
+  volleyball:{
+    OH:_VB_HIT, OPP:_VB_HIT,
+    MB:{
+      young:[
+        {title:'Block & jump', dur:'8–10 min', why:'Middle blockers jump a lot — clean footwork and hands pressing over start young.', how:['Practice a block jump: press the hands, land balanced','Quick side shuffle into a block jump','Approach and swing at a high ball'], say:'"Press your hands, jump tall, land soft."', mistake:'Swinging arms instead of pressing over.', stop:'Jump onto a good surface; soft ball.'},
+      ],
+      mid:[
+        {title:'Blocking footwork & quick attack', dur:'15 min', why:'Fast feet to block and a quick approach make a middle a weapon.', how:['Block footwork to the pins and back','Quick-set approach and swing timing','Press and seal the hands over the net'], say:'"Read, move, press — jump on time."', mistake:'Late feet and floating the block.', stop:'Land soft; rest the knees and shoulder.'},
+      ],
+    },
+    S:{
+      young:[
+        {title:'Setting hands', dur:'8–10 min', why:'Soft, symmetric hands and moving to the ball are the setter core.', how:['Set to yourself, 10 in a row, ball off the fingerpads','Set to a wall or parent, quiet hands','Move the feet under the ball, face your target'], say:'"Hands to your forehead, push through, face your hitter."', mistake:'Setting off the palms or catch-and-throw.', stop:'Soft ball for young hands.'},
+      ],
+      mid:[
+        {title:'Footwork & set locations', dur:'15 min', why:'Getting to the ball early and delivering hittable sets runs the whole offense.', how:['Move to the target spot, square up, set','Set to different spots (pin, middle, back)','Quick, quiet release'], say:'"Beat the ball, square up, deliver a hittable set."', mistake:'Setting on the move without squaring up.', stop:'Rest wrists and fingers if sore.'},
+      ],
+    },
+    L:_VB_BACK, DS:_VB_BACK,
+  },
+  track:{
+    SPR:{
+      young:[
+        {title:'Fast feet & short runs', dur:'8–10 min', why:'Sprinting is natural — short, fun runs build speed without formal training.', how:['4 × 15-yard runs, accelerate then relax, full walk-back','High-knees and quick skips','Races to a cone'], say:'"Tall, quick feet, relaxed face."', mistake:'Sprinting hard with no warm-up.', stop:'Full recovery between runs; keep it fun.'},
+      ],
+      mid:[
+        {title:'Sprint mechanics & acceleration', dur:'15 min', why:'Good mechanics and drive make every sprinter faster and safer.', how:['A-skips and high-knees, 2× each','4–6 × 20–30 yard accelerations, full recovery','Practice a strong first-step drive'], say:'"Drive out low, then run tall and relaxed."', mistake:'No warm-up or under-resting.', stop:'Full recovery; stop if hamstrings tighten.'},
+      ],
+    },
+    MID:_TR_ENDUR, DIST:_TR_ENDUR,
+    HUR:{
+      young:[
+        {title:'Hurdle mobility & rhythm', dur:'8–10 min', why:'Hurdling starts with hip mobility and rhythm over low objects.', how:['Step over low cones or foam, tall posture','Lead-leg and trail-leg mobility, walking','3-step rhythm between low objects'], say:'"Tall and smooth — step over, do not jump."', mistake:'Jumping the hurdle instead of stepping.', stop:'Use very low, soft objects; no real hurdles young.'},
+      ],
+      mid:[
+        {title:'Hurdle technique', dur:'15 min', why:'Lead and trail-leg technique and 3-step rhythm make hurdling smooth and fast.', how:['Lead-leg and trail-leg drills over low hurdles','Practice 3-step rhythm between hurdles','Stay tall, attack with the lead knee'], say:'"Attack the hurdle, snap the trail leg, keep the rhythm."', mistake:'Floating or breaking rhythm.', stop:'Low hurdles first; stop if form breaks.'},
+      ],
+    },
+    JMP:{
+      young:[
+        {title:'Jump & land', dur:'8–10 min', why:'Young jumpers build spring and safe landings through play.', how:['Two-foot broad jumps onto soft ground, stick the landing','Hop and skip for height','Short run then one-foot takeoff to a soft area'], say:'"Explode up, land soft and balanced."', mistake:'Hard, stiff landings.', stop:'Land on soft ground; low volume.'},
+      ],
+      mid:[
+        {title:'Approach & takeoff', dur:'15 min', why:'A consistent approach and a fast, tall takeoff are the base of long and high jump.', how:['Short controlled approach, hit a takeoff mark','Practice a tall, quick takeoff (no over-jumping)','Bounding and skips for power'], say:'"Steady approach, fast foot down, jump up and out."', mistake:'Slowing down before takeoff.', stop:'Land in a pit or on mats; respect the knees.'},
+      ],
+    },
+    THR:{
+      young:[
+        {title:'Throw & follow-through', dur:'8–10 min', why:'Young throwers learn a full-body throw with light objects — never heavy implements.', how:['Overhead throws with a light ball for distance','Rotational throws (twist and throw)','Use the legs and hips, not just the arm'], say:'"Push with your legs, whip your arm last."', mistake:'All-arm throws.', stop:'Light objects only — no shot or discus weight young; always clear the area.'},
+      ],
+      mid:[
+        {title:'Throwing mechanics', dur:'15 min', why:'A legs-hips-arm sequence and balance build safe, powerful throws.', how:['Standing throws with an age-appropriate implement, focus on the sequence','Footwork into the throw (glide or rotation basics)','Balance and follow-through, stay in the ring'], say:'"Big base, legs first, finish tall."', mistake:'Throwing all-arm off balance.', stop:'Age-appropriate weight only; clear the throwing area and never throw toward people.'},
+      ],
+    },
+  },
+  gymnastics:{ AA:_GYM_BASE, BB:_GYM_BASE, FX:_GYM_BASE, UB:_GYM_BASE, VT:_GYM_BASE },
+  dance:{
+    BALLET:{
+      young:[
+        {title:'Positions & posture', dur:'8–10 min', why:'The five positions, turnout, and tall posture are the ballet foundation.', how:['Practice foot positions 1–5 with gentle turnout','Tall posture, arms in first and second','Relevé balance, 10s each side'], say:'"Tall spine, turn out from the hips, soft arms."', mistake:'Forcing turnout from the knees.', stop:'Turnout comes from the hips — never force the knees.'},
+      ],
+      mid:[
+        {title:'Barre & control', dur:'15 min', why:'Barre work builds the strength, control, and line ballet is known for.', how:['Pliés, tendus, and dégagés with control','Relevé and balance holds','One simple turn (pirouette prep) with spotting'], say:'"Control every inch — quality over quantity."', mistake:'Rushing and losing turnout or posture.', stop:'Sharp knee or ankle pain, stop and rest.'},
+      ],
+    },
+    JAZZ:_DANCE_TECH, CONTEMP:_DANCE_TECH,
+    POM:{
+      young:[
+        {title:'Sharp motions', dur:'8–10 min', why:'Pom is all about sharp, clean, synced motions and energy.', how:['High-V, T, and clean arm hits, held still','Motions to a count','Big smile and strong stance'], say:'"Hit it and freeze — sharp and strong."', mistake:'Loose, floppy arms.', stop:'Keep it fun.'},
+      ],
+      mid:[
+        {title:'Technique, poms & sync', dur:'15 min', why:'Clean technique and staying perfectly synced is what pom is judged on.', how:['Motion sequence with poms in a mirror, freeze each hit','Add sharp level changes and clean transitions','Film and check timing together'], say:'"Sharp, clean, and together — every hit."', mistake:'Rushing or soft motions.', stop:'Rest as needed; hydrate.'},
+      ],
+    },
+    HIPHOP:{
+      young:[
+        {title:'Isolations & groove', dur:'8–10 min', why:'Hip-hop starts with body isolations and finding the beat.', how:['Isolate head, shoulders, chest, hips','Bounce and groove to the beat','Simple 8-count of basic moves'], say:'"Feel the beat — let it move you."', mistake:'Stiff body, off the beat.', stop:'Keep it fun.'},
+      ],
+      mid:[
+        {title:'Grooves & choreo', dur:'15 min', why:'Cleaner isolations, musicality, and choreography make hip-hop pop.', how:['Warm up isolations','Learn and clean an 8–16 count combo','Hit the accents, control the pauses'], say:'"Hit the accents, control the pauses — make it clean."', mistake:'Marking through instead of full-out.', stop:'Warm up wrists and knees before floor moves.'},
+      ],
+    },
+    TAP:{
+      young:[
+        {title:'Basic steps & rhythm', dur:'8–10 min', why:'Tap is rhythm through the feet — clear sounds start simple.', how:['Shuffles and toe/heel taps, slow and clear','Step to a steady count','Make each sound clean and separate'], say:'"Relax the ankle, make each sound clear."', mistake:'Tight ankles and muddy sounds.', stop:'Keep it light; hard floors need supportive shoes.'},
+      ],
+      mid:[
+        {title:'Time steps & speed', dur:'15 min', why:'Clean time steps and control let a tapper build speed without losing clarity.', how:['Warm up the ankles','Practice a time step slowly, then faster','Keep the sounds clean as speed increases'], say:'"Clean first, fast second."', mistake:'Speeding up and blurring the sounds.', stop:'Rest ankles if sore.'},
+      ],
+    },
+  },
+  tennis:{
+    SING:_TEN,
+    DOUB:{
+      young:_TEN.young,
+      mid:[
+        {title:'Volleys & net play', dur:'15 min', why:'Doubles is won at the net — punch volleys and good positioning.', how:['Punch forehand and backhand volleys from a feed, short motion','Move to the net after a serve','Communicate and cover with a partner'], say:'"Short punch, move forward, cover together."', mistake:'Swinging big on volleys.', stop:'Warm up; hydrate.'},
+      ],
+    },
+  },
+  swimming:{ FR:_SWIM_BASE, BK:_SWIM_BASE, BR:_SWIM_BASE, FLY:_SWIM_BASE, IM:_SWIM_BASE, DIST:_SWIM_BASE, SPRINT:_SWIM_BASE },
+  wrestling:{ FOLK:_WR, FREE:_WR, GRECO:_WR },
 };
 
 function skillsFor(sportKey, band, positions){
@@ -184,6 +660,30 @@ function buildProgram(age, goals, sportKey, positions){
 
 const BAND_LINE={littles:'short, playful sessions with lots of rest',youth:'fundamentals and fun — quality over quantity',preteen:'skill focus with age-safe strength and speed',teen:'structured training with form first',older:'progressive training, still form-first'};
 
+// ---- Coach's Corner: peer notes for parents who played the sport ----
+const COACH_LEVEL={ kid:'growing up', jr_high:'in junior high', hs:'in high school', college:'in college', pro:'at a high level' };
+const COACH_CORNER={
+  football:'You know how a clean tuck and a confident first step feel. Demo it slowly yourself, then let them copy you — kids pick up ball security and footwork fastest from a parent who has done it. Praise effort over outcome and keep the reps short.',
+  soccer:'You remember that a soft first touch buys time. Show them, then play little 1v1s — your presence and light coaching beat any drill sheet at this age.',
+  basketball:'You know footwork and form beat launching threes early. Model a balanced shot up close and celebrate good form, not makes.',
+  baseball:'You know the value of watching the ball all the way in and a quick, accurate throw. Slow it down, demo it, and keep arm care front of mind.',
+  softball:'You know a relaxed windmill and soft hands matter more than pure speed. Model calm mechanics and protect that young arm.',
+  volleyball:'You know platform and footwork win rallies. Show a quiet platform and move your feet — they will copy your calm.',
+  track:'You know relaxed speed is fast speed. Model tall, loose running and make rest part of the plan — young engines love the fun stuff.',
+  cheer:'You know sharp motions and a strong base come from control, not force. Model clean, held motions — and keep every stunt and tumble at the gym with coaches and mats.',
+  gymnastics:'You know tight shapes and flexibility are everything. Model a strong hollow and a clean handstand line at home — leave apparatus skills for the gym.',
+  dance:'You know clean lines and musicality separate dancers. Count it out together and model control — your rhythm rubs off.',
+  tennis:'You know footwork and a smooth swing beat power. Rally softly, model the split-step, and keep it playful.',
+  swimming:'You know a long, flat body glides. Model streamline and easy breathing — and never let them swim without a lifeguard.',
+  wrestling:'You know a low stance and motion win before any move. Drill stance and level changes with them — save live wrestling for the mat with a coach.',
+};
+function coachCornerHTML(){
+  if(!state.coach || !state.coach.sportKey) return '';
+  const note=COACH_CORNER[state.coach.sportKey]; if(!note) return '';
+  const sportName=(state.ref&&state.ref.sports.find(s=>s.key===state.coach.sportKey)||{}).name||'this sport';
+  const lvl=COACH_LEVEL[state.coach.level]?(' '+COACH_LEVEL[state.coach.level]):'';
+  return `<div class="teach" style="margin-top:14px;background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🧠</div><div><h4>Coach's Corner</h4><p>You played ${esc(sportName)}${esc(lvl)} — so here's a note just for you. ${esc(note)}</p></div></div>`;
+}
 function openActivity(act){
   if(!act) return;
   sheet(H`
@@ -194,6 +694,7 @@ function openActivity(act){
     ${act.say?`<div class="teach" style="margin-top:14px"><div class="ic">🗣️</div><div><h4>What to say</h4><p>${esc(act.say)}</p></div></div>`:''}
     ${act.mistake?`<p style="font-size:13px;color:var(--muted);margin-top:12px"><b style="color:var(--ink)">Common mistake:</b> ${esc(act.mistake)}</p>`:''}
     ${act.stop?`<div style="background:#FBE9DC;border:1px solid #E6C9BC;border-radius:12px;padding:11px 13px;margin-top:12px;font-size:12.5px;color:#8a3b12;line-height:1.5"><b>Safety — when to stop:</b> ${esc(act.stop)}</div>`:''}
+    ${coachCornerHTML()}
   `);
 }
 

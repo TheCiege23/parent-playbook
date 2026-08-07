@@ -6,6 +6,7 @@ async function screenWeek(){
   ]);
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
   state.activeSportKey = primary?.sport_key||'general'; setAppBg();
+  state.coach = primary?.parent_experience ? { sportKey:primary.sport_key, level:primary.parent_experience } : null;
   const sportName = primary ? (state.ref?.sports.find(s=>s.key===primary.sport_key)?.name || primary.sport_key) : 'Athlete';
   const sub = `${sportName}${primary?.positions?.length? ' · '+primary.positions.join('/'):''}${age!=null?` · Age ${age}`:''}`;
   const prog = buildProgram(age, goals||[], primary?.sport_key||'general', primary?.positions||[]);

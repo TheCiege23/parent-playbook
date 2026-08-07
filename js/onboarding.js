@@ -1,8 +1,9 @@
 // ===================================================================
 //  ONBOARDING — teaching while collecting
 // ===================================================================
-const ob = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:'',hand:''}, sport:'', positions:[], level:'', goals:[], consents:{} };
-function obReset(patch){ Object.assign(ob,{ i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:'',hand:''}, sport:'', positions:[], level:'', goals:[], consents:{} }, patch||{}); }
+const ob = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:'',hand:''}, sport:'', positions:[], level:'', parentExp:'', goals:[], consents:{} };
+function obReset(patch){ Object.assign(ob,{ i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:'',hand:''}, sport:'', positions:[], level:'', parentExp:'', goals:[], consents:{} }, patch||{}); }
+const PARENT_EXP=[['','No'],['kid','As a kid'],['jr_high','Jr high'],['hs','High school'],['college','College'],['pro','Pro/elite']];
 
 async function renderOnboarding(){
   document.body.classList.remove('auth'); setAppBg();
@@ -116,7 +117,13 @@ function obSport(){
     <div class="field"><label>Level</label>
       <select id="lvl"><option value="">Select level…</option>
         ${levels.map(l=>`<option ${ob.level===l?'selected':''}>${esc(l)}</option>`).join('')}
-      </select></div>`:''}
+      </select></div>
+    <div class="field"><label>Did you play ${esc(sports.find(s=>s.key===chosen)?.name||'this sport')}? (optional)</label>
+      <div class="chipgrid" id="pexp" style="grid-template-columns:repeat(3,1fr)">
+        ${PARENT_EXP.map(([v,l])=>`<div class="chip ${ob.parentExp===v?'on':''}" data-e="${v}">${esc(l)}</div>`).join('')}
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">We'll add a "Coach's Corner" note for you on drills you already know.</p>
+    </div>`:''}
   <div class="err" id="oberr"></div>
   <div class="row2" style="margin-top:8px">
     <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
@@ -134,6 +141,9 @@ function obSportBind(){
     c.classList.toggle('on');
   });
   const lvl=$("#lvl"); if(lvl) lvl.onchange=()=>ob.level=lvl.value;
+  const pexp=$("#pexp"); if(pexp) pexp.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    ob.parentExp=c.dataset.e; pexp.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
+  });
   $("#n").onclick=()=>{
     if(!ob.sport){$("#oberr").textContent="Pick a sport to continue.";return;}
     if(ob.positions.length===0){$("#oberr").textContent="Choose at least one position.";return;}
@@ -241,6 +251,7 @@ async function finishOnboarding(){
       })),
     });
     if(error) throw error;
+    if(ob.parentExp){ try{ await sb.from('athlete_sports').update({ parent_experience:ob.parentExp }).eq('athlete_id',athleteId); }catch(e){ console.error(e); } }
     await loadAthletes();
     state.active = state.athletes.find(a=>a.id===athleteId) || state.athletes[0];
     toast('Profile created 🎉');
