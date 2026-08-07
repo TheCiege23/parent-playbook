@@ -51,11 +51,71 @@ const SKILLS={
   softball:{mid:[{title:'Fielding & hitting', dur:'15 min', why:'Clean fielding and a balanced swing build all-around players.', how:['Field 15 grounders — soft hands, glove out front','Tee work — 20 balanced swings, level path','Accurate throws to a target'], say:'"Watch it into the glove, then throw."', mistake:'Standing up too early on grounders.', stop:'Stop if the swing or arm gets tired and sloppy.'}]},
   track:{mid:[{title:'Sprint form & drills', dur:'15 min', why:'Good mechanics make every athlete faster and safer.', how:['A-skips and high-knees — 2× each','4 × 20-yard build-ups (accelerate, then relax)','Full walk-back recovery'], say:'"Tall posture, quick feet, relaxed face."', mistake:'Sprinting hard with no warm-up.', stop:'Full recovery between runs; stop if hamstrings tighten.'}]},
 };
-function skillsFor(sportKey, band){
+// ---- position-specific skill work (keyed by sport → position code → band bucket) ----
+// When an athlete has positions selected, the weekly plan pulls drills for THOSE
+// positions first (e.g. a QB/RB gets a QB drill and an RB drill), then falls back
+// to the sport's general skills, then to GENERIC_SKILL. Football is built out first.
+const POSITION_SKILLS={
+  football:{
+    QB:{
+      young:[
+        {title:'Little QB: grip & toss', dur:'8–10 min', why:'A comfy grip and a soft, on-target toss are all a young quarterback needs first — it builds confidence and hand-eye control.', how:['Show the grip: fingers across the laces, ball not jammed into the palm','10 short tosses to a parent 5–8 feet away — step and follow through','Play "hit the target" at a taped X on the wall or a bucket'], say:'"Step to your target and reach for it — like a high-five."', mistake:'Throwing all arm with no step, or squeezing the ball too tight.', stop:'Keep throws short and light — no long heaves for little arms.'},
+        {title:'Handoff & fake', dur:'6–8 min', why:'Clean handoffs and a simple fake teach ball control and footwork every young QB uses.', how:['Practice a soft, two-handed handoff to a parent or sibling walking past','Add a little fake, then hand it the other way','Keep the ball tucked and secure the whole time'], say:'"Hide it, hand it, high and tight."', mistake:'Slapping the ball at the runner instead of placing it in the belly.', stop:'Just play — no live contact.'},
+      ],
+      mid:[
+        {title:'Throwing mechanics', dur:'15 min', why:'A repeatable motion — feet, hips, follow-through — turns a toss into an accurate spiral.', how:['Warm up the arm with short, easy throws','20 throws to a partner or net: point the lead foot, rotate the hips, follow through across the body','5 throws on the move: roll one way, set the feet, deliver'], say:'"Feet first, then let the arm follow."', mistake:'All-arm throws with no lower-body drive.', stop:'Stop if the shoulder aches — arm care matters young.'},
+        {title:'Footwork & drops', dur:'10 min', why:'Quick, balanced feet on a 3-step drop give a QB time and a strong base to throw from.', how:['Practice a clean 3-step drop and set','Ball held high and ready, eyes up','5 reps, walk back and reset each time'], say:'"Fast feet back, eyes downfield, ready to fire."', mistake:'Staring at the feet or drifting backward off balance.', stop:'Quality reps over speed — rest between.'},
+      ],
+      old:[
+        {title:'Drop-back & timing + film', dur:'20 min', why:'Timing between footwork and the route is what separates good high-school QBs — and film makes it click fast.', how:['Warm up the arm progressively','Work 3- and 5-step drops with on-time throws to spots','Film 3–4 reps, watch, fix one thing: base, eyes, or follow-through'], say:'"On time and on balance beats a big arm."', mistake:'Late, off-platform throws; skipping the warm-up.', stop:'Respect arm fatigue — build volume gradually, no max-effort throwing when tired.'},
+      ],
+    },
+    RB:{
+      young:[
+        {title:'Ball security: high & tight', dur:'8–10 min', why:'Protecting the ball is the first job of a running back — and a habit best built early.', how:['Tuck the ball high and tight against the ribs, elbow down','Jog through 4 cones keeping it covered','A parent gives gentle taps to knock it loose — squeeze and protect'], say:'"High and tight — never let go of the rock."', mistake:'Carrying the ball loose or away from the body.', stop:'Playful taps only — no real contact or tackling at home.'},
+        {title:'Start & go', dur:'6–8 min', why:'Quick first steps and reacting to a signal build the burst a running back lives on.', how:['Line up, react to "GO!" and sprint 5–10 yards to a cone','Take a soft handoff first, then go','3–4 reps with full rest and lots of cheering'], say:'"Explode on go — the first three steps are everything."', mistake:'Leaning or false-stepping before the go.', stop:'Full rest between sprints — keep it fun, not exhausting.'},
+      ],
+      mid:[
+        {title:'Vision & cuts', dur:'15 min', why:'Seeing the gap and cutting decisively is what turns a good back into a dangerous one.', how:['Set cones as defenders; practice a plant-and-cut and a jump cut, both directions','Keep the ball high and tight through every cut','5 reps each way, walk-back rest'], say:'"Press it, plant, and go — decide and commit."', mistake:'Dancing and hesitating instead of one hard cut.', stop:'Non-contact only; rest between reps.'},
+        {title:'Footwork & agility', dur:'10 min', why:'Quick, coordinated feet help a back stick cuts and stay balanced.', how:['Ladder or chalk: in-in-out-out, both lead feet','Weave through cones keeping the ball secure','5 reps, full walk-back'], say:'"Light and quick — eyes up, ball tight."', mistake:'Watching the feet; loose ball on cuts.', stop:'Quality over speed; full rest.'},
+      ],
+      old:[
+        {title:'Contact balance & pad level', dur:'20 min', why:'Running behind your pads with balance protects the ball and breaks tackles — trained safely without live contact.', how:['Low, athletic stance; drive through a hand shield or bag a parent holds','3-cone bursts finishing low and balanced','Ball-security reps through simulated contact (bag taps)'], say:'"Low man wins — stay low, stay square, ball high and tight."', mistake:'Running tall or exposing the ball.', stop:'No live tackling at home; save real contact for supervised practice.'},
+      ],
+    },
+    WR:{
+      young:[
+        {title:'Soft hands', dur:'8–10 min', why:'Catching with the hands (not the body) and watching it in is the whole game for a young receiver.', how:['15 soft catches from a parent toss — reach and look it in','Make a diamond with the hands for high balls','Tuck it away after every catch'], say:'"Eyes all the way in, then tuck it."', mistake:'Catching against the chest or looking upfield early.', stop:'Light tosses; keep it fun.'},
+      ],
+      mid:[
+        {title:'Routes & releases', dur:'15 min', why:'Sharp cuts and a clean release get a receiver open — footwork wins routes.', how:['Run simple routes (slant, out, hitch), planting hard at the top','Catch 15 on-the-move balls, eyes to the tuck','Add a quick release step off the line'], say:'"Sell it, snap the cut, look it in."', mistake:'Rounding cuts or drifting.', stop:'Rest if legs or hands get tired and sloppy.'},
+      ],
+    },
+  },
+};
+
+function skillsFor(sportKey, band, positions){
   const bucket=(band==='littles'||band==='youth')?'young':(band==='preteen')?'mid':'old';
-  const s=SKILLS[sportKey];
-  if(s){ return s[bucket]||s.mid||s.young||s.old; }
-  return GENERIC_SKILL[bucket]||GENERIC_SKILL.mid;
+  // 1) position-specific drills for the athlete's chosen positions
+  const posMap=POSITION_SKILLS[sportKey];
+  let out=[];
+  if(posMap && Array.isArray(positions)){
+    positions.forEach(code=>{
+      const p=posMap[code]; if(!p) return;
+      const list=p[bucket]||p.mid||p.young||p.old;
+      if(list && list.length) out.push(list[0]); // one signature drill per position
+    });
+  }
+  // 2) top up from the sport's general skills (and generic) so there are ≥2 sessions
+  const general=(SKILLS[sportKey] && (SKILLS[sportKey][bucket]||SKILLS[sportKey].mid||SKILLS[sportKey].young||SKILLS[sportKey].old))
+    || GENERIC_SKILL[bucket] || GENERIC_SKILL.mid;
+  general.forEach(g=>{ if(out.length<2 && !out.some(x=>x.title===g.title)) out.push(g); });
+  // if a single position was chosen, add its second drill for variety
+  if(posMap && Array.isArray(positions) && positions.length===1){
+    const p=posMap[positions[0]]; const list=p&&(p[bucket]||p.mid||p.young||p.old);
+    if(list && list[1] && !out.some(x=>x.title===list[1].title)) out.splice(1,0,list[1]);
+  }
+  return out.length?out:general;
 }
 
 // ---- age-safe strength (bodyweight-first) ----
@@ -89,9 +149,9 @@ function fuelCards(band){
 const GAMEDAY={title:'Game day', dur:'', why:'Game day is for competing and having fun — not cramming new skills.', how:['Light breakfast + hydrate well','Arrive calm; warm up with the team','After: name one thing that went well and one to work on — then let it go'], say:'"I love watching you play." (skip the play-by-play critique)', mistake:'Coaching from the sideline or post-game film sessions.', stop:'Any head-injury signs (headache, dizziness, confusion, nausea) → out of play and see a medical pro.'};
 const RECOVERY={title:'Active recovery', dur:'', why:'Easy movement on off days helps muscles rebuild and keeps kids fresh.', how:['10–15 min easy walk, bike, or swim','Gentle full-body stretch','Hydrate and get to bed on time'], say:'"Today we recharge — that\'s how we get stronger."', mistake:'Turning rest days into extra training.', stop:'Real soreness or fatigue → take true rest.'};
 
-function buildProgram(age, goals, sportKey){
+function buildProgram(age, goals, sportKey, positions){
   const band=ageBand(age);
-  const skills=skillsFor(sportKey, band);
+  const skills=skillsFor(sportKey, band, positions);
   const strength=STRENGTH[band];
   const speed=SPEED[band];
   const fuel=fuelCards(band);

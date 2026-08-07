@@ -8,7 +8,7 @@ async function screenWeek(){
   state.activeSportKey = primary?.sport_key||'general'; setAppBg();
   const sportName = primary ? (state.ref?.sports.find(s=>s.key===primary.sport_key)?.name || primary.sport_key) : 'Athlete';
   const sub = `${sportName}${primary?.positions?.length? ' · '+primary.positions.join('/'):''}${age!=null?` · Age ${age}`:''}`;
-  const prog = buildProgram(age, goals||[], primary?.sport_key||'general');
+  const prog = buildProgram(age, goals||[], primary?.sport_key||'general', primary?.positions||[]);
   const weekEmoji = sportEmojiFor(primary?.sport_key||'general');
   const weekGrad = sportGradient(primary?.sport_key||'general');
   const todayIdx = (new Date().getDay()+6)%7; // Mon=0
