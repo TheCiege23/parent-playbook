@@ -87,6 +87,8 @@ function friendlyAuthErr(m){
   if(/already registered/i.test(m)) return "That email already has an account. Try logging in.";
   if(/invalid login/i.test(m)) return "Email or password is incorrect.";
   if(/not confirmed|confirm/i.test(m)) return "Please confirm your email first — check your inbox and spam folder.";
+  if(/provider.*disabled|logins are disabled/i.test(m)) return "Email sign-in is turned off in settings — enable the Email provider in Supabase.";
+  if(/redirect/i.test(m)) return "This link target isn't allowed yet — add the Site URL in Supabase settings.";
   if(/rate/i.test(m)) return "Too many tries — wait a moment and retry.";
   return m;
 }
@@ -123,8 +125,9 @@ function renderForgot(prefill=''){
     if(!email){ errEl.textContent="Enter your email."; return; }
     const btn=$("#send"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
     const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
-    // Always show success (don't reveal whether an account exists).
-    if(error && /rate/i.test(error.message)){ errEl.textContent="Too many tries — wait a moment."; btn.innerHTML=label; btn.disabled=false; return; }
+    // resetPasswordForEmail returns success whether or not the account exists (no
+    // enumeration), so any error here is a real config/rate problem — surface it.
+    if(error){ console.error(error); errEl.textContent=friendlyAuthErr(error.message); btn.innerHTML=label; btn.disabled=false; return; }
     root.innerHTML = H`<div class="app-pad" style="padding-top:70px;text-align:center">
       <div class="avatar" style="width:56px;height:56px;border-radius:16px;font-size:24px;margin:0 auto 16px;background:var(--amber)">✉️</div>
       <h2 style="font-size:22px">Check your email</h2>
