@@ -80,7 +80,7 @@
 (function(){try{
   var m=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
   var h=location.hash||'',s=location.search||'';
-  var link=h==='#app'||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
+  var link=/^#(app|week|growth|journey|profile|account|activity)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
   var sess=false;
   for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
     if(k&&k.indexOf('sb-')===0&&k.indexOf('-auth-token')!==-1&&localStorage.getItem(k)){sess=true;break;}}
@@ -102,7 +102,7 @@
       <span class="lp-word">Parent Playbook</span>
       <nav class="lp-nav" aria-label="Sections">
         <a href="#how" data-scroll="#how">How it works</a>
-        <a href="#week" data-scroll="#week">Inside a week</a>
+        <a href="#inside-week" data-scroll="#inside-week">Inside a week</a>
         <a href="#faq" data-scroll="#faq">FAQ</a>
       </nav>
       <a class="lp-cta" href="#app" data-start>Start free</a>
@@ -123,7 +123,7 @@
           <p class="lp-lead">A week of at-home work built for your kid's age and sport — what to practice, when to rest, and what to actually say on the drive home. Getting better without burning out.</p>
           <div class="lp-btns">
             <a class="lp-b1" href="#app" data-start>Start free — no app store</a>
-            <a class="lp-b2" href="#week" data-scroll="#week">See a real week</a>
+            <a class="lp-b2" href="#inside-week" data-scroll="#inside-week">See a real week</a>
           </div>
           <div class="lp-stats">
             <div><b>Ages 3–19</b><span>age-banded plans</span></div>
@@ -212,7 +212,7 @@
     </section>
 
     <!-- 4. inside a week -->
-    <section id="week" class="lp-week">
+    <section id="inside-week" class="lp-week">
       <div class="glow" aria-hidden="true"></div>
       <div class="in">
         <div class="lp-k" data-reveal>Inside a week</div>
@@ -424,7 +424,7 @@
           <h4>Product</h4>
           <ul>
             <li><a href="#how" data-scroll="#how">How it works</a></li>
-            <li><a href="#week" data-scroll="#week">Inside a week</a></li>
+            <li><a href="#inside-week" data-scroll="#inside-week">Inside a week</a></li>
             <li><a href="#start" data-scroll="#start">Install to phone</a></li>
             <li><a href="#faq" data-scroll="#faq">FAQ</a></li>
           </ul>

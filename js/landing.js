@@ -23,7 +23,11 @@
     if(root) root.hidden = false;
     document.body.classList.add('in-app');
     document.documentElement.classList.add('pp-boot');
-    if(location.hash !== '#app'){ try{ history.pushState({app:1},'','#app'); }catch(e){} }
+    // Keep a real tab hash if there is one — overwriting /#journey with '#app' is what
+    // broke deep links. Only stamp '#app' when the URL carries nothing useful.
+    if(APP_HASHES.indexOf(location.hash) === -1){
+      try{ history.pushState({app:1},'','#app'); }catch(e){}
+    }
     if(typeof initInstallBanner==='function') initInstallBanner();
     if(typeof handleStripeReturn==='function') handleStripeReturn();
     if(typeof boot==='function') boot(mode);
@@ -37,9 +41,14 @@
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
         || navigator.standalone === true;
   }
+  // Every in-app tab, not just '#app'. Without the rest of these, opening
+  // /#journey while signed in fell through to hasStoredSession(), and enterApp then
+  // REPLACED the hash with '#app' — so #journey and #profile both silently landed on
+  // the week screen. Deep links to a tab are the most natural thing to paste.
+  var APP_HASHES = ['#app','#week','#growth','#journey','#profile','#account','#activity'];
   function isAppLink(){
     var h = location.hash || '', s = location.search || '';
-    return h === '#app'
+    return APP_HASHES.indexOf(h) !== -1
         || h.indexOf('type=recovery') !== -1
         || h.indexOf('access_token=') !== -1     // Supabase drops its auth hash here
         || s.indexOf('invite=') !== -1
