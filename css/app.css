@@ -131,6 +131,9 @@
   .inv-perms .no span{color:var(--muted)}
   .inv-bang,.inv-tick{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;
     justify-content:center;font-family:'Archivo';font-weight:900;font-size:24px;margin-bottom:18px}
+  /* This screen is aimed at grandparents. A 14px inline link is not a tap target —
+     pad it out without turning it into a second competing button. */
+  .inv-wrap .muted-note a{display:inline-block;padding:12px 8px;margin:-12px -8px;font-weight:600}
   .inv-bang{background:var(--amber-s);color:#8A5A14}
   .inv-tick{background:#DFF0E8;color:var(--green-d)}
 
