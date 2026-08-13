@@ -144,7 +144,7 @@ function trAboutBind(){
 
 // ---- step: sports & specialties ----
 function trSports(){
-  const sports=state.ref.sports;
+  const sports=(state.ref&&state.ref.sports)||[];
   const picked=k=>tr.sports.some(s=>s.sport_key===k);
   return H`
   <div class="ob-head"><div class="k">Your sports</div><h2>What do you coach?</h2>

@@ -47,7 +47,7 @@ function edBandNote(bd){
 
 function edRender(){
   const a=state.active;
-  const sports=state.ref.sports;
+  const sports=(state.ref&&state.ref.sports)||[];
   const levels=ed.sport?(sports.find(s=>s.key===ed.sport)||{}).level_vocab||[]:[];
   const sportChanged=ed.sport&&ed.origSport&&ed.sport!==ed.origSport;
   root.innerHTML = H`<div class="app-pad" style="padding-top:22px">

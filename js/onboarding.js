@@ -209,6 +209,14 @@ function posChips(sportKey, selected, id){
 // chips up front reads as a form; six reads as a question.
 const OB_COMMON_SPORTS = ['football','basketball','soccer','baseball','track','volleyball'];
 function obSport(){
+  // Sentry: "Cannot read properties of null (reading 'sports')" from this line, in
+  // production. renderOnboarding loads the catalogue, but obStep() is also reached from
+  // confirmDelete and from a resumed flow, and a hard throw here leaves a parent on a
+  // blank screen mid-signup. Recover instead: reload the catalogue and re-render.
+  if(!state.ref || !state.ref.sports){
+    loadRef().then(()=>obStep()).catch(err=>{ console.error(err); reportError(err,'onboarding:loadRef'); bootError(err); });
+    return H`<div class="center-screen" style="min-height:40dvh"><span class="spinner"></span></div>`;
+  }
   const sports = state.ref.sports;
   const chosen = ob.sport;
   // Expand automatically if their sport isn't in the short list — otherwise the chip
@@ -216,7 +224,7 @@ function obSport(){
   const allShown = ob.showAllSports || (chosen && !OB_COMMON_SPORTS.includes(chosen));
   const shown = allShown ? sports
     : OB_COMMON_SPORTS.map(k=>sports.find(x=>x.key===k)).filter(Boolean);
-  const positions = chosen ? state.ref.positions.filter(p=>p.sport_key===chosen) : [];
+  const positions = chosen ? (state.ref.positions||[]).filter(p=>p.sport_key===chosen) : [];
   const levels = chosen ? (sports.find(s=>s.key===chosen)?.level_vocab||[]) : [];
   return H`
   <div class="ob-head"><div class="k">The sport</div><h2>What's ${esc(ob.athlete.first)} playing right now?</h2>

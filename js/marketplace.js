@@ -46,7 +46,7 @@ async function openMarketplace(){
       .eq('status','approved');
     if(error) throw error; trainers=data||[];
   }catch(err){ console.error(err); return bootError(); }
-  const sports=state.ref.sports;
+  const sports=(state.ref&&state.ref.sports)||[];
   const shown = mpSport ? trainers.filter(t=>(t.trainer_sports||[]).some(s=>s.sport_key===mpSport)) : trainers;
   root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
