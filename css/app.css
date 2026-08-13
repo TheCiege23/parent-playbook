@@ -5,10 +5,13 @@
   :root{
     --paper:#F6F2E9; --ink:#111A15; --muted:#6C6A63; --line:#E7E2D8;
     --green:#17936F; --green-d:#0E3B31; --amber:#EFA33B; --amber-s:#FAEBD4;
-    --card:#FFFFFF; --good:#2E7D5B; --soft:#F1EDE3; --danger:#9E4426;
+    --card:#FFFFFF; --good:#2E7D5B; --soft:#F1EDE3; --danger:#B4451F;
     --shadow:0 1px 2px rgba(28,27,24,.05), 0 8px 24px rgba(28,27,24,.06);
     /* landing-page tokens the app also uses */
     --pine-900:#0B1F1A; --ink-deep:#04120E; --green-lift:#1FB388;
+    /* Clay is a pairing, not a colour: --clay for borders/fills/large type,
+       --clay-ink for anything ≤13px (clay itself is 3.8:1 on bone and fails). */
+    --clay:#C0603F; --clay-ink:#A34E30;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -76,7 +79,9 @@
 
   /* onboarding header */
   .ob-head{margin-bottom:6px}
-  .ob-head .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;color:var(--clay,#C0603F);letter-spacing:.14em;text-transform:uppercase}
+  /* Clay at 11px is 3.8:1 on bone. --clay stays for borders, fills and display type;
+     small text uses --clay-ink. Same rule the design system corrected. */
+  .ob-head .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;color:var(--clay-ink);letter-spacing:.14em;text-transform:uppercase}
   .ob-head h2{font-size:23px;margin:6px 0 4px}
   .ob-head p{color:var(--muted);font-size:14px;margin:0}
 
@@ -183,6 +188,37 @@
   .stripes{position:absolute;inset:0;pointer-events:none;opacity:.55;
     background:repeating-linear-gradient(128deg,#0E3B31 0,#0E3B31 9px,#10453a 9px,#10453a 18px)}
 
+  /* ---- Growth: the goal leads, the number proves it ---- */
+  .ghero{background:var(--pine-900);color:var(--paper);border-radius:18px;padding:18px 17px 16px;
+    margin:0 0 4px;box-shadow:0 10px 26px -14px rgba(4,18,14,.7)}
+  .ghero .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+  .ghero h2{font-size:22px;font-weight:800;margin:7px 0 12px}
+  .gh-num{display:flex;align-items:baseline;gap:5px}
+  .gh-num b{font-family:'Archivo';font-weight:900;font-size:46px;line-height:1;letter-spacing:-.03em}
+  .gh-num span{font-family:'Archivo';font-weight:700;font-size:17px;color:rgba(246,242,233,.6)}
+  .gh-meta{font-size:13px;color:rgba(246,242,233,.72);margin-top:7px}
+  .gh-delta{font-weight:600}
+  .gh-delta.up{color:#7FE3BE} .gh-delta.down{color:#F0A98C}
+  .gh-empty{font-size:13.5px;color:rgba(246,242,233,.72);margin:0 0 13px;line-height:1.55}
+  .gh-empty b{color:var(--paper)}
+
+  /* Trend bars — five readings, scaled to the metric's own range. Scaled to zero, a
+     7.9s and an 8.1s dash would look identical, which is the whole point missed. */
+  .mtrend{padding:14px 0;border-bottom:1px solid var(--line)}
+  .mtrend:first-child{padding-top:2px} .mtrend:last-child{border-bottom:none;padding-bottom:2px}
+  .mt-h{display:flex;align-items:center;gap:8px}
+  .mt-h b{font-size:14px;font-family:'Archivo';font-weight:700}
+  .mt-v{margin-left:auto;font-family:'Archivo';font-weight:800;font-size:19px}
+  .bars{display:flex;align-items:flex-end;gap:5px;height:40px;margin:11px 0 5px}
+  .bars i{flex:1;background:var(--line);border-radius:4px 4px 2px 2px;min-height:6px}
+  .bars i.on{background:var(--green)}
+  .mt-x{display:flex;justify-content:space-between;font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:9.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pill.good{background:#E9F1EF;color:var(--good)}
+  .pill.flat{background:var(--soft);color:var(--muted)}
+  .gi.mglyph{font-family:'Archivo';font-weight:800;font-size:13px;color:var(--green-d)}
+
   /* goal + measure rows */
   .grow{display:flex;gap:11px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
   .grow:last-child{border-bottom:none}
@@ -190,6 +226,53 @@
   .grow .gt{flex:1}.grow .gt b{font-size:14px;display:block}.grow .gt span{font-size:12px;color:var(--muted)}
   .mrow{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px}
   .mrow:last-child{border-bottom:none}.mrow b{font-family:'Archivo'}
+
+  /* A row that goes somewhere. Same anatomy as .grow, but the whole row is the target
+     — a 14px chevron is not a tap target. */
+  .navrow{display:flex;gap:11px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line);
+    cursor:pointer;min-height:56px}
+  .navrow:first-child{padding-top:2px} .navrow:last-child{border-bottom:none;padding-bottom:2px}
+  .navrow .gi{width:34px;height:34px;border-radius:10px;background:var(--soft);display:flex;
+    align-items:center;justify-content:center;font-size:16px;flex:0 0 auto}
+  .navrow .gt{flex:1;min-width:0}
+  .navrow .gt b{font-size:14px;display:block}
+  .navrow .gt span{font-size:12px;color:var(--muted);display:block;line-height:1.4}
+  .navrow i{font-style:normal;color:var(--muted);font-size:18px;flex:0 0 auto}
+  .navrow:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:10px}
+  .navrow.danger .gt b{color:var(--danger)}
+  .navrow.danger .gi{background:#F7E7E0}
+
+  /* Two named notification toggles, not one vague "turn on" — nobody grants push to an
+     unspecified request; they will for a game-day reminder. */
+  .tgl{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+  .tgl:first-child{padding-top:2px} .tgl:last-child{border-bottom:none}
+  .tgl .gt{flex:1;min-width:0}
+  .tgl .gt b{font-size:14px;display:block}
+  .tgl .gt span{font-size:12px;color:var(--muted);display:block;line-height:1.4}
+  .sw{flex:0 0 auto;width:50px;height:30px;border-radius:999px;background:var(--line);
+    position:relative;transition:background .18s;border:none;padding:0}
+  .sw i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;
+    box-shadow:0 1px 3px rgba(28,27,24,.3);transition:transform .18s}
+  .sw.on{background:var(--green)}
+  .sw.on i{transform:translateX(20px)}
+  .sw:disabled{opacity:.55}
+  .sw:focus-visible{outline:2px solid var(--green-d);outline-offset:2px}
+
+  /* Radio cards — the season picker. Each option carries its consequence, because
+     "offseason" means nothing until you say what it changes. */
+  .pickcard{border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:13px 14px;
+    margin-bottom:9px;cursor:pointer;transition:.12s}
+  .pickcard.on{border-color:var(--green);background:#DFF0E8}
+  .pickcard b{display:block;font-family:'Archivo';font-size:15px;font-weight:700}
+  .pickcard.on b{color:var(--green-d)}
+  .pickcard span{display:block;font-size:12.5px;color:var(--muted);line-height:1.45;margin-top:3px}
+  .pickcard:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+  /* Deliberately not a button. On a shared family phone nobody should hit log out by
+     accident reaching for something else. */
+  .logout-plain{display:block;width:100%;text-align:center;background:none;border:none;
+    color:var(--muted);font-size:14px;font-weight:500;padding:22px 0 8px}
+  .logout-plain:hover{color:var(--ink)}
 
   .modal-bg{position:fixed;inset:0;background:rgba(28,27,24,.5);z-index:70;display:flex;align-items:flex-end;justify-content:center}
   .sheet{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));max-height:88dvh;overflow:auto}

@@ -1,60 +1,174 @@
-// Totals, current streak, and an 8-week sparkline from the completion log.
-// A "streak" counts consecutive weeks with at least one session, ending with the current
-// week or the one before it — so a week still in progress doesn't break it.
-function sessionStats(rows){
-  const weekKey=iso=>{ const p=iso.slice(0,10).split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]);
-    d.setDate(d.getDate()-((d.getDay()+6)%7)); return isoDay(d); };
-  const counts={};
-  rows.forEach(r=>{ const k=weekKey(r.done_on); counts[k]=(counts[k]||0)+1; });
-  const thisMon=mondayOfThisWeek();
-  const keyFor=back=>{ const d=new Date(thisMon); d.setDate(d.getDate()-back*7); return isoDay(d); };
-  const last8=[]; for(let i=7;i>=0;i--) last8.push({ week:keyFor(i), count:counts[keyFor(i)]||0 });
-  let streak=0;
-  const start=(counts[keyFor(0)]||0)>0?0:1;   // don't punish a week that's only just begun
-  for(let i=start;i<520;i++){ if((counts[keyFor(i)]||0)>0) streak++; else break; }
-  return { total:rows.length, thisWeek:counts[keyFor(0)]||0, streak, last8 };
+// ===================================================================
+//  GROWTH — the active goal, and the number that proves it's working
+// ===================================================================
+// Design handoff, app screens §5. The goal leads, paired with the one measurement
+// that evidences it; measurements become trend bars; goals sit underneath. A parent
+// opens this screen for a number, not for a list of intentions.
+
+// Which metric best evidences which goal. Deliberately small — an unmapped goal falls
+// back to the label on its own rather than showing an unrelated number, which would be
+// worse than showing none.
+const GOAL_METRIC = {
+  speed:'dash_40', agility:'shuttle', strength:'broad_jump', endurance:'plank_hold',
+  catching:'catch_pct', footwork:'shuttle',
+  // confidence and iq have no honest number. They stay unmapped on purpose.
+};
+
+// The empty state suggests things worth measuring for THIS age, not the whole metrics
+// table. Weight is deliberately absent under 13 — see the note in ARCHITECTURE.md.
+// It stays available under "+ Record"; it is simply never suggested.
+const SUGGEST_METRICS = {
+  littles: ['height','broad_jump'],
+  youth:   ['dash_40','height','broad_jump','shuttle'],
+  preteen: ['dash_40','height','broad_jump','shuttle'],
+  teen:    ['dash_40','height','broad_jump','shuttle','vertical'],
+  older:   ['dash_40','height','broad_jump','shuttle','vertical'],
+};
+const METRIC_HINT = {
+  dash_40:'Same stretch of grass, every time', height:'Once a month is plenty',
+  broad_jump:'Power, without a gym', shuttle:'Change of direction, 5-10-5',
+  vertical:'Standing reach to peak', plank_hold:'Core, held not counted',
+  catch_pct:'Out of 20 throws', weight:'Ask your pediatrician first',
+};
+const METRIC_GLYPH = { dash_40:'40', height:'Ht', broad_jump:'▮', shuttle:'↕',
+  vertical:'▲', plank_hold:'⏱', catch_pct:'%', weight:'lb' };
+
+function metricMeta(key){ return (state.ref&&state.ref.metrics||[]).find(m=>m.key===key)||null; }
+function metricName(key){ return (metricMeta(key)||{}).name || key; }
+
+// Height in inches reads as a number nobody uses out loud. 54 -> 4′ 6″.
+function fmtMeasure(key, value, unit){
+  const v=Number(value);
+  if(key==='height' && unit==='in' && v>=24) return Math.floor(v/12)+'′ '+Math.round(v%12)+'″';
+  const n=Math.round(v*100)/100;
+  return n+(unit?' '+unit:'');
+}
+
+// Last five readings for one metric, oldest→newest, scaled to that metric's OWN
+// min/max. Scaling to zero would make a 7.9s and an 8.1s dash look identical; scaling
+// to the range is what makes a 0.2s improvement visible at all.
+//
+// Taller ALWAYS means better. On a lower-is-better metric the scale is inverted —
+// without that, a kid whose 40 went 8.6 → 7.9 sees his best time drawn as the
+// shortest bar, which reads as getting worse. That is the whole screen backwards.
+function trendBars(list, lowerIsBetter){
+  const pts=list.slice(0,5).reverse().map(m=>Number(m.value)).filter(n=>Number.isFinite(n));
+  if(pts.length<2) return '';                     // one reading is not a trend
+  const min=Math.min(...pts), max=Math.max(...pts), span=(max-min)||1;
+  return `<div class="bars">${pts.map((v,i)=>{
+    const norm = lowerIsBetter ? (max-v)/span : (v-min)/span;
+    const h=18+Math.round(norm*82);               // floor so the worst reading is still a bar
+    const last=i===pts.length-1;
+    return `<i style="height:${h}%" class="${last?'on':''}"></i>`;
+  }).join('')}</div>`;
 }
 
 async function screenGrowth(){
-  const a=state.active;
-  const [{data:goals},{data:meas},{data:sess},{data:cancels}] = await Promise.all([
+  const a=state.active; const age=ageFrom(a.birthdate); const band=ageBand(age);
+  const [{data:goals},{data:meas},{data:sess},{data:sports}] = await Promise.all([
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),
-    sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(40),
-    sb.from('sessions').select('done_on,title,kind').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(120),
-    sb.from('schedule_exceptions').select('on_date,kind').eq('athlete_id',a.id).order('on_date',{ascending:false}).limit(40),
+    sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(60),
+    sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(60),
+    sb.from('athlete_sports').select('sport_key,is_primary').eq('athlete_id',a.id),
   ]);
-  const done=sess||[];
-  const stats=sessionStats(done);
-  const byMetric={};(meas||[]).forEach(m=>{(byMetric[m.metric_key]=byMetric[m.metric_key]||[]).push(m);});
+  const primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
+  state.activeSportKey=primary?.sport_key||state.activeSportKey||'general'; setAppBg();
+
+  const byMetric={}; (meas||[]).forEach(m=>{ (byMetric[m.metric_key]=byMetric[m.metric_key]||[]).push(m); });
+  const metricKeys=Object.keys(byMetric);
+  const active=(goals||[]).filter(g=>g.status==='active');
+  const lead=active[0]||null;
+  const leadKey=lead?GOAL_METRIC[lead.key]:null;
+  const leadList=leadKey?byMetric[leadKey]:null;
+
+  // "since March" — when the record actually starts, not when the account was made
+  const firstOn=(meas||[]).length?(meas[meas.length-1].measured_on):null;
+  const sinceLabel=firstOn
+    ? new Date(firstOn+'T00:00:00').toLocaleDateString(undefined,{month:'long'})
+    : null;
+
+  // ---- the hero: the goal, and the number that evidences it ----
+  let heroBody;
+  if(!lead){
+    heroBody = H`<p class="gh-empty">No active goal yet. Pick one and the week starts building around it — and this screen starts tracking whether it's working.</p>
+      <button class="btn sm amber" id="heroGoal">Choose a goal</button>`;
+  } else if(leadList && leadList.length){
+    const latest=leadList[0], prev=leadList[1];
+    const mm=metricMeta(leadKey)||{};
+    let delta='';
+    if(prev){
+      const cur=Number(latest.value), prv=Number(prev.value);
+      const better = mm.lower_is_better ? cur<prv : cur>prv;
+      const diff=Math.round(Math.abs(cur-prv)*100)/100;
+      // "0.4s faster" reads right for a time; "2in more" reads right for a distance.
+      const word = mm.lower_is_better ? (better?'faster':'slower') : (better?'more':'less');
+      delta = `<span class="gh-delta ${better?'up':'down'}">${diff}${esc(mm.unit||'')} ${word}</span>`;
+    }
+    heroBody = H`<div class="gh-num"><b>${esc(String(Math.round(Number(latest.value)*100)/100))}</b><span>${esc(mm.unit||'')}</span></div>
+      <div class="gh-meta">${esc(metricName(leadKey))}${delta?' · '+delta:''}</div>`;
+  } else {
+    const suggest=leadKey?metricName(leadKey):null;
+    heroBody = H`<p class="gh-empty">${suggest
+      ? H`Time one <b>${esc(suggest.toLowerCase())}</b> today and you've got a starting line. Everything after that is progress you can see.`
+      : H`This one isn't a number — you'll see it on the field before you see it here. Keep the week going.`}</p>
+      ${suggest?H`<button class="btn sm amber" id="heroRecord">Record ${esc(a.first_name)}'s first ${esc(suggest.toLowerCase())}</button>`:''}`;
+  }
+
+  const suggestions=(SUGGEST_METRICS[band]||SUGGEST_METRICS.youth).filter(k=>!metricKeys.includes(k));
+
   $("#screen").innerHTML = H`
-    ${topBar('Progress & goals')}
+    ${topBar(`Progress${sinceLabel?` · since ${sinceLabel}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
-      <div class="sec-title" style="margin:6px 2px 10px">Training done</div>
-      <div class="card app-pad">
-        ${done.length?H`
-          <div style="display:flex;gap:10px;text-align:center">
-            <div style="flex:1"><div style="font-size:24px;font-weight:700;color:var(--green-d)">${stats.total}</div>
-              <div style="font-size:11.5px;color:var(--muted)">sessions</div></div>
-            <div style="flex:1"><div style="font-size:24px;font-weight:700;color:var(--green-d)">${stats.thisWeek}</div>
-              <div style="font-size:11.5px;color:var(--muted)">this week</div></div>
-            <div style="flex:1"><div style="font-size:24px;font-weight:700;color:${stats.streak?'var(--green-d)':'var(--muted)'}">${stats.streak}</div>
-              <div style="font-size:11.5px;color:var(--muted)">week streak</div></div>
-          </div>
-          <div style="display:flex;gap:3px;margin-top:14px;align-items:flex-end;height:38px">
-            ${stats.last8.map(w=>`<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%">
-              <div title="${w.count} session${w.count===1?'':'s'}" style="background:${w.count?'var(--green)':'var(--line)'};height:${Math.max(4,Math.min(100,w.count*22))}%;border-radius:3px"></div></div>`).join('')}
-          </div>
-          <p style="font-size:11px;color:var(--muted);margin:6px 2px 0;text-align:center">last 8 weeks</p>
-          <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
-            ${done.slice(0,5).map(s=>H`<div class="mrow"><span>${esc(fmtDate(s.done_on))}</span><b style="max-width:62%;text-align:right;font-weight:500">${esc(s.title)}</b></div>`).join('')}
-          </div>
-          ${(cancels||[]).length?`<p style="font-size:11.5px;color:var(--muted);margin:10px 2px 0">${cancels.length} team session${cancels.length===1?'':'s'} cancelled — most recently ${esc(fmtDate(cancels[0].on_date))}.</p>`:''}`
-        :`<p style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">Nothing logged yet — tap a day on the Week screen and mark it done.</p>`}
+
+      <div class="ghero">
+        <div class="k">Working toward</div>
+        <h2>${lead?esc(lead.label):'Nothing set yet'}</h2>
+        ${heroBody}
       </div>
 
+      ${metricKeys.length?H`
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="sec-title" style="margin:6px 2px 10px">Goals</div>
-        <button class="btn sm ghost" id="addGoal">+ Goal</button>
+        <div class="sec-title">Measurements</div>
+        <button class="btn sm ghost" id="addMeas">＋ Record</button>
+      </div>
+      <div class="card app-pad">
+        ${metricKeys.map(k=>{
+          const list=byMetric[k], latest=list[0], prev=list[1], mm=metricMeta(k)||{};
+          let chip='';
+          if(prev){
+            const cur=Number(latest.value), prv=Number(prev.value);
+            const better = mm.lower_is_better ? cur<prv : cur>prv;
+            const diff=Math.round(Math.abs(cur-prv)*100)/100;
+            chip=`<span class="pill ${better?'good':'flat'}">${better?'▲ better':'▼'} ${diff}${mm.unit?' '+esc(mm.unit):''}</span>`;
+          }
+          const bars=trendBars(list, !!mm.lower_is_better);
+          const oldest=list[Math.min(list.length,5)-1];
+          return H`<div class="mtrend">
+            <div class="mt-h"><b>${esc(metricName(k))}</b>${chip}
+              <span class="mt-v">${esc(fmtMeasure(k,latest.value,latest.unit||mm.unit))}</span></div>
+            ${bars?H`${bars}<div class="mt-x"><span>${esc(new Date(oldest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span><span>${esc(new Date(latest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span></div>`
+                 :`<div class="mt-x"><span>One reading — measure again in a few weeks to see a trend</span></div>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
+        <h4>Same test, same conditions</h4>
+        <p>Every few weeks is plenty. The trend is the point — one number means nothing.</p></div></div>`
+      :H`
+      <div class="sec-title">Worth tracking for ${age!=null?'a '+age+'-year-old':'this age'}</div>
+      <div class="card app-pad">
+        ${suggestions.map(k=>H`<div class="grow"><div class="gi mglyph">${esc(METRIC_GLYPH[k]||'•')}</div>
+          <div class="gt"><b>${esc(metricName(k))}</b><span>${esc(METRIC_HINT[k]||'')}</span></div>
+          <button class="btn sm ghost" data-rec="${esc(k)}" aria-label="Record ${esc(metricName(k))}">＋</button></div>`).join('')}
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn sm ghost" id="addMeas" style="flex:1">Something else ›</button>
+        </div>
+      </div>
+      ${age!=null&&age<13?`<p class="muted-note" style="margin-top:10px">No weigh-ins suggested for under-13s. Ask your pediatrician before tracking weight.</p>`:''}`}
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="sec-title">Goals</div>
+        <button class="btn sm ghost" id="addGoal">＋ Goal</button>
       </div>
       <div class="card app-pad">
         ${(goals&&goals.length)?goals.map(g=>H`
@@ -64,54 +178,35 @@ async function screenGrowth(){
               ${g.status==='active'?`<button class="btn sm ghost" data-achieve="${esc(g.id)}" title="Mark achieved">✓</button>`:''}
               <button class="btn sm ghost" data-delgoal="${esc(g.id)}" title="Remove">✕</button>
             </div></div>`).join('')
-          :`<p style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">No goals yet — add one to shape the week.</p>`}
+          :`<p class="empty">No goals yet — add one to shape the week.</p>`}
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="sec-title">Measurements</div>
-        <button class="btn sm ghost" id="addMeas">+ Record</button>
-      </div>
-      <div class="card app-pad">
-        ${Object.keys(byMetric).length?Object.entries(byMetric).map(([k,list])=>{
-          const latest=list[0]; const name=state.ref?.metrics.find(m=>m.key===k)?.name||k;
-          const prev=list[1];
-          let trend=''; if(prev){ const lower=state.ref?.metrics.find(m=>m.key===k)?.lower_is_better;
-            const cur=Number(latest.value), prv=Number(prev.value);        // numeric comes back as string — coerce
-            const better = lower ? cur<prv : cur>prv;
-            const diff = Math.round(Math.abs(cur-prv)*100)/100;
-            trend = `<span class="pill" style="background:${better?'#E9F1EF':'#FBE9DC'};color:${better?'var(--good)':'#9a4a12'}">${better?'▲ better':'▼'} ${diff}</span>`; }
-          return H`<div class="mrow"><span>${esc(name)}</span><span style="display:flex;gap:8px;align-items:center">${trend}<b>${(+latest.value)}${latest.unit?' '+esc(latest.unit):''}</b></span></div>`;
-        }).join(''):`<p style="color:var(--muted);font-size:13px;text-align:center;padding:8px 0">No measurements yet — start with height and weight below.</p>`}
-        <!-- One tap straight to the two measurements that matter, instead of "+ Record"
-             then hunting a 14-item dropdown. Height and weight are the ones a parent
-             actually logs, and height is the only one that changes the training plan. -->
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn sm" id="addHeight" style="flex:1">+ Height</button>
-          <button class="btn sm" id="addWeight" style="flex:1">+ Weight</button>
-        </div>
-        <p style="font-size:11.5px;color:var(--muted);margin:10px 2px 0;line-height:1.45">
-          Add height every couple of months and we'll spot a growth spurt — that's when we ease the week off instead of adding to it. Use <b>+ Record</b> above for anything else.</p>
-      </div>
-      <div class="teach" style="margin-top:16px"><div class="ic">🎓</div><div>
-        <h4>Measure a few things, consistently</h4>
-        <p>Same test, same conditions, every few weeks. Trends matter far more than any single number — and they keep kids motivated.</p></div></div>
+      ${MARKETPLACE_ENABLED?H`<div class="card app-pad" id="mpBanner" style="cursor:pointer;margin-top:14px">
+        <div class="grow" style="border:none;padding:0"><div class="gi">🔎</div>
+          <div class="gt"><b>Find a Pro Trainer</b><span>Book a verified coach for ${esc(a.first_name)}.</span></div>
+          <span class="pill">Browse ›</span></div>
+      </div>`:''}
+
+      ${(sess||[]).length?`<p class="muted-note" style="margin-top:16px">${sess.length} session${sess.length===1?'':'s'} logged, most recently ${esc(fmtDate(sess[0].done_on))}.</p>`:''}
     </div>`;
   bindTop();
-  $("#addGoal").onclick=()=>openAddGoal(goals||[]);
-  $("#addMeas").onclick=()=>openAddMeasure();
-  { const h=$("#addHeight"); if(h) h.onclick=()=>openAddMeasure('height'); }
-  { const w=$("#addWeight"); if(w) w.onclick=()=>openAddMeasure('weight'); }
+  { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
+  { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
+  { const b=$("#addMeas"); if(b) b.onclick=()=>openAddMeasure(); }
+  { const b=$("#heroRecord"); if(b&&leadKey) b.onclick=()=>openAddMeasure(leadKey); }
+  { const b=$("#mpBanner"); if(b) b.onclick=openMarketplace; }
+  $("#screen").querySelectorAll('[data-rec]').forEach(b=>b.onclick=()=>openAddMeasure(b.dataset.rec));
   // Achieving keeps the goal in the record; removing takes it out of the plan entirely.
   $("#screen").querySelectorAll('[data-achieve]').forEach(b=>b.onclick=async()=>{
     b.disabled=true;
     const { error }=await sb.from('goals').update({status:'achieved'}).eq('id',b.dataset.achieve);
-    if(error){ console.error(error); toast('Could not update'); b.disabled=false; return; }
+    if(error){ console.error(error); reportError(error,'growth:achieve'); toast('Could not update'); b.disabled=false; return; }
     toast('Goal achieved 🏆'); renderApp('growth');
   });
   $("#screen").querySelectorAll('[data-delgoal]').forEach(b=>b.onclick=async()=>{
     b.disabled=true;
     const { error }=await sb.from('goals').delete().eq('id',b.dataset.delgoal);
-    if(error){ console.error(error); toast('Could not remove'); b.disabled=false; return; }
+    if(error){ console.error(error); reportError(error,'growth:delgoal'); toast('Could not remove'); b.disabled=false; return; }
     toast('Goal removed'); renderApp('growth');
   });
 }

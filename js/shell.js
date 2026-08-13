@@ -1,4 +1,6 @@
-const APP_TABS=['week','growth','journey','profile'];
+// `account` is a route, not a tab — it has no nav button and lives one level under
+// Profile. It's in this list so the hash router and the Back button still handle it.
+const APP_TABS=['week','growth','journey','profile','account'];
 async function renderApp(tab, fromPop){
   document.body.classList.remove('auth'); setAppBg();
   // Keep the URL and the Back button in sync. Without this, Back exits the app
@@ -25,6 +27,7 @@ async function renderApp(tab, fromPop){
     if(tab==='week') await screenWeek();
     else if(tab==='growth') await screenGrowth();
     else if(tab==='journey') await screenJourney();
+    else if(tab==='account') await screenAccount();
     else await screenProfile();
   }catch(err){ console.error(err); screenError(tab); }
 }
@@ -38,6 +41,8 @@ function screenError(tab){
 }
 function navBtn(id,label,path){ return H`<button data-t="${id}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>${label}</button>`; }
 function bindNav(active){
+  // Account & settings sits under Profile, so Profile stays lit while you're in it.
+  if(active==='account') active='profile';
   $("#nav").querySelectorAll('button').forEach(b=>{
     const on=b.dataset.t===active;
     b.classList.toggle('on',on);

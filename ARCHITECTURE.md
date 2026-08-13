@@ -20,8 +20,9 @@ don't hoist across separate `<script>` tags).
 | `js/program.js` | Age-appropriate activity/plan engine | `ageBand`, `SKILLS`, `POSITION_SKILLS`, `skillsFor`, `weeksSince`, `buildProgram`, `SEASON_STATE`, `rebalanceWeek`, `weekStreak` |
 | `js/shell.js` | App frame: router, bottom nav, top bar | `APP_TABS`, `renderApp`, `navBtn`, `topBar` |
 | `js/screen-week.js` | Weekly plan screen | `screenWeek` |
-| `js/screen-growth.js` | Goals + measurements screen | `screenGrowth` |
-| `js/screen-profile.js` | Profile, athlete switch, sharing | `screenProfile` |
+| `js/screen-growth.js` | The active goal, its evidencing metric, trend bars | `screenGrowth`, `GOAL_METRIC`, `SUGGEST_METRICS`, `trendBars` |
+| `js/screen-profile.js` | The athlete, Coach's Corner, who can see them | `screenProfile` |
+| `js/account.js` | Account & settings route + its sheets | `screenAccount`, `openSeasonState`, `openExportEverything`, `openChangePassword`, `openRenameHousehold` |
 | `js/screen-edit.js` | Edit the athlete (name, birthdate, hand, sport, positions, level) | `openEditAthlete`, `edSave` |
 | `js/trainer-onboarding.js` | Pro Trainer application + post-submit status | `startTrainerOnboarding`, `trainerStatusScreen`, `tr*` |
 | `js/monitoring.js` | Sentry error reporting, scrubbed hard for a children's app (no replay, no PII, no console/UI breadcrumbs) | `reportError` |
@@ -104,10 +105,54 @@ These look like styling choices and are not. Each one is load-bearing:
 `rebalanceWeek` is a view transform, not a write — the plan regenerates every render, so
 there is nothing to persist and nothing that can drift out of sync.
 
+## Growth, Profile and Account
+
+`screenProfile` was doing eight jobs. It is now **two routes**: Profile (the athlete,
+Coach's Corner, who can see them) and `account` (household, password, notifications,
+export, legal, deletion, log out). `account` is in `APP_TABS` so the hash router and
+Back handle it, but it has no nav button — `bindNav` lights Profile while you're in it.
+
+Three rules on these screens that look cosmetic and are not:
+
+1. **Trend bars: taller always means better.** `trendBars(list, lowerIsBetter)` inverts
+   the scale for time-based metrics. Without it a 40-yard dash going 8.6 → 7.9 draws the
+   best time as the shortest bar — the screen reading backwards.
+2. **No weight suggested under 13.** `SUGGEST_METRICS` omits it for every band and the
+   empty state points at a pediatrician. Weight stays available under "+ Record"; it is
+   simply never *suggested*. A deliberate safeguarding call, not an oversight.
+3. **Coach's Corner lives on Profile.** It is the parent-experience question removed
+   from onboarding. Delete it here and `state.coach` never gets set, and the feature
+   silently dies.
+
+**Contrast tokens** (`--muted` `#6C6A63`, `--clay-ink` `#A34E30` for text ≤13px,
+`--danger` `#B4451F`, `--pp-placeholder` `#A5A296` for empty inputs only). Contrast is
+a pairing, not a colour — `--clay` `#C0603F` is fine as a border or a fill and fails as
+a 10px label.
+
+## Notifications are two named toggles
+
+`notification_prefs(guardian_id, weekly, game_day)`. **A missing row means both are on**
+— the table records preference, not permission; permission lives in the browser and in
+`push_subscriptions`. Turning a switch on calls `enablePush()` first, so we never store
+"yes please" against a device that can never receive anything.
+
+Both types actually send, which is the point — the design's argument for splitting the
+ask is that nobody grants push to a vague request but will for a game-day reminder, so
+a dead toggle would defeat it:
+
+| Function | Cron | What it does |
+|---|---|---|
+| `notify-weekly` | `0 22 * * 0` | Sunday, "your week is ready" |
+| `notify-gameday` | `0 23 * * *` | Nightly; sends only if TOMORROW is a game day for someone in season and not cancelled |
+
+`notify-gameday` takes `?dry=1` and `?for=YYYY-MM-DD` so it can be tested on a day that
+isn't a game day. It uses Mon=0 indexing to match `DAY_LABELS` — `getUTCDay()` is Sun=0
+and mixing them shifts every game by a day.
+
 ## `season_state` — where the athlete is in the year
 
 `athlete_sports.season_state` is `in_season | offseason | between_sports`, or NULL when
-never asked (every row predating the column). `deriveSeasonState()` falls back to reading
+never asked (every row predating the column). It is set in Profile via `openSeasonState()`. `deriveSeasonState()` falls back to reading
 `season_start`/`season_end` — but **only when the family gave real dates**, so a null
 column can never silently change an existing plan.
 
