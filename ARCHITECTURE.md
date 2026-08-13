@@ -32,6 +32,7 @@ don't hoist across separate `<script>` tags).
 | `js/marketplace.js` | Parent-side browse / book / message / pay | `openMarketplace`, `viewTrainer`, `openMyBookings`, `payBooking` |
 | `js/trainer-services.js` | Trainer-side services + booking requests | `openTrainerServices`, `openTrainerBookings` |
 | `js/journey.js` | Athlete diary screen + sport visuals | `screenJourney`, `sportGradient`, `MEDIA_MAX`, `fmtDate` |
+| `js/log-game.js` | Log a game: two steps, commits at the end of step 1 | `openLogGame`, `STAT_PRESETS`, `lgCommit` |
 | `js/sheets.js` | Bottom-sheet actions (log game, milestone, media, goals, measures, invite, delete) | `sheet`, `openLogGame`, `openAddMilestone`, … |
 | `js/invites.js` | Invite redeem: the invite, accepted, expired | `renderRedeem`, `acceptAndEnter`, `INVITE_ROLE` |
 | `js/pwa.js` | Install banner + push + service-worker registration | `enablePush`, `initInstallBanner`, `registerServiceWorker` |

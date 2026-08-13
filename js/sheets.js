@@ -26,86 +26,11 @@ async function uploadMedia(files,{gameId=null,caption=null,takenOn=null}={}){
 }
 function oversize(files){ return [...files].find(f=>f.size>MEDIA_MAX); }
 
-// `existing` turns this into Edit. The upsert already keys on a client-side id, so the
-// same code path updates instead of inserting — nothing else had to change.
-function openLogGame(existing){
-  const today=new Date().toISOString().slice(0,10);
-  const g0=existing||null;
-  // Prefill from the plan: if the athlete has a game day within a day of today, the
-  // date, opponent and season are almost certainly that fixture.
-  const bg=sheet(H`<h3>${g0?'Edit game':'Log a game'}</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Record the result, a stat or two, and add photos or video from the day.</p>
-    <div class="row2">
-      <div class="field"><label>Date</label><input id="gd" type="date" value="${esc(g0?.game_date||today)}" max="${today}"/></div>
-      <div class="field"><label>Season (optional)</label><input id="gs" placeholder="e.g. Fall 2026" value="${esc(g0?.season||jrnLastSeason()||'')}"/></div>
-    </div>
-    <div class="field"><label>Opponent (optional)</label><input id="go" placeholder="e.g. Eagles" value="${esc(g0?.opponent||'')}"/></div>
-    <div class="field"><label>Where</label>
-      <div class="chipgrid" id="gha">
-        <div class="chip" data-ha="home">Home</div><div class="chip" data-ha="away">Away</div><div class="chip" data-ha="neutral">Neutral</div>
-      </div></div>
-    <div class="row2">
-      <div class="field"><label>Our score</label><input id="gour" type="number" inputmode="numeric" placeholder="—" value="${g0&&g0.our_score!=null?g0.our_score:''}"/></div>
-      <div class="field"><label>Their score</label><input id="gtheir" type="number" inputmode="numeric" placeholder="—" value="${g0&&g0.their_score!=null?g0.their_score:''}"/></div>
-    </div>
-    <div class="field"><label>Stats (optional)</label>
-      <div id="stats"></div>
-      <button class="btn sm ghost" id="addStat" style="margin-top:8px">＋ Add a stat</button>
-    </div>
-    <div class="field"><label>Notes (optional)</label><textarea id="gn" rows="2" placeholder="One thing that went well, one to work on.">${esc(g0?.notes||'')}</textarea></div>
-    <div class="field"><label>Photos / video (optional)</label><input id="gf" type="file" accept="image/*,video/*" multiple/>
-      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Up to 100 MB each — short clips work best.</p></div>
-    <div class="err" id="gerr"></div>
-    <button class="btn" id="save">${g0?'Save changes':'Save game'}</button>`);
-  let ha=g0?.home_away||'';
-  if(ha) bg.querySelectorAll('#gha .chip').forEach(x=>x.classList.toggle('on',x.dataset.ha===ha));
-  bg.querySelectorAll('#gha .chip').forEach(c=>c.onclick=()=>{ ha=(ha===c.dataset.ha?'':c.dataset.ha); bg.querySelectorAll('#gha .chip').forEach(x=>x.classList.toggle('on',x.dataset.ha===ha)); });
-  const statsEl=bg.querySelector('#stats');
-  const addStatRow=()=>{ const d=document.createElement('div'); d.className='row2'; d.style.marginBottom='8px';
-    d.innerHTML=`<input class="sk" placeholder="Stat (e.g. Goals)" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/><input class="sv" placeholder="Value" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/>`;
-    statsEl.appendChild(d); };
-  bg.querySelector('#addStat').onclick=addStatRow;
-  // existing stats come back as editable rows, not as something you have to retype
-  if(g0&&g0.stats&&typeof g0.stats==='object') Object.entries(g0.stats).forEach(([k,v])=>{
-    addStatRow(); const rows=statsEl.querySelectorAll('.row2'); const r=rows[rows.length-1];
-    r.querySelector('.sk').value=k; r.querySelector('.sv').value=v; });
-  let gid=g0?g0.id:null; // keep one id across retries so a failed media upload can't create a 2nd game
-  bg.querySelector('#save').onclick=async(e)=>{
-    const errEl=bg.querySelector('#gerr'); errEl.textContent='';
-    const gd=bg.querySelector('#gd').value; if(!gd){ errEl.textContent='Pick the game date.'; return; }
-    const numOr=id=>{ const v=bg.querySelector(id).value; return v===''?null:parseInt(v,10); };
-    const our=numOr('#gour'), their=numOr('#gtheir');
-    const stats={}; statsEl.querySelectorAll('.row2').forEach(r=>{ const k=r.querySelector('.sk').value.trim(), v=r.querySelector('.sv').value.trim(); if(k&&v) stats[k]=v; });
-    const files=bg.querySelector('#gf').files;
-    const big=oversize(files); if(big){ errEl.textContent=`“${big.name}” is over 100 MB — trim it and try again.`; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
-    try{
-      if(!gid) gid=uuid();
-      let result='na'; if(our!=null&&their!=null) result=our>their?'win':our<their?'loss':'tie';
-      const gameRow={ id:gid, athlete_id:state.active.id, game_date:gd,
-        season:bg.querySelector('#gs').value.trim()||null, opponent:bg.querySelector('#go').value.trim()||null,
-        home_away:ha||null, our_score:our, their_score:their, result,
-        notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id };
-      // Offline: the game is the thing that must not be lost. Queue it, queue any
-      // photos separately, and let them walk back to the car.
-      if(!navigator.onLine && typeof owQueue==='function'){
-        await owQueue({ kind_op:'game_log', row:gameRow });
-        if(files.length && typeof owQueueMedia==='function') await owQueueMedia(files,{gameId:gid,takenOn:gd});
-        bg.remove(); toast('Saved — will sync when you\'re back online'); return renderApp('journey');
-      }
-      const { error }=await sb.from('games').upsert({ id:gid, athlete_id:state.active.id, game_date:gd,
-        season:bg.querySelector('#gs').value.trim()||null, opponent:bg.querySelector('#go').value.trim()||null,
-        home_away:ha||null, our_score:our, their_score:their, result,
-        notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id },{ onConflict:'id' });
-      if(error) throw error;
-      if(files.length){ e.target.innerHTML='<span class="spinner"></span> Uploading…'; await uploadMedia(files,{gameId:gid,takenOn:gd}); }
-      bg.remove(); toast(g0?'Game updated':'Game logged 🏅'); renderApp('journey');
-    }catch(err){ console.error(err); errEl.textContent='Could not save. '+(err.message||''); e.target.innerHTML=g0?'Save changes':'Save game'; e.target.disabled=false; }
-  };
-}
+// openLogGame moved to js/log-game.js — it is a two-step flow now, and the row
+// commits at the end of step 1 so stats and photos can be skipped without losing it.
 
-function openAddMilestone(){
-  const today=new Date().toISOString().slice(0,10);
+function openAddMilestone(onDate){
+  const today=onDate||new Date().toISOString().slice(0,10);
   const bg=sheet(H`<h3>Add a milestone</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">A moment worth remembering — a first, a personal best, a big step.</p>
     <div class="field"><label>Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
