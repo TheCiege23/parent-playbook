@@ -15,40 +15,50 @@ async function uploadMedia(files,{gameId=null,caption=null,takenOn=null}={}){
 }
 function oversize(files){ return [...files].find(f=>f.size>MEDIA_MAX); }
 
-function openLogGame(){
+// `existing` turns this into Edit. The upsert already keys on a client-side id, so the
+// same code path updates instead of inserting — nothing else had to change.
+function openLogGame(existing){
   const today=new Date().toISOString().slice(0,10);
-  const bg=sheet(H`<h3>Log a game</h3>
+  const g0=existing||null;
+  // Prefill from the plan: if the athlete has a game day within a day of today, the
+  // date, opponent and season are almost certainly that fixture.
+  const bg=sheet(H`<h3>${g0?'Edit game':'Log a game'}</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Record the result, a stat or two, and add photos or video from the day.</p>
     <div class="row2">
-      <div class="field"><label>Date</label><input id="gd" type="date" value="${today}" max="${today}"/></div>
-      <div class="field"><label>Season (optional)</label><input id="gs" placeholder="e.g. Fall 2026"/></div>
+      <div class="field"><label>Date</label><input id="gd" type="date" value="${esc(g0?.game_date||today)}" max="${today}"/></div>
+      <div class="field"><label>Season (optional)</label><input id="gs" placeholder="e.g. Fall 2026" value="${esc(g0?.season||jrnLastSeason()||'')}"/></div>
     </div>
-    <div class="field"><label>Opponent (optional)</label><input id="go" placeholder="e.g. Eagles"/></div>
+    <div class="field"><label>Opponent (optional)</label><input id="go" placeholder="e.g. Eagles" value="${esc(g0?.opponent||'')}"/></div>
     <div class="field"><label>Where</label>
       <div class="chipgrid" id="gha">
         <div class="chip" data-ha="home">Home</div><div class="chip" data-ha="away">Away</div><div class="chip" data-ha="neutral">Neutral</div>
       </div></div>
     <div class="row2">
-      <div class="field"><label>Our score</label><input id="gour" type="number" inputmode="numeric" placeholder="—"/></div>
-      <div class="field"><label>Their score</label><input id="gtheir" type="number" inputmode="numeric" placeholder="—"/></div>
+      <div class="field"><label>Our score</label><input id="gour" type="number" inputmode="numeric" placeholder="—" value="${g0&&g0.our_score!=null?g0.our_score:''}"/></div>
+      <div class="field"><label>Their score</label><input id="gtheir" type="number" inputmode="numeric" placeholder="—" value="${g0&&g0.their_score!=null?g0.their_score:''}"/></div>
     </div>
     <div class="field"><label>Stats (optional)</label>
       <div id="stats"></div>
       <button class="btn sm ghost" id="addStat" style="margin-top:8px">＋ Add a stat</button>
     </div>
-    <div class="field"><label>Notes (optional)</label><textarea id="gn" rows="2" placeholder="One thing that went well, one to work on."></textarea></div>
+    <div class="field"><label>Notes (optional)</label><textarea id="gn" rows="2" placeholder="One thing that went well, one to work on.">${esc(g0?.notes||'')}</textarea></div>
     <div class="field"><label>Photos / video (optional)</label><input id="gf" type="file" accept="image/*,video/*" multiple/>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Up to 100 MB each — short clips work best.</p></div>
     <div class="err" id="gerr"></div>
-    <button class="btn" id="save">Save game</button>`);
-  let ha='';
+    <button class="btn" id="save">${g0?'Save changes':'Save game'}</button>`);
+  let ha=g0?.home_away||'';
+  if(ha) bg.querySelectorAll('#gha .chip').forEach(x=>x.classList.toggle('on',x.dataset.ha===ha));
   bg.querySelectorAll('#gha .chip').forEach(c=>c.onclick=()=>{ ha=(ha===c.dataset.ha?'':c.dataset.ha); bg.querySelectorAll('#gha .chip').forEach(x=>x.classList.toggle('on',x.dataset.ha===ha)); });
   const statsEl=bg.querySelector('#stats');
   const addStatRow=()=>{ const d=document.createElement('div'); d.className='row2'; d.style.marginBottom='8px';
     d.innerHTML=`<input class="sk" placeholder="Stat (e.g. Goals)" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/><input class="sv" placeholder="Value" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/>`;
     statsEl.appendChild(d); };
   bg.querySelector('#addStat').onclick=addStatRow;
-  let gid=null; // keep one id across retries so a failed media upload can't create a 2nd game
+  // existing stats come back as editable rows, not as something you have to retype
+  if(g0&&g0.stats&&typeof g0.stats==='object') Object.entries(g0.stats).forEach(([k,v])=>{
+    addStatRow(); const rows=statsEl.querySelectorAll('.row2'); const r=rows[rows.length-1];
+    r.querySelector('.sk').value=k; r.querySelector('.sv').value=v; });
+  let gid=g0?g0.id:null; // keep one id across retries so a failed media upload can't create a 2nd game
   bg.querySelector('#save').onclick=async(e)=>{
     const errEl=bg.querySelector('#gerr'); errEl.textContent='';
     const gd=bg.querySelector('#gd').value; if(!gd){ errEl.textContent='Pick the game date.'; return; }
@@ -67,8 +77,8 @@ function openLogGame(){
         notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id },{ onConflict:'id' });
       if(error) throw error;
       if(files.length){ e.target.innerHTML='<span class="spinner"></span> Uploading…'; await uploadMedia(files,{gameId:gid,takenOn:gd}); }
-      bg.remove(); toast('Game logged 🏅'); renderApp('journey');
-    }catch(err){ console.error(err); errEl.textContent='Could not save. '+(err.message||''); e.target.innerHTML='Save game'; e.target.disabled=false; }
+      bg.remove(); toast(g0?'Game updated':'Game logged 🏅'); renderApp('journey');
+    }catch(err){ console.error(err); errEl.textContent='Could not save. '+(err.message||''); e.target.innerHTML=g0?'Save changes':'Save game'; e.target.disabled=false; }
   };
 }
 
@@ -94,9 +104,11 @@ function openAddMilestone(){
   };
 }
 
-function openAddMedia(games){
+function openAddMedia(games, preselect){
   const today=new Date().toISOString().slice(0,10);
-  const gopts=(games||[]).map(g=>`<option value="${g.id}">${esc(fmtDate(g.game_date))}${g.opponent?' vs '+esc(g.opponent):''}</option>`).join('');
+  // `preselect` is the game whose "＋ Photos" button was tapped — landing on "None"
+  // after choosing a specific game is a small betrayal of the tap.
+  const gopts=(games||[]).map(g=>`<option value="${g.id}" ${g.id===preselect?'selected':''}>${esc(fmtDate(g.game_date))}${g.opponent?' vs '+esc(g.opponent):''}</option>`).join('');
   const bg=sheet(H`<h3>Add photos or video</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">From a game or practice. They stay private to your household.</p>
     <div class="field"><label>Choose files</label><input id="mf" type="file" accept="image/*,video/*" multiple/>
@@ -122,22 +134,68 @@ function openAddMedia(games){
   };
 }
 
-function openMediaViewer(m,url){
-  const body = !url ? `<div class="empty">This file couldn't be loaded.</div>`
+// Full-screen media viewer. Replaces the bottom sheet, and replaces the share composer
+// that CHANGES-2026-08-13 removed from the product.
+//
+// The privacy rules ARE the spec here:
+//   - nothing leaves the app: no share sheet, no export, no public link
+//   - media stays on the short-lived signed URLs already batched by screenJourney,
+//     from the private athlete-media bucket. A public object is never minted.
+//   - invited viewers can look, not take. Download and delete belong to the owner.
+//
+// "Save to phone" is not sharing — it's a parent putting their own photo in their own
+// camera roll. What happens after that is outside the product.
+function openMediaViewer(id){
+  const store=state.jrnMedia||{byId:{},urls:{},byGame:{}};
+  const m=store.byId[id]; if(!m) return;
+  const url=store.urls[m.path]||'';
+  // The rest of this game's media, so you can thumb along without going back.
+  const strip=(m.game_id&&store.byGame[m.game_id])?store.byGame[m.game_id]:[m];
+  const canManage = state.jrnCanEdit!==false;
+
+  const body = !url
+    ? `<div class="empty" style="color:rgba(246,242,233,.7)">This file couldn't be loaded. Go back and try again.</div>`
     : m.kind==='video'
-      ? `<video src="${esc(url)}" controls autoplay playsinline style="width:100%;border-radius:14px;background:#000;max-height:60dvh"></video>`
-      : `<img src="${esc(url)}" style="width:100%;border-radius:14px;display:block" alt="${esc(m.caption||'')}"/>`;
-  const bg=sheet(H`<h3>${esc(m.caption||(m.kind==='video'?'Video':'Photo'))}</h3>
-    ${m.taken_on?`<span class="pill" style="margin:6px 0 2px">${esc(fmtDate(m.taken_on))}</span>`:''}
-    <div style="margin-top:10px">${body}</div>
-    <button class="btn danger" id="delm" style="margin-top:14px">Delete this ${m.kind==='video'?'video':'photo'}</button>`);
-  bg.querySelector('#delm').onclick=async(e)=>{
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
-    await sb.storage.from('athlete-media').remove([m.path]);
-    const { error }=await sb.from('media').delete().eq('id',m.id);
-    if(error){ toast('Could not delete'); e.target.innerHTML='Delete'; e.target.disabled=false; return; }
-    bg.remove(); toast('Deleted'); renderApp('journey');
-  };
+      ? `<video src="${esc(url)}" controls autoplay playsinline></video>`
+      : `<img src="${esc(url)}" alt="${esc(m.caption||'')}"/>`;
+
+  const bg=document.createElement('div');
+  bg.className='mv';
+  bg.innerHTML = H`
+    <div class="mv-top">
+      <button class="iconbtn dark" id="mvClose" aria-label="Close">←</button>
+      <span class="k-mono">${esc(m.kind==='video'?'Video':'Photo')}</span>
+    </div>
+    <div class="mv-stage">${body}</div>
+    <div class="mv-meta">
+      ${m.caption?H`<b>${esc(m.caption)}</b>`:''}
+      <span>${m.taken_on?esc(fmtDate(m.taken_on)):esc(fmtDate((m.created_at||'').slice(0,10)))} · private to your household</span>
+    </div>
+    ${strip.length>1?H`<div class="mv-strip">
+      ${strip.map(x=>H`<button class="${x.id===m.id?'on':''}" data-jump="${esc(x.id)}">
+        ${mediaThumbInner(x,store.urls[x.path],'gth')}</button>`).join('')}
+    </div>`:''}
+    <div class="mv-acts">
+      ${url?H`<a class="btn ghost dark" id="mvSave" href="${esc(url)}" download="${esc(m.path.split('/').pop()||'photo')}">Save to phone</a>`:''}
+      ${canManage?H`<button class="btn danger dark" id="mvDel">Delete</button>`:''}
+    </div>`;
+  document.body.appendChild(bg);
+  const close=()=>{ bg.remove(); document.removeEventListener('keydown',onKey); };
+  function onKey(e){ if(e.key==='Escape') close(); }
+  document.addEventListener('keydown',onKey);
+  bg.querySelector('#mvClose').onclick=close;
+  bg.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ close(); openMediaViewer(b.dataset.jump); });
+  { const d=bg.querySelector('#mvDel');
+    if(d) d.onclick=async()=>{
+      d.innerHTML='<span class="spinner"></span>'; d.disabled=true;
+      // Storage first, then the row — the existing order. A row without its file is a
+      // broken thumbnail; a file without its row is invisible and harmless.
+      await sb.storage.from('athlete-media').remove([m.path]);
+      const { error }=await sb.from('media').delete().eq('id',m.id);
+      if(error){ console.error(error); reportError(error,'journey:deleteMedia');
+        toast('Could not delete'); d.innerHTML='Delete'; d.disabled=false; return; }
+      close(); toast('Deleted'); renderApp('journey');
+    }; }
 }
 
 // ---------- sheets / modals ----------

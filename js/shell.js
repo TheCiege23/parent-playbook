@@ -1,6 +1,6 @@
 // `account` is a route, not a tab — it has no nav button and lives one level under
 // Profile. It's in this list so the hash router and the Back button still handle it.
-const APP_TABS=['week','growth','journey','profile','account'];
+const APP_TABS=['week','growth','journey','profile','account','activity'];
 async function renderApp(tab, fromPop){
   document.body.classList.remove('auth'); setAppBg();
   // Keep the URL and the Back button in sync. Without this, Back exits the app
@@ -28,6 +28,7 @@ async function renderApp(tab, fromPop){
     else if(tab==='growth') await screenGrowth();
     else if(tab==='journey') await screenJourney();
     else if(tab==='account') await screenAccount();
+    else if(tab==='activity') await screenActivity();
     else await screenProfile();
   }catch(err){ console.error(err); screenError(tab); }
 }
@@ -43,7 +44,14 @@ function navBtn(id,label,path){ return H`<button data-t="${id}" aria-label="${es
 function bindNav(active){
   // Account & settings sits under Profile, so Profile stays lit while you're in it.
   if(active==='account') active='profile';
-  $("#nav").querySelectorAll('button').forEach(b=>{
+  // The activity screen owns the whole viewport and has its own sticky action, so the
+  // bottom nav comes off — two competing action bars is one too many.
+  if(active==='activity'){ const n=$("#nav"); if(n) n.remove(); return; }
+  // renderApp rebuilds the nav before every call, but the activity route removes it —
+  // so this is no longer guaranteed to exist. Fail quietly rather than throwing and
+  // taking the whole screen down with it.
+  const nav=$("#nav"); if(!nav) return;
+  nav.querySelectorAll('button').forEach(b=>{
     const on=b.dataset.t===active;
     b.classList.toggle('on',on);
     b.setAttribute('aria-current',on?'page':'false');

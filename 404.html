@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,follow" />
+<meta name="theme-color" content="#0B1F1A" />
+<title>Page not found — Parent Playbook</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100dvh;
+    background:#0B1F1A;
+    background-image:
+      radial-gradient(circle at 88% -10%, rgba(23,147,111,.45), transparent 42%),
+      radial-gradient(circle at -10% 108%, rgba(239,163,59,.15), transparent 48%),
+      linear-gradient(150deg,#0E3B31 0%,#0B1F1A 52%,#04120E 100%);
+    color:#F6F2E9;
+    font-family:'Public Sans',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;
+  }
+  .rules{position:fixed;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(90deg,rgba(246,242,233,.05) 0px,rgba(246,242,233,.05) 1px,transparent 1px,transparent 96px)}
+  .wrap{position:relative;flex:1;display:flex;flex-direction:column;
+    max-width:680px;margin:0 auto;padding:28px 24px 40px;width:100%}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:auto}
+  .mark{width:36px;height:36px;border-radius:11px;background:#EFA33B;color:#0B1F1A;
+    display:grid;place-items:center;font-family:'Archivo',sans-serif;font-weight:900;font-size:17px}
+  .brand span{font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;letter-spacing:-.01em}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:#EFA33B;margin:56px 0 18px}
+  h1{font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(38px,8vw,60px);
+    line-height:.99;letter-spacing:-.032em;margin:0 0 18px;max-width:14ch;text-wrap:balance}
+  .lede{font-size:clamp(16px,3.4vw,19px);line-height:1.6;color:rgba(246,242,233,.76);
+    margin:0 0 34px;max-width:44ch;text-wrap:pretty}
+  .actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:34px}
+  .btn{display:inline-block;font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;
+    padding:16px 28px;border-radius:14px;text-decoration:none;min-height:48px}
+  .btn-primary{background:#17936F;color:#04120E;box-shadow:0 14px 30px -14px rgba(23,147,111,.9)}
+  .btn-primary:hover{background:#1FB388}
+  .btn-ghost{color:#F6F2E9;border:1.5px solid rgba(246,242,233,.26);font-weight:600}
+  .btn-ghost:hover{border-color:rgba(246,242,233,.55)}
+  .card{background:rgba(246,242,233,.07);border:1px solid rgba(246,242,233,.16);
+    border-radius:18px;padding:18px 20px;margin-bottom:auto}
+  .card h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;margin:0 0 6px}
+  .card p{font-size:14.5px;line-height:1.55;color:rgba(246,242,233,.72);margin:0}
+  .card a{color:#F6F2E9;font-weight:700}
+  .foot{margin-top:40px;font-size:13px;color:rgba(246,242,233,.7);line-height:1.6}
+  @media (max-width:520px){
+    .actions .btn{width:100%;text-align:center}
+    .eyebrow{margin-top:40px}
+  }
+</style>
+</head>
+<body>
+<div class="rules"></div>
+<div class="wrap">
+
+  <a class="brand" href="/" style="text-decoration:none;color:#F6F2E9">
+    <span class="mark">P</span>
+    <span>Parent Playbook</span>
+  </a>
+
+  <div class="eyebrow">Page not found</div>
+  <h1>This one's not on the plan.</h1>
+  <p class="lede">The link may be mistyped, or the page may have moved. Nothing's wrong with your account — everything you've saved is where you left it.</p>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="/">Go to Parent Playbook</a>
+    <a class="btn btn-ghost" href="/#how">What is this?</a>
+  </div>
+
+  <div class="card">
+    <h2>Following an invite?</h2>
+    <p>Invite links expire after a week. Ask whoever sent it for a fresh one — it takes them about ten seconds from their Profile screen. Or <a href="/">log in</a> if the athlete was already shared with you.</p>
+  </div>
+
+  <div class="foot">
+    Parent Playbook — a Brown Pig LLC company
+  </div>
+
+</div>
+</body>
+</html>

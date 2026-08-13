@@ -1395,39 +1395,5 @@ async function undoSessionDone(ctx, btn){
   renderApp('week');
 }
 
-function openActivity(act, ctx){
-  if(!act) return;
-  // Only day rows carry a date. Reference cards (fuel, hydration) aren't "completed",
-  // you can't tick off a session that hasn't happened yet, and rest days aren't chores —
-  // ticking one would show a ✓ that the weekly tally deliberately never counts.
-  const canLog = !!(ctx&&ctx.date) && ctx.loggable!==false && ctx.date<=isoDay(new Date());
-  const done = !!(ctx&&ctx.done);
-  sheet(H`
-    <h3>${esc(act.title)}</h3>
-    ${act.dur?`<span class="pill" style="margin:6px 0 2px">${esc(act.dur)}</span>`:''}
-    <p style="font-size:13.5px;line-height:1.5;margin:12px 0 0"><b>Why it matters.</b> ${esc(act.why)}</p>
-    ${act.how&&act.how.length?`<div class="sec-title" style="margin:16px 2px 8px">How to do it</div><ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.7">${act.how.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
-    ${(act.images&&act.images.length)?`<div class="drill-steps">${act.images.map((im,i)=>`
-      <figure class="drill-step">
-        <img src="${esc(drillImageUrl(im.path))}" alt="${esc(im.alt||('Step '+(i+1)))}" loading="lazy" decoding="async"/>
-        <figcaption>${esc(im.alt||('Step '+(i+1)))}</figcaption>
-      </figure>`).join('')}</div>`:''}
-    ${act.say?`<div class="teach" style="margin-top:14px"><div class="ic">🗣️</div><div><h4>What to say</h4><p>${esc(act.say)}</p></div></div>`:''}
-    ${act.mistake?`<p style="font-size:13px;color:var(--muted);margin-top:12px"><b style="color:var(--ink)">Common mistake:</b> ${esc(act.mistake)}</p>`:''}
-    ${act.stop?`<div style="background:#FBE9DC;border:1px solid #E6C9BC;border-radius:12px;padding:11px 13px;margin-top:12px;font-size:12.5px;color:#8a3b12;line-height:1.5"><b>Safety — when to stop:</b> ${esc(act.stop)}</div>`:''}
-    ${coachCornerHTML()}
-    ${canLog?`<button class="btn ${done?'ghost':''}" id="ppDone" style="margin-top:16px">${done?'✓ Done — tap to undo':'Mark done'}</button>`:''}
-    ${(ctx&&ctx.teamSession)?`<button class="btn ghost" id="ppCancel" style="margin-top:8px">${ctx.cancelled?'It happened after all':'Mark cancelled (rain, called off)'}</button>`:''}
-    ${(ctx&&ctx.cancelled&&!ctx.teamSession)?`<button class="btn ghost" id="ppUncancel" style="margin-top:8px">Put the team session back</button>`:''}
-    ${sourceHTML(act)}
-  `);
-  if(canLog){
-    const b=document.querySelector('.modal-bg #ppDone');
-    if(b) b.onclick=()=>done?undoSessionDone(ctx,b):markSessionDone({...ctx,title:act.title},b);
-  }
-  { const c=document.querySelector('.modal-bg #ppCancel');
-    if(c) c.onclick=()=>markCancelled(ctx,c,!ctx.cancelled); }
-  { const u=document.querySelector('.modal-bg #ppUncancel');
-    if(u) u.onclick=()=>markCancelled(ctx,u,false); }
-}
+// openActivity moved to js/screen-activity.js — it is a route now, not a sheet.
 

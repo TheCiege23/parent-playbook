@@ -42,18 +42,67 @@ function mediaThumbInner(m,url,cls){
   return `<img class="${cls}" src="${esc(url)}" loading="lazy" alt="${esc(m.caption||'')}"/>`;
 }
 
+// ===================================================================
+//  JOURNEY — grouped by sport, then season
+// ===================================================================
+// Design handoff, app screens §4, as amended by CHANGES-2026-08-13: sharing is gone.
+// There is no composer, no export card, no public URL — the only outward action is
+// "Save to phone", which is a parent putting their own photo in their own camera roll.
+//
+// A kid who plays football in the fall and basketball in the winter gets two clean
+// records, not one jumbled feed. Milestones sit inline with the games by date rather
+// than in a separate timeline — same data, one chronological column.
+
+// Which sport tab is showing. Null = the athlete's primary.
+let JRN_SPORT = null;
+
+function seasonOf(g){ return (g && g.season) ? g.season : 'Undated'; }
+// season is free text, so the only sane default is whatever they typed last. Without
+// this every game after the first starts blank and the grouping quietly falls apart.
+function jrnLastSeason(){ return (state && state.jrnSeason) || ''; }
+
+// Merge games and milestones into one date-ordered column. Two record types, one
+// column, because that is how the year actually happened.
+function jrnTimeline(games, miles){
+  const rows=[
+    ...(games||[]).map(g=>({ kind:'game', on:g.game_date, data:g })),
+    ...(miles||[]).map(m=>({ kind:'milestone', on:m.milestone_date, data:m })),
+  ];
+  rows.sort((a,b)=> (b.on||'').localeCompare(a.on||'') );
+  return rows;
+}
+
 async function screenJourney(){
   const a=state.active;
-  const [{data:sports},{data:games},{data:miles},{data:media}] = await Promise.all([
+  const [{data:sports},{data:games},{data:miles},{data:media},{data:access}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('games').select('*').eq('athlete_id',a.id).order('game_date',{ascending:false}),
     sb.from('milestones').select('*').eq('athlete_id',a.id).order('milestone_date',{ascending:false}),
     sb.from('media').select('*').eq('athlete_id',a.id).order('created_at',{ascending:false}),
+    sb.from('athlete_access').select('guardian_id,role').eq('athlete_id',a.id).is('revoked_at',null),
   ]);
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
-  const sportKey = primary?.sport_key||'general';
-  state.activeSportKey = sportKey; setAppBg();
-  const sportName = primary ? (state.ref?.sports.find(s=>s.key===sportKey)?.name || sportKey) : 'Athlete';
+  const myRole=(access||[]).find(x=>x.guardian_id===state.user.id)?.role || 'owner';
+  const canEdit = myRole==='owner' || myRole==='editor';
+
+  // Sport tabs. A game logged before games.sport_key existed has null — it belongs to
+  // the primary sport, which is what the backfill assumed and what the UI must match.
+  const played = (sports||[]).map(s=>s.sport_key);
+  const sportKeyOf = g => g.sport_key || primary?.sport_key || 'general';
+  const withGames = [...new Set((games||[]).map(sportKeyOf))];
+  const tabs = [...new Set([...(primary?[primary.sport_key]:[]), ...played, ...withGames])].filter(Boolean);
+  const activeSport = (JRN_SPORT && tabs.includes(JRN_SPORT)) ? JRN_SPORT : (tabs[0]||'general');
+  state.activeSportKey = activeSport; setAppBg();
+
+  const nameOf = k => state.ref?.sports.find(s=>s.key===k)?.name || k;
+  const sportName = nameOf(activeSport);
+  const emoji = SPORT_EMOJI[activeSport]||'🏅';
+
+  const myGames = (games||[]).filter(g=>sportKeyOf(g)===activeSport);
+  // Milestones aren't sport-tagged. Showing them under every tab would duplicate them,
+  // so they ride with the sport that was primary when they were recorded — which we
+  // can't know. They go under the FIRST tab only, and are labelled as the athlete's.
+  const myMiles = (activeSport===tabs[0]) ? (miles||[]) : [];
 
   // sign private media urls (batch)
   const urlMap={};
@@ -64,11 +113,39 @@ async function screenJourney(){
   }
   const mediaById={}; (media||[]).forEach(m=>mediaById[m.id]=m);
   const mediaByGame={}; (media||[]).forEach(m=>{ if(m.game_id){(mediaByGame[m.game_id]=mediaByGame[m.game_id]||[]).push(m);} });
+  state.jrnMedia = { byId:mediaById, urls:urlMap, byGame:mediaByGame };
+  state.jrnCanEdit = canEdit;   // invited viewers can look, not take
 
-  const rec={win:0,loss:0,tie:0}; (games||[]).forEach(g=>{const r=gameResult(g); if(rec[r]!=null)rec[r]++;});
-  const total=(games||[]).length;
-  const years=(games||[]).map(g=>g.game_date&&g.game_date.slice(0,4)).filter(Boolean);
+  const rec={win:0,loss:0,tie:0}; myGames.forEach(g=>{const r=gameResult(g); if(rec[r]!=null)rec[r]++;});
+  const total=myGames.length;
+  const years=myGames.map(g=>g.game_date&&g.game_date.slice(0,4)).filter(Boolean);
   const since = years.length?Math.min(...years.map(Number)):null;
+  const photoCount=(media||[]).length;
+  const seasons=[...new Set(myGames.map(seasonOf))];
+  state.jrnSeason = seasons.find(x=>x!=='Undated') || '';
+
+  // ---- empty state: the one screen allowed to be sentimental ----
+  if(!(games||[]).length && !(miles||[]).length){
+    $("#screen").innerHTML = H`
+      ${topBar('Journey')}
+      <div class="app-pad" style="padding-top:6px">
+        <div class="jrn-empty">
+          <div class="k">${esc(a.first_name)}'s journey</div>
+          <h2>Nothing here yet — and that's the point.</h2>
+          <p>In ten years ${esc(a.first_name)} won't remember the score of a single game this season. You will. The photo from the sideline, what you wrote down after, the first time something clicked.</p>
+          <div class="rows">
+            <div><i>🏅</i><div><b>Games</b><span>Score, a stat or two, and how it went</span></div></div>
+            <div><i>★</i><div><b>Milestones</b><span>Firsts, personal bests, the big ones</span></div></div>
+            <div><i>📷</i><div><b>Photos</b><span>Private to your house, always</span></div></div>
+          </div>
+          ${canEdit?H`<button class="btn amber" id="logGame">Log ${esc(a.first_name)}'s first game</button>
+          <p class="sub">Takes about a minute</p>`:'<p class="sub">Whoever owns this profile can start the record.</p>'}
+        </div>
+      </div>`;
+    bindTop();
+    { const b=$("#logGame"); if(b) b.onclick=()=>openLogGame(); }
+    return;
+  }
 
   const gameCard=g=>{
     const r=gameResult(g);
@@ -80,61 +157,92 @@ async function screenJourney(){
       <div class="gh">
         <div style="min-width:0">
           <div class="score">${scoreStr||'Game'}</div>
-          <div class="meta">${esc(fmtDate(g.game_date))}${g.opponent?' · vs '+esc(g.opponent):''}${g.home_away?' · '+esc(g.home_away):''}${g.season?' · '+esc(g.season):''}</div>
+          <div class="meta">${esc(fmtDate(g.game_date))}${g.opponent?' · vs '+esc(g.opponent):''}${g.home_away?' · '+esc(g.home_away):''}</div>
         </div>
         <span class="result-badge r-${r}">${rlabel}</span>
       </div>
       ${statsEntries.length?`<div class="statchips">${statsEntries.map(([k,v])=>`<span class="statchip">${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div>`:''}
       ${g.notes?`<p style="font-size:13px;color:var(--ink);margin:10px 0 0;line-height:1.5">${esc(g.notes)}</p>`:''}
       ${gm.length?`<div class="gmedia">${gm.map(m=>`<button class="thbtn" data-mid="${m.id}">${mediaThumbInner(m,urlMap[m.path],'gth')}</button>`).join('')}</div>`:''}
+      ${canEdit?`<div class="gactions"><button class="btn sm ghost" data-editgame="${esc(g.id)}">Edit</button>
+        <button class="btn sm ghost" data-addphoto="${esc(g.id)}">＋ Photos</button></div>`:''}
     </div>`;
   };
 
+  const mileCard=m=>H`<div class="mcard">
+    <div class="mi">★</div>
+    <div><div class="k">${esc(fmtDate(m.milestone_date))} · Milestone</div>
+      <b>${esc(m.title)}</b>${m.note?H`<p>${esc(m.note)}</p>`:''}</div>
+  </div>`;
+
   $("#screen").innerHTML = H`
-    ${topBar('Career diary')}
+    ${topBar(`${total} game${total===1?'':'s'}${since?` · since ${since}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
-      <div class="jhero" style="background:${sportGradient(sportKey)}">
+
+      ${tabs.length>1?H`<div class="jrn-tabs" role="tablist">
+        ${tabs.map(k=>H`<button role="tab" aria-selected="${k===activeSport?'true':'false'}"
+          class="${k===activeSport?'on':''}" data-sport="${esc(k)}">${esc(nameOf(k))}</button>`).join('')}
+      </div>`:''}
+
+      <div class="jhero" style="background:${sportGradient(activeSport)}">
         <div class="tex"></div>
         <div style="position:relative">
-          <div class="k">${esc(a.first_name)}'s journey</div>
-          <h2 style="font-size:22px;margin:6px 0 2px">${esc(sportName)} career</h2>
-          <p style="font-size:13px;opacity:.9;margin:0">${total} game${total===1?'':'s'} logged${since?` · since ${since}`:''}</p>
+          <div class="k">${esc(a.first_name)}'s ${esc(sportName)}</div>
+          <h2 style="font-size:22px;margin:6px 0 2px">${total} game${total===1?'':'s'}${seasons.length?`. ${seasons.length} season${seasons.length===1?'':'s'}.`:''}</h2>
         </div>
         <div class="rec">
           <div class="b"><b>${rec.win}</b><span>Wins</span></div>
           <div class="b"><b>${rec.loss}</b><span>Losses</span></div>
           <div class="b"><b>${rec.tie}</b><span>Ties</span></div>
-          <div class="b"><b>${total}</b><span>Games</span></div>
+          <div class="b"><b>${photoCount}</b><span>Photos</span></div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
+      ${canEdit?H`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
         <button class="btn sm" id="logGame">＋ Game</button>
         <button class="btn sm amber" id="addMile">＋ Milestone</button>
         <button class="btn sm ghost" id="addMedia">＋ Media</button>
-      </div>
+      </div>`:''}
 
-      <div class="sec-title">Game log</div>
-      ${total?(games.map(gameCard).join('')):`<div class="card app-pad"><div class="empty">No games yet. Tap <b>＋ Game</b> after the next one to start ${esc(a.first_name)}'s record — scores, stats, and photos all in one place.</div></div>`}
+      ${seasons.length?seasons.map(sn=>{
+        const inSeason=myGames.filter(g=>seasonOf(g)===sn);
+        // Milestones fall into the season whose games bracket their date; anything
+        // outside every season window lands in the last group rather than vanishing.
+        const dates=inSeason.map(g=>g.game_date).filter(Boolean);
+        const lo=dates.length?dates[dates.length-1]:null, hi=dates.length?dates[0]:null;
+        const mine=myMiles.filter(m=>lo&&hi ? (m.milestone_date>=lo&&m.milestone_date<=hi)
+                                           : sn===seasons[seasons.length-1]);
+        const rows=jrnTimeline(inSeason, mine);
+        return H`
+        <div class="jrn-season">
+          <div class="sec-title">${esc(sn)}</div>
+          <span class="pill">${inSeason.length} game${inSeason.length===1?'':'s'}</span>
+        </div>
+        ${rows.map(r=>r.kind==='game'?gameCard(r.data):mileCard(r.data)).join('')}`;
+      }).join('')
+      :H`<div class="card app-pad" style="margin-top:16px"><div class="empty">No ${esc(sportName)} games logged yet${canEdit?' — tap <b>＋ Game</b> after the next one':''}.</div></div>`}
 
-      <div class="sec-title">Milestones</div>
-      <div class="card app-pad">
-        ${(miles&&miles.length)?`<div class="tl">${miles.map(m=>`<div class="it"><div class="dt">${esc(fmtDate(m.milestone_date))}</div><b>${esc(m.title)}</b>${m.note?`<p>${esc(m.note)}</p>`:''}</div>`).join('')}</div>`
-          :`<div class="empty">First goal, first start, a new personal best — mark the moments worth remembering.</div>`}
-      </div>
+      ${(()=>{ const orphan=myMiles.filter(m=>!myGames.some(g=>g.game_date));
+        return orphan.length&&!myGames.length ? orphan.map(mileCard).join('') : ''; })()}
 
-      <div class="sec-title">Gallery</div>
-      ${(media&&media.length)?`<div class="gal">${media.map(m=>`<button class="galcell" data-mid="${m.id}">${mediaThumbInner(m,urlMap[m.path],'gth')}</button>`).join('')}</div>`
-        :`<div class="card app-pad"><div class="empty">Photos and videos you add — from any game or practice — collect here.</div></div>`}
+      ${(media&&media.length)?H`<div class="sec-title">Gallery</div>
+      <div class="gal">${media.map(m=>`<button class="galcell" data-mid="${m.id}">${mediaThumbInner(m,urlMap[m.path],'gth')}</button>`).join('')}</div>`:''}
 
-      <p class="muted-note" style="margin-top:18px">Your photos and videos are private to your household and the people you invite. Only you can share or delete them.</p>
+      <p class="muted-note" style="margin-top:18px">Photos and videos stay private to your household and the people you invite. Nothing here is ever posted anywhere or given a public link.</p>
     </div>`;
   bindTop();
-  $("#logGame").onclick=()=>openLogGame();
-  $("#addMile").onclick=()=>openAddMilestone();
-  $("#addMedia").onclick=()=>openAddMedia(games||[]);
+  { const b=$("#logGame");  if(b) b.onclick=()=>openLogGame(); }
+  { const b=$("#addMile");  if(b) b.onclick=()=>openAddMilestone(); }
+  { const b=$("#addMedia"); if(b) b.onclick=()=>openAddMedia(games||[]); }
+  $("#screen").querySelectorAll('[data-sport]').forEach(b=>b.onclick=()=>{ JRN_SPORT=b.dataset.sport; renderApp('journey'); });
+  $("#screen").querySelectorAll('[data-editgame]').forEach(b=>{
+    const g=(games||[]).find(x=>x.id===b.dataset.editgame); if(g) b.onclick=()=>openLogGame(g);
+  });
+  $("#screen").querySelectorAll('[data-addphoto]').forEach(b=>{
+    const g=(games||[]).find(x=>x.id===b.dataset.addphoto); if(g) b.onclick=()=>openAddMedia(games||[], g.id);
+  });
   $("#screen").querySelectorAll('[data-mid]').forEach(el=>{
-    const m=mediaById[el.getAttribute('data-mid')]; if(m) el.onclick=()=>openMediaViewer(m,urlMap[m.path]);
+    const id=el.getAttribute('data-mid');
+    el.onclick=()=>openMediaViewer(id);
   });
 }
-

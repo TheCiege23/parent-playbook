@@ -1,0 +1,21 @@
+# outputDirectory is ".", so anything left here is served publicly at its own URL.
+# That is fine for the app, and was NOT fine for these.
+#
+# AUDIT.md in particular was reachable at https://playbook.chimaura.com/AUDIT.md —
+# 60-odd KB describing every vulnerability found in this app and how each was fixed.
+# A roadmap for anyone probing it. Verified 200 before this file existed.
+
+# internal docs
+*.md
+!index.md
+
+# server-side source: edge functions and migrations are not browser assets
+supabase/
+
+# transactional email templates — pasted into the Supabase dashboard by hand,
+# never fetched by the app
+emails/
+
+# tooling
+.claude/
+.env*

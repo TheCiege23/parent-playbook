@@ -5,7 +5,7 @@
   :root{
     --paper:#F6F2E9; --ink:#111A15; --muted:#6C6A63; --line:#E7E2D8;
     --green:#17936F; --green-d:#0E3B31; --amber:#EFA33B; --amber-s:#FAEBD4;
-    --card:#FFFFFF; --good:#2E7D5B; --soft:#F1EDE3; --danger:#B4451F;
+    --card:#FFFFFF; --good:#27694D; --soft:#F1EDE3; --danger:#B4451F;
     --shadow:0 1px 2px rgba(28,27,24,.05), 0 8px 24px rgba(28,27,24,.06);
     /* landing-page tokens the app also uses */
     --pine-900:#0B1F1A; --ink-deep:#04120E; --green-lift:#1FB388;
@@ -239,6 +239,60 @@
   .pill.flat{background:var(--soft);color:var(--muted)}
   .gi.mglyph{font-family:'Archivo';font-weight:800;font-size:13px;color:var(--green-d)}
 
+  /* ---- Activity: a route with a sticky action ---- */
+  .act-top{display:flex;align-items:center;gap:12px;padding:14px 18px 4px}
+  .iconbtn{width:38px;height:38px;border-radius:12px;background:var(--soft);color:var(--ink);
+    font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .iconbtn:hover{background:var(--line)}
+  .act-title{font-size:28px;font-weight:900;letter-spacing:-.028em;line-height:1.08;margin:8px 0 0}
+  .act-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+  .act-chips span{font-size:12px;font-weight:600;color:var(--green-d);background:#DFF0E8;
+    padding:5px 10px;border-radius:8px}
+  .act-sec{margin-top:22px}
+  .act-sec p{font-size:15px;line-height:1.6;color:var(--ink);margin:0}
+  .act-steps{margin:0;padding-left:0;list-style:none;counter-reset:astep}
+  .act-steps li{counter-increment:astep;display:flex;gap:12px;font-size:15px;line-height:1.55;
+    padding:11px 0;border-bottom:1px solid var(--line)}
+  .act-steps li:last-child{border-bottom:none}
+  .act-steps li::before{content:counter(astep);flex:0 0 24px;height:24px;border-radius:8px;
+    background:var(--green-d);color:var(--paper);font-family:'Archivo';font-weight:800;font-size:12px;
+    display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .act-stop{margin-top:20px;background:#FBE9DC;border:1px solid #E6C9BC;border-radius:14px;
+    padding:13px 15px;font-size:14px;line-height:1.55;color:#7A3A12}
+  .act-stop b{display:block;font-family:'Archivo';font-weight:800;color:#8E3F22;margin-bottom:3px}
+  /* Sticky, because a parent reads this mid-drill with a kid waiting. */
+  .act-foot{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;z-index:40;
+    background:linear-gradient(180deg,rgba(246,242,233,0),var(--paper) 34%);
+    padding:20px 18px calc(16px + env(safe-area-inset-bottom))}
+  /* State 1 — the loop */
+  .act-loop{margin:20px 0 0}
+  .act-loop video{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:16px;
+    background:var(--pine-900);display:block}
+  .act-loop figcaption{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .act-loop figcaption span{flex:1;font-size:12px;color:var(--muted);line-height:1.4}
+  .slowbtn{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--green-d);background:var(--soft);
+    border-radius:9px;padding:7px 11px}
+  .slowbtn.on{background:#DFF0E8}
+  /* State 2 — step stills. The third frame is the MISTAKE; showing wrong beside right
+     is what actually teaches, so it is marked rather than hidden. */
+  .act-stills{display:flex;flex-direction:column;gap:14px}
+  .act-stills figure{margin:0;display:flex;gap:13px;align-items:flex-start}
+  .act-stills img{flex:0 0 96px;width:96px;height:96px;object-fit:cover;border-radius:14px;
+    background:var(--soft);border:1px solid var(--line)}
+  .act-stills .lbl{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;
+    font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .act-stills figcaption b{display:block;font-family:'Archivo';font-size:15px;font-weight:700;margin:4px 0 3px}
+  .act-stills figcaption span:not(.lbl){display:block;font-size:13px;color:var(--muted);line-height:1.45}
+  .act-stills .is-mistake img{border:2px solid var(--clay)}
+  .act-stills .is-mistake .lbl{color:var(--clay-ink)}
+  /* State 3 — no media. No empty frame, no "coming soon": the writing carries it and
+     this quiet ask is how the library actually fills up. */
+  .act-ask{margin-top:24px;border:1px dashed var(--line);border-radius:14px;padding:15px}
+  .act-ask b{display:block;font-family:'Archivo';font-size:14.5px;font-weight:700}
+  .act-ask span{display:block;font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 10px}
+  .act-ask a{display:inline-block;font-size:13px;font-weight:700;color:var(--green-d);
+    border:1.5px solid var(--line);border-radius:10px;padding:8px 13px;text-decoration:none}
+
   /* goal + measure rows */
   .grow{display:flex;gap:11px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
   .grow:last-child{border-bottom:none}
@@ -355,6 +409,62 @@
   .rec .b b{display:block;font-family:'Archivo';font-size:22px;font-weight:800;line-height:1;color:#fff}
   .rec .b span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:500;color:rgba(255,255,255,.88);
     text-transform:uppercase;letter-spacing:.08em}
+  /* ---- Journey: sport tabs, then seasons ---- */
+  .jrn-tabs{display:flex;gap:7px;overflow-x:auto;padding:0 0 12px;margin:0 -2px}
+  .jrn-tabs::-webkit-scrollbar{height:0}
+  .jrn-tabs button{flex:0 0 auto;font-family:'Archivo';font-weight:700;font-size:14px;padding:9px 15px;
+    border-radius:11px;background:var(--soft);color:var(--muted);min-height:40px}
+  .jrn-tabs button.on{background:var(--green-d);color:var(--paper)}
+  .jrn-season{display:flex;justify-content:space-between;align-items:center}
+  .gactions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  /* Milestones sit inline with the games rather than in their own timeline — same data,
+     one chronological column, which is how the year actually happened. */
+  .mcard{display:flex;gap:12px;align-items:flex-start;background:var(--amber-s);
+    border:1px solid #EEDCBC;border-radius:16px;padding:14px 15px;margin-bottom:12px}
+  .mcard .mi{flex:0 0 30px;height:30px;border-radius:9px;background:var(--amber);color:var(--ink-deep);
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .mcard .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;
+    letter-spacing:.1em;text-transform:uppercase;color:#8A5A14}
+  .mcard b{display:block;font-family:'Archivo';font-size:16px;font-weight:800;margin-top:4px;color:#5E3E0C}
+  .mcard p{font-size:13px;color:#6E5427;margin:4px 0 0;line-height:1.5}
+
+  /* The one screen in the app allowed to be sentimental — it is selling a ten-year
+     habit, so it argues for itself instead of showing a shrug and a button. */
+  .jrn-empty{background:var(--pine-900);color:var(--paper);border-radius:20px;padding:26px 20px 22px;
+    box-shadow:0 14px 34px -16px rgba(4,18,14,.75)}
+  .jrn-empty .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+  .jrn-empty h2{font-size:25px;font-weight:900;letter-spacing:-.025em;margin:9px 0 10px}
+  .jrn-empty>p{font-size:14px;line-height:1.6;color:rgba(246,242,233,.75);margin:0}
+  .jrn-empty .rows{margin:20px 0 22px;display:flex;flex-direction:column;gap:14px}
+  .jrn-empty .rows>div{display:flex;gap:12px;align-items:flex-start}
+  .jrn-empty .rows i{flex:0 0 32px;height:32px;border-radius:10px;background:rgba(246,242,233,.1);
+    display:flex;align-items:center;justify-content:center;font-style:normal;font-size:15px}
+  .jrn-empty .rows b{display:block;font-family:'Archivo';font-size:14.5px;font-weight:700}
+  .jrn-empty .rows span{display:block;font-size:12.5px;color:rgba(246,242,233,.62);line-height:1.45}
+  .jrn-empty .sub{text-align:center;font-size:12.5px;color:rgba(246,242,233,.6);margin:10px 0 0}
+
+  /* ---- Media viewer: a full-screen route, never a share sheet ---- */
+  .mv{position:fixed;inset:0;z-index:90;background:var(--ink-deep);color:var(--paper);
+    display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  .mv-top{display:flex;align-items:center;gap:12px;padding:14px 16px}
+  .iconbtn.dark{background:rgba(246,242,233,.12);color:var(--paper)}
+  .iconbtn.dark:hover{background:rgba(246,242,233,.22)}
+  .mv-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 12px}
+  .mv-stage img,.mv-stage video{max-width:100%;max-height:100%;border-radius:14px;display:block}
+  .mv-meta{padding:14px 18px 4px}
+  .mv-meta b{display:block;font-family:'Archivo';font-size:16px;font-weight:700}
+  .mv-meta span{display:block;font-size:12.5px;color:rgba(246,242,233,.6);margin-top:3px}
+  .mv-strip{display:flex;gap:7px;overflow-x:auto;padding:12px 18px 4px}
+  .mv-strip::-webkit-scrollbar{height:0}
+  .mv-strip button{flex:0 0 auto;padding:0;border:none;background:none;line-height:0;border-radius:10px}
+  .mv-strip button .gth{width:52px;height:52px;border:2px solid transparent}
+  .mv-strip button.on .gth{border-color:var(--amber)}
+  .mv-acts{display:flex;gap:9px;padding:14px 18px 18px}
+  .mv-acts>*{flex:1;text-align:center;text-decoration:none}
+  .btn.ghost.dark{color:var(--paper);border-color:rgba(246,242,233,.28)}
+  .btn.danger.dark{color:#F0A98C;border-color:rgba(240,169,140,.4)}
+
   .gcard{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px 15px;margin-bottom:12px}
   .gcard .gh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .gcard .score{font-family:'Archivo';font-size:20px;font-weight:700;white-space:nowrap}

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
+<title>You've been invited — Parent Playbook</title>
+<!--
+  NOT a Supabase auth template. This one needs a sender (edge function + Resend/Postmark).
+  Subject: {{inviter_first}} is sharing {{athlete_first}}'s season with you
+  Variables: {{inviter_first}} {{inviter_full}} {{athlete_first}} {{athlete_age}}
+             {{sport}} {{role_label}} {{invite_url}} {{expires_human}}
+-->
+<style>
+  @media only screen and (max-width:620px){
+    .pp-wrap{width:100% !important;}
+    .pp-pad{padding-left:24px !important;padding-right:24px !important;}
+    .pp-h1{font-size:27px !important;line-height:31px !important;}
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#F1EDE3;">
+<span style="display:none;font-size:1px;color:#F1EDE3;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">Follow {{athlete_first}}'s games, milestones and photos — private, and only what {{inviter_first}} shares.</span>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F1EDE3;">
+  <tr>
+    <td align="center" style="padding:32px 12px;">
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="pp-wrap" style="width:600px;max-width:600px;background-color:#F6F2E9;border-radius:16px;overflow:hidden;">
+
+        <tr>
+          <td bgcolor="#0B1F1A" style="background-color:#0B1F1A;padding:26px 40px;" class="pp-pad">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="34" style="width:34px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="34" style="width:34px;">
+                    <tr><td align="center" bgcolor="#EFA33B" height="34" style="width:34px;height:34px;background-color:#EFA33B;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:bold;color:#0B1F1A;mso-line-height-rule:exactly;line-height:34px;">P</td></tr>
+                  </table>
+                </td>
+                <td style="padding-left:12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#F6F2E9;letter-spacing:-0.2px;">Parent Playbook</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:40px 40px 0 40px;" class="pp-pad">
+            <div class="pp-h1" style="font-family:Arial,Helvetica,sans-serif;font-size:31px;line-height:35px;font-weight:bold;color:#111A15;letter-spacing:-0.8px;mso-line-height-rule:exactly;">{{inviter_first}} wants you to follow {{athlete_first}}'s season.</div>
+            <div style="height:16px;line-height:16px;font-size:16px;">&nbsp;</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;color:#565449;mso-line-height-rule:exactly;">Parent Playbook is where the family keeps {{athlete_first}}'s games, milestones and photos — and the weekly plan {{athlete_first}} is working on. {{athlete_first}} is {{athlete_age}} and plays {{sport}}.</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:26px 40px 0 40px;" class="pp-pad">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:#FFFFFF;border:1px solid #E4DED2;border-radius:14px;">
+              <tr>
+                <td style="padding:18px 20px;">
+                  <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;font-weight:bold;color:#A34E30;letter-spacing:1.3px;text-transform:uppercase;mso-line-height-rule:exactly;">You'd get {{role_label}}</div>
+                  <div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td width="22" valign="top" style="width:22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#17936F;font-weight:bold;mso-line-height-rule:exactly;">&#10003;</td>
+                      <td style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#2C302A;mso-line-height-rule:exactly;">Games, photos and milestones</td>
+                    </tr>
+                    <tr><td colspan="2" height="8" style="height:8px;line-height:8px;font-size:8px;">&nbsp;</td></tr>
+                    <tr>
+                      <td width="22" valign="top" style="width:22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#17936F;font-weight:bold;mso-line-height-rule:exactly;">&#10003;</td>
+                      <td style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#2C302A;mso-line-height-rule:exactly;">The week {{athlete_first}} is working on</td>
+                    </tr>
+                    <tr><td colspan="2" height="8" style="height:8px;line-height:8px;font-size:8px;">&nbsp;</td></tr>
+                    <tr>
+                      <td width="22" valign="top" style="width:22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#6C6A63;font-weight:bold;mso-line-height-rule:exactly;">&#10007;</td>
+                      <td style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#6C6A63;mso-line-height-rule:exactly;">No editing, and no other children</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:26px 40px 0 40px;" class="pp-pad">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" bgcolor="#17936F" style="background-color:#17936F;border-radius:12px;">
+                  <a href="{{invite_url}}" style="display:block;padding:16px 30px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#04120E;text-decoration:none;mso-line-height-rule:exactly;line-height:20px;">Accept the invite</a>
+                </td>
+              </tr>
+            </table>
+            <div style="height:14px;line-height:14px;font-size:14px;">&nbsp;</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#6C6A63;mso-line-height-rule:exactly;">This link expires {{expires_human}}, and {{inviter_first}} can remove your access at any time.</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:22px 40px 34px 40px;" class="pp-pad">
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#6C6A63;mso-line-height-rule:exactly;">Not expecting this? Someone may have typed the wrong address — you can ignore it, and nothing is shared with you.</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td bgcolor="#0B1F1A" style="background-color:#0B1F1A;padding:26px 40px;" class="pp-pad">
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#9DB5AD;mso-line-height-rule:exactly;">Sent by {{inviter_full}} through Parent Playbook.</div>
+            <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:#7C948C;mso-line-height-rule:exactly;">A Brown Pig LLC company · [STREET ADDRESS], [CITY, STATE ZIP]<br />One-off invitation — you won't be added to any mailing list.</div>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+</body>
+</html>
