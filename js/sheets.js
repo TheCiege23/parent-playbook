@@ -1,6 +1,14 @@
 async function uploadMedia(files,{gameId=null,caption=null,takenOn=null}={}){
   const a=state.active;
+  // A 60MB clip on a cellular plan at a football field is somebody's data allowance.
+  // Queue those for Wi-Fi and upload the rest now; owSendHeldNow() is the override.
+  let heldForWifi=0;
+  if(typeof owQueueMedia==="function"){
+    const r=await owQueueMedia(files,{gameId,caption,takenOn});
+    heldForWifi=r.heldForWifi||0;
+  }
   for(const file of files){
+    if(typeof owShouldHold==="function" && owShouldHold(file)) continue;   // queued above
     const isVid=(file.type||'').startsWith('video');
     let ext=(file.name.split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     if(!ext) ext=isVid?'mp4':'jpg';
@@ -12,6 +20,9 @@ async function uploadMedia(files,{gameId=null,caption=null,takenOn=null}={}){
       caption:caption||null, taken_on:takenOn||null, created_by:state.user.id });
     if(error){ await sb.storage.from('athlete-media').remove([path]); throw error; }
   }
+  if(heldForWifi) toast(heldForWifi===1
+    ? '1 large file will upload on Wi-Fi'
+    : heldForWifi+' large files will upload on Wi-Fi');
 }
 function oversize(files){ return [...files].find(f=>f.size>MEDIA_MAX); }
 
@@ -71,6 +82,17 @@ function openLogGame(existing){
     try{
       if(!gid) gid=uuid();
       let result='na'; if(our!=null&&their!=null) result=our>their?'win':our<their?'loss':'tie';
+      const gameRow={ id:gid, athlete_id:state.active.id, game_date:gd,
+        season:bg.querySelector('#gs').value.trim()||null, opponent:bg.querySelector('#go').value.trim()||null,
+        home_away:ha||null, our_score:our, their_score:their, result,
+        notes:bg.querySelector('#gn').value.trim()||null, stats, created_by:state.user.id };
+      // Offline: the game is the thing that must not be lost. Queue it, queue any
+      // photos separately, and let them walk back to the car.
+      if(!navigator.onLine && typeof owQueue==='function'){
+        await owQueue({ kind_op:'game_log', row:gameRow });
+        if(files.length && typeof owQueueMedia==='function') await owQueueMedia(files,{gameId:gid,takenOn:gd});
+        bg.remove(); toast('Saved — will sync when you\'re back online'); return renderApp('journey');
+      }
       const { error }=await sb.from('games').upsert({ id:gid, athlete_id:state.active.id, game_date:gd,
         season:bg.querySelector('#gs').value.trim()||null, opponent:bg.querySelector('#go').value.trim()||null,
         home_away:ha||null, our_score:our, their_score:their, result,
@@ -97,8 +119,13 @@ function openAddMilestone(){
     if(!t){ errEl.textContent='Give the milestone a title.'; return; }
     if(!d){ errEl.textContent='Pick a date.'; return; }
     e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
-    const { error }=await sb.from('milestones').insert({ athlete_id:state.active.id, milestone_date:d, title:t,
-      note:bg.querySelector('#mn').value.trim()||null, created_by:state.user.id });
+    const mrow={ id:uuid(), athlete_id:state.active.id, milestone_date:d, title:t,
+      note:bg.querySelector('#mn').value.trim()||null, created_by:state.user.id };
+    if(!navigator.onLine && typeof owQueue==='function'){
+      await owQueue({ kind_op:'milestone_add', row:mrow });
+      bg.remove(); toast('Saved — will sync when you\'re back online'); return renderApp('journey');
+    }
+    const { error }=await sb.from('milestones').insert(mrow);
     if(error){ errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save milestone'; e.target.disabled=false; return; }
     bg.remove(); toast('Milestone added ⭐'); renderApp('journey');
   };

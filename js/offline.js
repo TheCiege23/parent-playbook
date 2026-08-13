@@ -93,7 +93,71 @@ const OW_REPLAY = {
     return sb.from('sessions').delete()
       .eq('athlete_id',op.athlete_id).eq('done_on',op.done_on).eq('title',op.title);
   },
+  // Games and milestones both carry a client-side id, so replay is an upsert and a
+  // half-finished flush can run again without duplicating the game.
+  async game_log(op){
+    return sb.from('games').upsert(op.row,{ onConflict:'id' });
+  },
+  async milestone_add(op){
+    return sb.from('milestones').upsert(op.row,{ onConflict:'id' });
+  },
+  // Media carries the actual bytes. IndexedDB stores Blobs, so the file survives a
+  // reload and a flat battery — which a File held only in memory would not.
+  async media_upload(op){
+    const path = op.path;
+    const { error:ue } = await sb.storage.from('athlete-media')
+      .upload(path, op.blob, { contentType:op.content_type||'application/octet-stream', upsert:true });
+    if(ue) return { error:ue };
+    return sb.from('media').upsert({
+      id:op.id, athlete_id:op.athlete_id, game_id:op.game_id||null, path,
+      kind:op.kind, caption:op.caption||null, taken_on:op.taken_on||null,
+      created_by:op.created_by,
+    },{ onConflict:'id' });
+  },
 };
+
+// ---- large files wait for Wi-Fi -------------------------------------------------
+// A 60MB clip on a cellular plan at a football field is somebody's data allowance.
+// Held by default with an explicit override, never silently dropped.
+const OW_BIG_FILE = 10*1024*1024;
+function owIsMetered(){
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if(!c) return false;                       // unknown: assume unmetered, don't block
+  if(c.saveData) return true;
+  return ['cellular','2g','3g'].includes(c.type) || ['slow-2g','2g','3g'].includes(c.effectiveType);
+}
+function owShouldHold(file){ return file && file.size > OW_BIG_FILE && owIsMetered(); }
+
+// Queue files for upload later — offline, or held back off Wi-Fi. The Blob goes into
+// IndexedDB rather than being kept in memory, so the clip survives a reload, a tab
+// close, and a flat battery. `force` is the "Send now" override.
+async function owQueueMedia(files, { gameId=null, caption=null, takenOn=null, force=false }={}){
+  const a=state.active; let n=0, held=0;
+  for(const file of [...files]){
+    if(!force && navigator.onLine && !owShouldHold(file)) continue;   // caller uploads it directly
+    if(!force && navigator.onLine && owShouldHold(file)) held++;
+    const isVid=(file.type||'').startsWith('video');
+    let ext=(file.name.split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    if(!ext) ext=isVid?'mp4':'jpg';
+    const id=uuid();
+    await owQueue({ id, kind_op:'media_upload',
+      athlete_id:a.id, game_id:gameId, kind:isVid?'video':'photo',
+      path:`${a.id}/${id}.${ext}`, blob:file, content_type:file.type||null,
+      caption, taken_on:takenOn, created_by:state.user.id,
+      // Held-for-Wi-Fi items are queued but not flushed until we're unmetered, unless
+      // the parent said send now.
+      hold_for_wifi: !force && owShouldHold(file) });
+    n++;
+  }
+  return { queued:n, heldForWifi:held };
+}
+
+// Send everything that was waiting for Wi-Fi, right now, on whatever connection.
+async function owSendHeldNow(){
+  const ops=await owAll();
+  for(const op of ops) if(op.hold_for_wifi){ op.hold_for_wifi=false; await owTx('readwrite', s=>s.put(op)); }
+  return owFlush();
+}
 
 let owFlushing = false;
 async function owFlush(){
@@ -103,7 +167,11 @@ async function owFlush(){
   try{
     const ops = await owAll();
     ops.sort((a,b)=>a.queued_at-b.queued_at);
+    const metered = owIsMetered();
     for(const op of ops){
+      // A big clip held for Wi-Fi stays held until we're actually on Wi-Fi, or the
+      // parent taps Send now. It is queued, never dropped.
+      if(op.hold_for_wifi && metered) continue;
       const fn = OW_REPLAY[op.kind_op];
       if(!fn){ await owDelete(op.id); continue; }        // unknown op from an older build
       let error;
@@ -124,9 +192,24 @@ async function owFlush(){
 // A quiet count, never a red badge. Queued work isn't an error.
 async function owBadge(){
   const el=document.getElementById('owBadge'); if(!el) return;
-  const n=await owCount();
-  el.hidden = n===0;
-  el.textContent = n===1 ? '1 change waiting to sync' : `${n} changes waiting to sync`;
+  const ops=await owAll();
+  el.hidden = ops.length===0;
+  if(!ops.length) return;
+  const held=ops.filter(o=>o.hold_for_wifi).length;
+  const other=ops.length-held;
+  const bits=[];
+  if(other) bits.push(other===1?'1 change waiting to sync':`${other} changes waiting to sync`);
+  // Held files get their own line WITH the override, because "waiting" with no way to
+  // act on it is just a nag.
+  if(held) bits.push(held===1?'1 large file waiting for Wi-Fi':`${held} large files waiting for Wi-Fi`);
+  el.innerHTML = esc(bits.join(' · ')) + (held?' <button class="owsend" id="owSendNow">Send now</button>':'');
+  const b=document.getElementById('owSendNow');
+  if(b) b.onclick=async()=>{
+    b.disabled=true; b.textContent='Sending…';
+    const r=await owSendHeldNow();
+    toast(r.sent?`Sent ${r.sent}`:'Could not send — try again on Wi-Fi');
+    owBadge();
+  };
 }
 
 function owInit(){

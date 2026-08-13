@@ -155,6 +155,9 @@
      shouting at you. */
   .ow-queued{font-size:12.5px;color:var(--muted);background:var(--soft);border-radius:10px;
     padding:9px 12px;margin:12px 0 0}
+  .owsend{font-size:12px;font-weight:700;color:var(--green-d);background:#DFF0E8;
+    border-radius:8px;padding:5px 9px;margin-left:6px}
+  .owsend:disabled{opacity:.6}
   .ow-fail{max-width:400px;margin:0 auto;padding-top:64px;text-align:center}
   .ow-glyph{font-size:34px;margin-bottom:14px}
   .ow-fail h1{font-size:24px;font-weight:900;letter-spacing:-.024em}
