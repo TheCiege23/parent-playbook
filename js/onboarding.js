@@ -492,12 +492,16 @@ function obReveal(){
   // Today if there's something on today, otherwise the next session AHEAD of today —
   // wrapping to next week rather than pointing at a Monday that has already gone.
   // "First up · Mon" on a Thursday reads as a plan that's already behind.
-  let firstIdx=-1;
-  for(let n=0;n<7;n++){
-    const i=(todayIdx+n)%7, d=prog.days[i];
-    if(d && (d.t==='train'||d.t==='gym'||d.t==='game'||d.t==='practice')){ firstIdx=i; break; }
-  }
-  if(firstIdx<0) firstIdx=todayIdx;                 // an all-rest week is a real answer
+  // Two passes, both walking forward from today. The first looks only for something the
+  // app is actually teaching them to do — a drill. "Game day" is a true answer and a
+  // terrible reveal: it's the one thing on the plan the parent was already going to do
+  // anyway, so it proves nothing about the product. Fall back to it only if the whole
+  // week has no session in it.
+  const scan=pred=>{ for(let n=0;n<7;n++){ const i=(todayIdx+n)%7;
+    if(prog.days[i]&&pred(prog.days[i])) return i; } return -1; };
+  let firstIdx = scan(d=>d.t==='train'||d.t==='gym');
+  if(firstIdx<0) firstIdx = scan(d=>d.t==='game'||d.t==='practice');
+  if(firstIdx<0) firstIdx = todayIdx;               // an all-rest week is a real answer
   const first=prog.days[firstIdx];
   const startsToday=firstIdx===todayIdx;
   const nextWeek=firstIdx<todayIdx;
