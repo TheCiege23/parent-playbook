@@ -42,6 +42,45 @@ function isScheduler(bearer: string): boolean {
 function mondayFirst(d: Date): number { return (d.getUTCDay() + 6) % 7; }
 function isoDay(d: Date): string { return d.toISOString().slice(0, 10); }
 
+// ---- send policy (design handoff, platform §6) ----------------------------------
+// Four messages a week, maximum. Nothing between 9pm and 7am. These are enforced here
+// rather than trusted to the cron schedule, because a schedule change is one click and
+// a parent who gets pushed at 11pm never turns notifications back on.
+const WEEKLY_CAP = 4;
+const QUIET_FROM = 21;   // 9pm
+const QUIET_TO   = 7;    // 7am
+
+// The household timezone isn't stored, so this uses America/New_York — every current
+// user is in Bergenfield, NJ. Revisit before anyone outside US Eastern signs up.
+const APP_TZ = 'America/New_York';
+function localHour(): number {
+  const s = new Intl.DateTimeFormat('en-US', { timeZone: APP_TZ, hour: 'numeric', hour12: false })
+    .format(new Date());
+  return parseInt(s, 10);
+}
+function inQuietHours(): boolean {
+  const h = localHour();
+  return h >= QUIET_FROM || h < QUIET_TO;
+}
+
+// Guardians who have already had WEEKLY_CAP messages in the last seven days.
+async function overCap(svc: any, guardianIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!guardianIds.length) return out;
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { data, error } = await svc.from('notification_log')
+    .select('guardian_id').in('guardian_id', guardianIds).gte('sent_at', since);
+  if (error) { console.error('cap check failed', error); return out; }   // fail OPEN, never silently mute
+  const counts: Record<string, number> = {};
+  for (const r of (data || [])) counts[r.guardian_id] = (counts[r.guardian_id] || 0) + 1;
+  for (const id of guardianIds) if ((counts[id] || 0) >= WEEKLY_CAP) out.add(id);
+  return out;
+}
+async function logSend(svc: any, guardianId: string, kind: string) {
+  const { error } = await svc.from('notification_log').insert({ guardian_id: guardianId, kind });
+  if (error) console.error('notification_log insert failed', error);   // never block a send on bookkeeping
+}
+
 Deno.serve(async (req) => {
   try {
     const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -49,6 +88,8 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const dry = url.searchParams.get('dry') === '1';
+    const force = url.searchParams.get('force') === '1';
+    if (!dry && !force && inQuietHours()) return json({ ok: true, skipped: 'quiet_hours', hour: localHour() });
     // ?for=YYYY-MM-DD pins "tomorrow" so this can be tested on a day that isn't one.
     const forParam = url.searchParams.get('for');
 
@@ -136,11 +177,13 @@ Deno.serve(async (req) => {
       webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:support@chimaura.com', pub, priv);
     }
 
-    let sent = 0, skipped = 0, reaped = 0;
+    const capped = await overCap(svc, [...new Set(subs.map((s: any) => s.user_id))]);
+    let sent = 0, skipped = 0, reaped = 0, cappedOut = 0;
     const failures: Array<{ code: number | null; message: string }> = [];
     const preview: Array<{ names: string[]; title: string; body: string }> = [];
 
     for (const s of subs) {
+      if (capped.has(s.user_id)) { cappedOut++; continue; }
       if (optedOut.has(s.user_id)) { skipped++; continue; }
       const msg = messageFor(namesByUser.get(s.user_id) || []);
       if (!msg) { skipped++; continue; }
@@ -152,6 +195,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ title, body, url: '/#week' }),
         );
         sent++;
+        await logSend(svc, s.user_id, 'game_day');
       } catch (err) {
         const code = (err as any)?.statusCode;
         if (code === 404 || code === 410) {
@@ -167,7 +211,7 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, dry, tomorrow: tIso, dayIndex: tIdx,
                   athletes: playing.length, subscriptions: subs.length,
-                  sent, skipped, reaped, failures, preview });
+                  sent, skipped, reaped, cappedOut, failures, preview });
   } catch (e) {
     return json({ error: (e as Error)?.message ?? String(e) }, 500);
   }

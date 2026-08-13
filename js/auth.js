@@ -156,6 +156,7 @@ function renderAuth(mode='login', prefill=''){
         }
         if(!res.data.session){ renderConfirmNotice(email); return; }
       } else {
+        try{ localStorage.setItem('pp_last_email',email); }catch(e){}
         res = await sb.auth.signInWithPassword({email,password:pw});
         if(res.error) throw res.error;
       }

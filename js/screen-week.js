@@ -278,6 +278,13 @@ async function screenWeek(){
 
       <p class="muted-note" style="margin-top:18px">Parent Playbook gives general, age-appropriate guidance — not medical or nutrition advice. Check with your pediatrician, a registered dietitian, or your child's coach before starting new training, and stop any activity that causes pain.</p>
     </div>`;
+  // Snapshot for the offline screen. Small and non-sensitive: the plan, who it's for,
+  // and which days are ticked. Never the journey.
+  if(typeof owSaveWeek==='function') owSaveWeek({
+    athlete_id:a.id, first_name:a.first_name, sub,
+    days:days.map(w=>({d:w.d,t:w.t,type:w.type,title:w.title,sub:w.sub||''})),
+    done:loggableIdx.filter(done),
+  });
   bindTop();
   { const gb=$("#goalBanner"); if(gb) gb.onclick=()=>openAddGoal(goals||[]); }
   { const sc=$("#schedBanner"); if(sc&&primary) sc.onclick=()=>openPracticeSchedule(primary.sport_key,

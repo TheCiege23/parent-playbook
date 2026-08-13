@@ -1357,6 +1357,16 @@ async function markSessionDone(ctx, btn){
   // hardcoding "Mark done" turned a failed tick into a button reading "Mark done".
   const was=btn.innerHTML;
   btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  // Offline: queue it and move on. A parent standing on a field with one bar should
+  // not lose the tick, and should not be told to try again later.
+  if(!navigator.onLine && typeof owQueue==='function'){
+    await owQueue({ kind_op:'session_done', athlete_id:state.active.id, done_on:ctx.date,
+      title:ctx.title, kind:ctx.kind||null, week_index:(ctx.week==null?null:ctx.week),
+      created_by:state.user.id });
+    toast('Saved — will sync when you\'re back online');
+    const bg0=btn.closest('.modal-bg'); if(bg0) bg0.remove();
+    return renderApp('week');
+  }
   const { error }=await sb.from('sessions').upsert({
     athlete_id:state.active.id, done_on:ctx.date, title:ctx.title,
     kind:ctx.kind||null, week_index:(ctx.week==null?null:ctx.week), created_by:state.user.id,
@@ -1388,6 +1398,13 @@ async function markCancelled(ctx, btn, on){
 async function undoSessionDone(ctx, btn){
   const was=btn.innerHTML;
   btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  if(!navigator.onLine && typeof owQueue==='function'){
+    await owQueue({ kind_op:'session_undo', athlete_id:state.active.id,
+      done_on:ctx.date, title:ctx.title });
+    toast('Saved — will sync when you\'re back online');
+    const bg0=btn.closest('.modal-bg'); if(bg0) bg0.remove();
+    return renderApp('week');
+  }
   const { error }=await sb.from('sessions').delete()
     .eq('athlete_id',state.active.id).eq('done_on',ctx.date).eq('title',ctx.title);
   if(error){ console.error(error); reportError(error,'week:undoDone'); toast('Could not undo'); btn.innerHTML=was; btn.disabled=false; return; }
