@@ -108,27 +108,33 @@ there is nothing to persist and nothing that can drift out of sync.
 ## Onboarding puts the account LAST
 
 Six steps: child → sport → season → goals → **reveal** → account. The first five run with
-**no session at all**, which is why /// carry anon
-SELECT policies.  is pure, so the reveal shows a real generated week before
+**no session at all**, which is why `sports`/`positions`/`metrics`/`drills` carry anon
+SELECT policies. `buildProgram` is pure, so the reveal shows a real generated week before
 anyone is asked for an email.
 
-**The catch, and how it is handled.** Email confirmation is ON, so  returns no
-session — and the RPC that saves the profile needs one. So  writes the answers
-to  (, 7-day TTL) and  replays them the
+**The catch, and how it is handled.** Email confirmation is ON, so `signUp()` returns no
+session — and the RPC that saves the profile needs one. So `obStash()` writes the answers
+to `localStorage` (`pp_pending_profile`, 7-day TTL) and `afterLogin()` replays them the
 moment a session appears. Consequences worth knowing:
 
 - **Nothing about the child touches the network before the account exists.** Verified:
-  zero DB calls between the first screen and . That is the handoff's
+  zero DB calls between the first screen and `signUp()`. That is the handoff's
   consent-timing requirement, not an implementation detail.
 - Confirming on a **different device** loses the stash — they land back in onboarding and
   re-enter it. Annoying, not broken, and better than writing a child's name to a server
   before consent has been captured.
--  is now reachable from three places (the reveal for siblings, the
-  account step, and the  replay). Only two have a visible button, so every
+- `finishOnboarding()` is now reachable from three places (the reveal for siblings, the
+  account step, and the `afterLogin` replay). Only two have a visible button, so every
   DOM lookup in it is null-guarded.
 
- drops the account step whenever  exists — siblings and
+`obSteps()` drops the account step whenever `state.user` exists — siblings and
 half-finished signups both end at the reveal.
+
+The anon SELECT policies are the one piece of this that is a product decision rather than
+a mechanic: the catalogue and the published drill library became readable without an
+account. Nothing there is personal, and anyone could read all of it by signing up free —
+but to reverse it, drop the four `*_read_anon` policies and the reveal falls back to the
+`program.js` constants.
 
 ## Growth, Profile and Account
 
