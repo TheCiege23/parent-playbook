@@ -1,8 +1,42 @@
 // `account` is a route, not a tab — it has no nav button and lives one level under
 // Profile. It's in this list so the hash router and the Back button still handle it.
 const APP_TABS=['week','growth','journey','profile','account','activity'];
+// Whether this guardian can WRITE for the active athlete. RLS is the real gate —
+// private.can_edit_athlete() only passes owner and co_parent — but the UI has to agree,
+// or family view is a screen full of controls that silently fail.
+async function loadRole(){
+  state.canEdit = true; state.role = 'owner';
+  const a=state.active; if(!a||!state.user) return;
+  const { data, error } = await sb.from('athlete_access')
+    .select('role').eq('athlete_id',a.id).eq('guardian_id',state.user.id).is('revoked_at',null).limit(1);
+  if(error){ console.error(error); return; }          // fail OPEN in the UI; RLS still refuses
+  const r=(data&&data[0])?data[0].role:null;
+  // No access row means they reach the athlete through family_members, i.e. they own it.
+  if(r){ state.role=r; state.canEdit = (r==='owner'||r==='co_parent'); }
+  // Read-only copy names who does the doing ("Chris marks these off") rather than
+  // using the passive voice, which reads like the app is withholding something.
+  // One extra query, and only for the guardians who actually need it.
+  if(!state.canEdit && !state.ownerName){
+    const { data:own } = await sb.from('athlete_access')
+      .select('guardian_id').eq('athlete_id',a.id).eq('role','owner').is('revoked_at',null).limit(1);
+    const oid=(own&&own[0])?own[0].guardian_id:null;
+    if(oid){
+      const { data:g } = await sb.from('guardians').select('display_name').eq('id',oid).limit(1);
+      const n=(g&&g[0]&&g[0].display_name||'').trim();
+      if(n) state.ownerName=n.split(/\s+/)[0];
+    }
+  }
+}
+// First name of whoever owns this athlete, for read-only copy. Falls back to a neutral
+// noun rather than an empty string.
+function ownerFirstName(){ return (state && state.ownerName) || 'Their parent'; }
+
 async function renderApp(tab, fromPop){
   document.body.classList.remove('auth'); setAppBg();
+  await loadRole();
+  // Family view has no Growth tab: goals and measurements are things a parent DOES,
+  // and an empty read-only version of them is just a locked door.
+  if(!state.canEdit && tab==='growth') tab='week';
   // Keep the URL and the Back button in sync. Without this, Back exits the app
   // entirely — badly wrong in an installed PWA. Hash-based because this deploys as
   // static files with no rewrites, so /growth would 404 on refresh but #growth won't.
@@ -15,10 +49,11 @@ async function renderApp(tab, fromPop){
     }
   }
   root.innerHTML = H`
+    ${state.canEdit?'':'<div class="roview" role="status"><i>👁</i> Family view · you can look, not change</div>'}
     <div id="screen"></div>
     <nav class="nav" id="nav">
       ${navBtn('week','Week','M4 5h16M4 12h16M4 19h10')}
-      ${navBtn('growth','Growth','M4 19V5m0 14l6-6 4 4 6-8')}
+      ${state.canEdit?navBtn('growth','Growth','M4 19V5m0 14l6-6 4 4 6-8'):''}
       ${navBtn('journey','Journey','M12 6.5C10 5 7 5 4 6v12c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V6c-3-1-6-1-8 .5z M12 6.5V19')}
       ${navBtn('profile','Profile','M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0')}
     </nav>`;

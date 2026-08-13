@@ -231,18 +231,47 @@ function openInvite(){
         <div class="chip on" data-r="family_view">Family view</div>
         <div class="chip" data-r="co_parent">Co-parent (edit)</div>
       </div></div>
+    <div class="field"><label>Their email (optional)</label>
+      <input id="invEmail" type="email" autocomplete="off" placeholder="grandma@email.com"/>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Give us an address and we'll send the invite for you. Leave it blank and you'll get a link to copy.</p></div>
     <div id="linkout"></div>
-    <button class="btn" id="gen">Create invite link</button>`);
+    <div class="err" id="inverr"></div>
+    <button class="btn" id="gen">Create invite</button>`);
   let role='family_view';
   bg.querySelectorAll('#role .chip').forEach(c=>c.onclick=()=>{ role=c.dataset.r; bg.querySelectorAll('#role .chip').forEach(x=>x.classList.toggle('on',x===c)); });
   bg.querySelector('#gen').onclick=async(e)=>{
     const btn=e.target; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
-    const { data, error } = await sb.from('athlete_invites').insert({ athlete_id:state.active.id, role }).select().single();
-    if(error){ toast('Could not create link'); btn.textContent='Try again'; btn.disabled=false; return; }
+    const errEl=bg.querySelector('#inverr'); errEl.textContent='';
+    const email=(bg.querySelector('#invEmail').value||'').trim();
+    if(email && !/.+@.+\..+/.test(email)){
+      errEl.textContent="That email address doesn't look right."; btn.innerHTML='Create invite'; btn.disabled=false; return; }
+    const { data, error } = await sb.from('athlete_invites')
+      .insert({ athlete_id:state.active.id, role, invited_email:email||null }).select().single();
+    if(error){ console.error(error); reportError(error,'invite:create');
+      toast('Could not create link'); btn.textContent='Try again'; btn.disabled=false; return; }
     const link=inviteLink(data.token);
     bg.querySelector('#linkout').innerHTML=H`
       <div class="linkbox"><span style="flex:1">${esc(link)}</span></div>`;
+
+    // The link ALWAYS works. Sending is a convenience on top of it, so a mail failure
+    // must never look like a failed invite — the parent still has something to paste.
+    if(email){
+      btn.innerHTML='<span class="spinner"></span> Sending…';
+      let sent=false, why='';
+      try{
+        const { data:r, error:se } = await sb.functions.invoke('send-invite',{ body:{ invite_id:data.id } });
+        if(se) why=se.message||'';
+        else if(r && r.ok) sent=true;
+        else why=(r&&(r.message||r.error))||'';
+      }catch(e){ console.error(e); why=e.message||''; }
+      if(sent){ toast('Invite sent to '+email); }
+      else{
+        errEl.textContent = "We couldn't email it"+(why?' ('+why+')':'')+' — the link below still works, copy it instead.';
+        reportError(new Error('send-invite failed: '+why),'invite:send');
+      }
+    }
     btn.textContent='Copy link';
+    btn.disabled=false;
     btn.onclick=()=>{ navigator.clipboard?.writeText(link); toast('Link copied — share it privately'); };
   };
 }

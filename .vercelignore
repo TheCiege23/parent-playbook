@@ -12,9 +12,15 @@
 # server-side source: edge functions and migrations are not browser assets
 supabase/
 
-# transactional email templates — pasted into the Supabase dashboard by hand,
-# never fetched by the app
-emails/
+# Transactional email templates. confirm-email and reset-password get pasted into the
+# Supabase dashboard by hand and are never fetched, so they stay out of the deploy.
+#
+# invite.html is the exception: send-invite fetches it at runtime, which keeps a 7KB
+# template out of the function bundle and lets you edit the email by redeploying the
+# site instead of the function. There is nothing to protect — the file exists to be
+# mailed to strangers.
+emails/*
+!emails/invite.html
 
 # tooling
 .claude/

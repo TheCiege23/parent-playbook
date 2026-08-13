@@ -105,6 +105,43 @@
   .ob-reveal .firstact b{display:block;font-family:'Archivo';font-weight:800;font-size:19px;margin:7px 0 3px}
   .ob-reveal .firstact span{font-size:13px;color:rgba(246,242,233,.7)}
 
+  /* ---- Invite: someone else's first impression ---- */
+  .inv-wrap{max-width:420px;margin:0 auto;padding-top:44px;padding-bottom:40px}
+  .inv-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+  .inv-brand .lp-mark{width:34px;height:34px;border-radius:10px;background:var(--amber);
+    color:var(--pine-900);display:flex;align-items:center;justify-content:center;
+    font-family:'Archivo';font-weight:900;font-size:16px}
+  .inv-brand b{font-family:'Archivo';font-weight:800;font-size:16px}
+  .inv-faces{display:flex;align-items:center;margin-bottom:18px}
+  .inv-faces span{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;
+    justify-content:center;font-family:'Archivo';font-weight:800;font-size:18px;color:#fff;
+    border:2px solid var(--paper)}
+  .inv-faces .f1{background:linear-gradient(140deg,#0E3B31,#17936F)}
+  .inv-faces .f2{background:linear-gradient(140deg,#17936F,#1FB388);margin-left:-14px}
+  .inv-wrap h1{font-size:26px;font-weight:900;letter-spacing:-.026em;line-height:1.12}
+  .inv-lead{font-size:15px;line-height:1.6;color:var(--muted);margin:12px 0 0}
+  .inv-perms{margin-top:22px}
+  .inv-perms .row{display:flex;gap:11px;align-items:flex-start;padding:8px 0;font-size:14.5px;line-height:1.45}
+  .inv-perms .row i{flex:0 0 20px;height:20px;border-radius:6px;font-style:normal;font-size:11px;
+    display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .inv-perms .yes i{background:#DFF0E8;color:var(--green-d)}
+  /* The single ✕ line does more for trust than any amount of reassurance copy, so it
+     is stated plainly rather than softened or hidden. */
+  .inv-perms .no i{background:#F7E7E0;color:var(--clay-ink)}
+  .inv-perms .no span{color:var(--muted)}
+  .inv-bang,.inv-tick{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;
+    justify-content:center;font-family:'Archivo';font-weight:900;font-size:24px;margin-bottom:18px}
+  .inv-bang{background:var(--amber-s);color:#8A5A14}
+  .inv-tick{background:#DFF0E8;color:var(--green-d)}
+
+  /* Read-only should feel like a seat, not a lockout: one quiet banner, no greyed-out
+     buttons taunting her. */
+  .roview{position:sticky;top:0;z-index:35;display:flex;align-items:center;gap:8px;
+    background:var(--green-d);color:var(--paper);font-size:12.5px;font-weight:500;
+    padding:9px 18px}
+  .roview i{font-style:normal}
+  .chk.static.seen{border-style:solid;border-color:#BFD9CE;color:var(--good);background:#F1F7F4}
+
   /* bottom nav */
   .nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;
     border-top:1px solid var(--line);display:flex;padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:40}

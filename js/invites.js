@@ -1,65 +1,196 @@
 // ===================================================================
-//  REDEEM INVITE
+//  REDEEM INVITE — someone else's first impression
 // ===================================================================
+// Design handoff, platform §3. A grandmother taps a link in a text message. She has
+// never heard of Parent Playbook, she is being asked to make an account, and the old
+// screen was a 🤝 emoji and two buttons.
+//
+// Three rules this file is built on:
+//   1. Say what the product IS before asking for an account. This is the only screen
+//      inside the app where that is true.
+//   2. State the LIMITS, not just the access. The one ✕ line does more for trust than
+//      any amount of reassurance copy.
+//   3. An expired link is not an error — it's a week-old text message.
+
+// What each role can and can't do, in the recipient's words. The ✕ line is the point.
+// Keys are access_role enum values. Getting this wrong still "worked" via the
+// fallback, which is exactly why it went unnoticed.
+const INVITE_ROLE = {
+  family_view: {
+    heading:'family view',
+    can:['His games, photos and milestones','The week he\'s working on'],
+    cant:'No editing, and no other children',
+  },
+  co_parent: {
+    heading:'co-parent access',
+    can:['Everything a parent sees','Log games, mark sessions done, add photos'],
+    cant:'No billing or account changes',
+  },
+};
+function inviteRole(r){ return INVITE_ROLE[r] || INVITE_ROLE.family_view; }
+
 async function renderRedeem(token){
+  document.body.classList.remove('auth'); setAppBg();
   root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Opening invite…</div></div>`;
-  const { data, error } = await sb.rpc('invite_preview',{ p_token:token });
+  let data, error;
+  try{ ({ data, error } = await sb.rpc('invite_preview',{ p_token:token })); }
+  catch(e){ console.error(e); return renderInviteDead('We couldn\'t open this link',
+    'Something went wrong on our end, not yours. Check your connection and try the link again.', token); }
   const info = Array.isArray(data)?data[0]:data;
+
   if(error||!info||info.status==='not_found'){
-    return root.innerHTML = redeemCard('This invite link is invalid', 'The link may be mistyped or was deleted.', false);
+    return renderInviteDead('This link doesn\'t work',
+      'It may have been mistyped, or the invite was deleted. Nothing is wrong on your end.', token);
   }
   if(info.status!=='pending'){
-    const map={revoked:'This invite was revoked.',accepted:'This invite has already been used.',expired:'This invite has expired.'};
-    return root.innerHTML = redeemCard('Invite unavailable', map[info.status]||'This invite can no longer be used.', false);
+    // Same layout for all three; only the headline and the first card change.
+    const head={ revoked:'This invite was turned off',
+                 accepted:'This link has already been used',
+                 expired:'This link has expired' }[info.status] || 'This link can no longer be used';
+    const why={ revoked:`${info.inviter} removed this invite. If that's a surprise, ask them for a new one.`,
+                accepted:'Someone already accepted it. If that was you, just log in — the athlete is still there.',
+                expired:'Invite links only last a week, so they can\'t be forwarded around forever. Nothing is wrong on your end.'
+              }[info.status] || 'Ask for a fresh link.';
+    return renderInviteDead(head, why, token, info);
   }
-  const roleLabel = info.invite_role==='co_parent'?'co-parent (can edit)':'family view';
-  root.innerHTML = H`<div class="app-pad" style="padding-top:52px">
-    <div style="text-align:center;margin-bottom:22px">
-      <div class="avatar" style="width:56px;height:56px;border-radius:16px;font-size:24px;margin:0 auto 14px">🤝</div>
-      <h1 style="font-size:24px">You've been invited</h1>
-      <p style="color:var(--muted);margin:8px auto 0;max-width:320px">
-        <b>${esc(info.inviter)}</b> is sharing <b>${esc(info.athlete_first_name)}'s</b> Parent Playbook with you as <b>${esc(roleLabel)}</b>.</p>
+
+  const role=inviteRole(info.invite_role);
+  const nm=esc(info.athlete_first_name||'their athlete');
+  const who=esc(info.inviter||'A parent');
+  const initials=(info.athlete_first_name||'?').trim()[0].toUpperCase();
+  const detail=[info.athlete_age!=null?`${info.athlete_age}`:null, info.sport_name?esc(info.sport_name):null]
+    .filter(Boolean).join(' · ');
+
+  root.innerHTML = H`
+  <div class="app-pad inv-wrap">
+    <div class="inv-brand"><div class="lp-mark">P</div><b>Parent Playbook</b></div>
+
+    <div class="inv-faces">
+      <span class="f1">${esc(who.trim()[0].toUpperCase())}</span>
+      <span class="f2">${esc(initials)}</span>
     </div>
-    <div class="card app-pad" id="rbox"></div>
+
+    <h1>${who} wants you to follow ${nm}'s season.</h1>
+    <p class="inv-lead">Parent Playbook is where the family keeps ${nm}'s games, milestones and photos — and the weekly plan ${nm} is working on. Nothing here is public.</p>
+
+    <div class="card app-pad inv-perms">
+      <div class="sec-title" style="margin:0 0 10px">You'd get ${esc(role.heading)}</div>
+      ${role.can.map(c=>H`<div class="row yes"><i>✓</i><span>${esc(c)}</span></div>`).join('')}
+      <div class="row no"><i>✕</i><span>${esc(role.cant)}</span></div>
+    </div>
+
+    <div id="rbox" style="margin-top:18px"></div>
+    <p class="muted-note">${who} can remove your access at any time.${detail?` ${nm} is ${esc(detail)}.`:''}</p>
   </div>`;
+
   const box=$("#rbox");
   if(state.user){
-    box.innerHTML=H`<p style="font-size:14px;margin:0 0 14px">You're logged in as ${esc(state.user.email)}. Accept to get access.</p>
-      <button class="btn" id="accept">Accept invite</button>
-      <button class="btn ghost" id="skip" style="margin-top:10px">Not now</button>`;
+    box.innerHTML=H`<button class="btn amber" id="accept">Accept and follow ${nm}</button>
+      <p class="muted-note" style="margin-top:10px">You're signed in as ${esc(state.user.email)}. <a href="#" id="skip" style="color:var(--green-d)">Not now</a></p>`;
     $("#accept").onclick=()=>acceptAndEnter(token);
-    $("#skip").onclick=()=>{ history.replaceState({},'',location.pathname); afterLogin(); };
+    $("#skip").onclick=e=>{ e.preventDefault(); history.replaceState({},'',location.pathname); afterLogin(); };
   }else{
-    box.innerHTML=H`<p style="font-size:14px;margin:0 0 14px">Create a free account (or log in) to accept. You'll only ever see athletes shared with you.</p>
-      <button class="btn" id="su">Create account & accept</button>
-      <button class="btn ghost" id="li" style="margin-top:10px">I already have an account</button>`;
+    box.innerHTML=H`<button class="btn amber" id="su">Create a free account</button>
+      <p class="muted-note" style="margin-top:10px">Already have one? <a href="#" id="li" style="color:var(--green-d)">Log in</a></p>`;
+    // Both paths keep ?invite= in the URL, so the token survives email confirmation and
+    // acceptAndEnter picks it up on the way back in.
     $("#su").onclick=()=>renderAuth('signup');
-    $("#li").onclick=()=>renderAuth('login');
+    $("#li").onclick=e=>{ e.preventDefault(); renderAuth('login'); };
   }
 }
-function redeemCard(title,sub,retry){
-  return H`<div class="app-pad" style="padding-top:70px;text-align:center">
-    <div class="avatar" style="width:56px;height:56px;border-radius:16px;font-size:24px;margin:0 auto 14px;background:var(--danger)">!</div>
-    <h2 style="font-size:22px">${esc(title)}</h2>
-    <p style="color:var(--muted);margin:10px auto 22px;max-width:300px">${esc(sub)}</p>
-    <div style="max-width:280px;margin:0 auto"><a class="btn ghost" href="${location.pathname}">Go to Parent Playbook</a></div>
+
+// Screen 4 — invalid, revoked, accepted and expired all land here. The tone is
+// "here's how to get a new one", never "invalid token".
+function renderInviteDead(title, why, token, info){
+  const who=info&&info.inviter?esc(info.inviter):'whoever sent it';
+  const msg=`Hi — could you send me a new Parent Playbook invite link? The last one stopped working.`;
+  root.innerHTML = H`
+  <div class="app-pad inv-wrap">
+    <div class="inv-brand"><div class="lp-mark">P</div><b>Parent Playbook</b></div>
+    <div class="inv-bang">!</div>
+    <h1>${esc(title)}</h1>
+    <p class="inv-lead">${esc(why)}</p>
+
+    <div class="card app-pad" style="margin-top:20px">
+      <div class="grow" style="border:none;padding:0"><div class="gi">🔁</div>
+        <div class="gt"><b>Ask ${who} for a new one</b><span>It takes about ten seconds — Profile, then Invite.</span></div></div>
+      <button class="btn ghost" id="invCopy" style="margin-top:12px">Copy a message to send</button>
+    </div>
+
+    <div class="card app-pad" style="margin-top:12px">
+      <div class="grow" style="border:none;padding:0"><div class="gi">👤</div>
+        <div class="gt"><b>Already have an account?</b><span>If an athlete was shared with you before, they're still there.</span></div></div>
+      <button class="btn" id="invLogin" style="margin-top:12px">Log in</button>
+    </div>
   </div>`;
+  // "Text Chris" needs a phone number we don't have. Copy-to-clipboard instead of a
+  // button that can't work.
+  $("#invCopy").onclick=()=>{
+    try{ navigator.clipboard.writeText(msg); toast('Message copied — paste it into a text'); }
+    catch(e){ toast('Could not copy — the message is: '+msg); }
+  };
+  $("#invLogin").onclick=()=>renderAuth('login');
 }
+
 async function acceptAndEnter(token){
   root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
   const { error } = await sb.rpc('accept_invite',{ p_token:token });
   history.replaceState({},'',location.pathname);
   if(error){
-    root.innerHTML = redeemCard('Could not accept', friendlyAcceptErr(error.message), false);
-    return;
+    return renderInviteDead('Could not accept this invite', friendlyAcceptErr(error.message||''), token);
   }
-  toast('Access granted 🎉');
-  try{ await afterLogin(); }catch(e){ console.error(e); bootError(); }
+  // Screen 2 — who this child is, what's next, and the install prompt. A grandparent
+  // needs "Add to Home Screen" most and will find it least, so it goes here rather
+  // than in a banner she'll dismiss.
+  try{
+    await Promise.all([ loadAthletes(), loadRef() ]);
+    state.active = state.athletes[0] || null;
+    if(!state.active) return afterLogin();
+    renderInviteAccepted();
+  }catch(e){ console.error(e); try{ await afterLogin(); }catch(_){ bootError(); } }
 }
+
+async function renderInviteAccepted(){
+  const a=state.active;
+  const [{data:sports},{data:games}] = await Promise.all([
+    sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
+    sb.from('games').select('*').eq('athlete_id',a.id).order('game_date',{ascending:false}).limit(1),
+  ]);
+  const p=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
+  const sportName=state.ref?.sports.find(s=>s.key===p?.sport_key)?.name||'';
+  const age=ageFrom(a.birthdate);
+  const g=(games||[])[0];
+  const nm=esc(a.first_name);
+  const bits=[age!=null?`${nm} is ${age}`:null, p?.positions?.length?`plays ${esc(p.positions.join('/'))}`:(sportName?`plays ${esc(sportName)}`:null)].filter(Boolean);
+
+  root.innerHTML = H`
+  <div class="app-pad inv-wrap">
+    <div class="inv-tick">✓</div>
+    <h1>You're in.</h1>
+    <p class="inv-lead">You can follow ${nm}'s season whenever you like.${bits.length?' '+esc(bits.join(', '))+'.':''}</p>
+
+    ${g?H`<div class="card app-pad" style="margin-top:20px">
+      <div class="sec-title" style="margin:0 0 8px">Most recent</div>
+      <div class="gh"><div style="min-width:0">
+        <div class="score">${(typeof g.our_score==='number'&&typeof g.their_score==='number')?`${g.our_score}–${g.their_score}`:'Game'}</div>
+        <div class="meta">${esc(fmtDate(g.game_date))}${g.opponent?' · vs '+esc(g.opponent):''}${g.home_away?' · '+esc(g.home_away):''}</div>
+      </div><span class="result-badge r-${gameResult(g)}">${({win:'Win',loss:'Loss',tie:'Tie',na:'Logged'})[gameResult(g)]}</span></div>
+    </div>`:''}
+
+    <div class="card app-pad" style="margin-top:12px">
+      <div class="grow" style="border:none;padding:0"><div class="gi">📲</div>
+        <div class="gt"><b>Add it to your phone</b><span>Tap Share, then Add to Home Screen — it opens like an app, no store needed.</span></div></div>
+    </div>
+
+    <button class="btn amber" id="invGo" style="margin-top:20px">See ${nm}'s week</button>
+  </div>`;
+  $("#invGo").onclick=()=>renderApp('week');
+}
+
 function friendlyAcceptErr(m){
-  if(/expired/i.test(m)) return 'This invite has expired. Ask for a new link.';
-  if(/revoked/i.test(m)) return 'This invite was revoked.';
-  if(/already/i.test(m)) return 'This invite was already used.';
-  if(/authenticated/i.test(m)) return 'Please log in first, then open the link again.';
-  return m;
+  if(/expired/i.test(m)) return 'Invite links only last a week. Ask for a new one — it takes about ten seconds.';
+  if(/revoked/i.test(m)) return 'This invite was turned off before you got to it.';
+  if(/already/i.test(m)) return 'It was already used. If that was you, just log in — the athlete is still there.';
+  if(/authenticated/i.test(m)) return 'Log in first, then open the link again.';
+  return m || 'Something went wrong on our end, not yours.';
 }

@@ -157,12 +157,14 @@ async function screenWeek(){
       <div class="today">
         <div class="k">Today · ${esc(dayName(todayIdx))}</div>
         <h3>${esc(todayW.title)}</h3>
-        <p>${esc(todayW.sub||'')}</p>
+        <p>${esc(todayW.sub||'')}${state.canEdit?'':' · '+esc(ownerFirstName())+' marks these off'}</p>
         <div class="acts">
-          ${todayW.act
-            ? H`<button class="btn sm amber" id="todayDone">Mark done</button>
-                <button class="ghostlink" id="todayOpen">How to do it ›</button>`
-            : '<span class="doneflag">Nothing to complete today</span>'}
+          ${!state.canEdit
+            ? H`<button class="ghostlink" id="todayOpen">See how it's done ›</button>`
+            : todayW.act
+              ? H`<button class="btn sm amber" id="todayDone">Mark done</button>
+                  <button class="ghostlink" id="todayOpen">How to do it ›</button>`
+              : '<span class="doneflag">Nothing to complete today</span>'}
         </div>
       </div>`;
   }
@@ -244,7 +246,9 @@ async function screenWeek(){
         const isDone=done(idx);
         const isMoved=w.t==='moved';
         const isToday=idx===todayIdx;
-        const tickable=w.t!=='rest'&&w.t!=='moved'&&!!w.act;
+        // Family view gets a small dot, never a checkbox — a control that looks
+        // tappable and then refuses is worse than no control at all.
+        const tickable=w.t!=='rest'&&w.t!=='moved'&&!!w.act&&state.canEdit!==false;
         const cls=['day', isDone?'is-done':'', isMoved?'is-moved':'', isToday?'is-today':''].filter(Boolean).join(' ');
         return H`
         <div class="${cls}" data-day="${idx}">
@@ -252,7 +256,7 @@ async function screenWeek(){
             ? H`<button class="chk ${isDone?'on':''}" data-tick="${idx}"
                   aria-pressed="${isDone?'true':'false'}"
                   aria-label="${isDone?'Mark not done':'Mark done'}: ${esc(w.title)}">${isDone?'✓':''}</button>`
-            : H`<span class="chk static ${w.t==='rest'?'rest':''}" aria-hidden="true">${w.t==='rest'?'z':(isMoved?'→':'')}</span>`}
+            : H`<span class="chk static ${w.t==='rest'?'rest':''} ${isDone?'seen':''}" aria-hidden="true">${isDone?'✓':(w.t==='rest'?'z':(isMoved?'→':''))}</span>`}
           <div class="d"><b>${w.d}</b>${isToday?'<span>Today</span>':'<span>&nbsp;</span>'}</div>
           <div class="body"><h4>${esc(w.title)}</h4><p>${esc(w.t==='rest'?(w.sub||'')+' — counts as done':(w.sub||''))}</p></div>
           <span class="tag t-${w.t}">${esc(w.type)}</span>
