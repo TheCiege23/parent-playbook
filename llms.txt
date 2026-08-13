@@ -1,0 +1,31 @@
+# Parent Playbook
+
+> A free web app for parents of youth athletes (ages 3–19). It builds a weekly,
+> age-appropriate at-home training plan around the team's existing practice and game
+> schedule, and keeps a private record of the child's sporting life.
+
+Parent Playbook is aimed at the parent who wants to help on non-practice days but has
+never played the sport. Every activity explains what it is, why it matters, what to
+say, and when to stop. Plans are age-banded and rest-first: the more the team trains
+in a given week, the less the app adds at home.
+
+## Pages
+- [Home](https://playbook.chimaura.com/): the marketing page and the app itself — the app boots in place at `#app`.
+- [Privacy Policy](https://playbook.chimaura.com/privacy): what is collected about a child and why, and how to delete it.
+- [Terms of Service](https://playbook.chimaura.com/terms)
+
+## What it does
+- Weekly plan: seven days of skill work, age-safe strength, game day and real rest, generated from the child's age, sport, position, goals and team schedule.
+- Parent guidance: per-activity how-to, common mistakes, what to say, and stop signs.
+- Athlete journey: game log with scores and stats, milestones, and a private photo/video gallery.
+- Growth tracking: height and weight over time — a fast growth spurt reduces the week's training load automatically.
+- Sharing: invite a co-parent, grandparent or coach; access can be revoked at any time.
+- Installs to a phone home screen as a PWA. No app store, free to start, no card.
+
+## What it is not
+- Not medical, nutrition or physical-therapy advice.
+- Not a social network. Nothing about a child is public or shareable to social platforms.
+- Not a scouting, recruiting or ranking service.
+
+## Contact
+support@chimaura.com — Parent Playbook is made by Brown Pig LLC.
