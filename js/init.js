@@ -20,7 +20,13 @@ async function boot(mode){
     if(PP_RECOVERY){ return renderResetPassword(); }
     const token = inviteTokenFromUrl();
     if(token){ return renderRedeem(token); }
-    if(!state.user) return renderAuth(mode==='signup'?'signup':'login');
+    if(!state.user){
+      // Account-last: "Start free" drops them straight into onboarding. They build the
+      // profile, see a real week, and are only then asked for an email. Log-in still
+      // goes to the form, because a returning parent has nothing to build.
+      if(mode==='signup') return renderOnboarding();
+      return renderAuth('login');
+    }
     await afterLogin();
   }catch(err){ console.error(err); bootError(); }
 }

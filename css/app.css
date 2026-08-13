@@ -85,6 +85,26 @@
   .ob-head h2{font-size:23px;margin:6px 0 4px}
   .ob-head p{color:var(--muted);font-size:14px;margin:0}
 
+  /* The reveal — a real generated week, shown before the account is asked for. The one
+     dark, full-bleed moment in onboarding, because it's the payoff for four questions. */
+  .ob-reveal{background:var(--pine-900);color:var(--paper);border-radius:20px;padding:22px 19px 20px;
+    box-shadow:0 14px 34px -16px rgba(4,18,14,.75)}
+  .ob-reveal .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+  .ob-reveal h2{font-size:25px;font-weight:900;margin:8px 0 7px;letter-spacing:-.025em}
+  .ob-reveal>p{font-size:13.5px;color:rgba(246,242,233,.72);margin:0;line-height:1.55}
+  .ob-reveal .strip{display:flex;gap:6px;margin-top:11px}
+  .ob-reveal .strip>div{flex:1;text-align:center}
+  .ob-reveal .strip i{display:block;height:38px;border-radius:7px}
+  .ob-reveal .strip span{display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;
+    font-weight:500;color:rgba(246,242,233,.55);margin-top:5px}
+  .ob-reveal .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+  .ob-reveal .legend span{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:rgba(246,242,233,.6)}
+  .ob-reveal .legend i{width:9px;height:9px;border-radius:3px}
+  .ob-reveal .firstact{margin-top:18px;padding-top:15px;border-top:1px solid rgba(246,242,233,.16)}
+  .ob-reveal .firstact b{display:block;font-family:'Archivo';font-weight:800;font-size:19px;margin:7px 0 3px}
+  .ob-reveal .firstact span{font-size:13px;color:rgba(246,242,233,.7)}
+
   /* bottom nav */
   .nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;
     border-top:1px solid var(--line);display:flex;padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:40}

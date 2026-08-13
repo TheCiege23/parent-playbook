@@ -1,7 +1,7 @@
 // ===================================================================
 //  ONBOARDING — teaching while collecting
 // ===================================================================
-const OB_BLANK = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:'',hand:'',height:'',weight:''}, sport:'', positions:[], level:'', parentExp:'', practiceDays:[], gameDay:null, seasonStart:null, goals:[], consents:{}, teamCode:'', teamName:'' };
+const OB_BLANK = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:''}, sport:'', showAllSports:false, positions:[], level:'', seasonState:'', practiceDays:[], gameDay:null, seasonStart:null, goals:[], consents:{}, teamCode:'', teamName:'' };
 const ob = { ...OB_BLANK };
 function obReset(patch){ Object.assign(ob, JSON.parse(JSON.stringify(OB_BLANK)), patch||{}); }
 const PARENT_EXP=[['','No'],['kid','As a kid'],['jr_high','Jr high'],['hs','High school'],['college','College'],['pro','Pro/elite']];
@@ -50,16 +50,30 @@ async function renderOnboarding(){
 // Seven screens is a lot to ask of a parent on a phone who was mildly curious about a
 // message in a team chat, and the ones lost to it are the ones who needed it most.
 const OB_FLOW = {
-  create:   ['child','sport','consent'],
-  addChild: ['child','sport','consent'],
+  create:   ['child','sport','season','goals','reveal','account'],
+  // A sibling is added by someone who already has an account, so there is nothing to
+  // sign up for. They still get the reveal — it is the best screen in the flow.
+  addChild: ['child','sport','season','goals','reveal'],
 };
-const OB_VIEW = {welcome:obWelcome,family:obFamily,child:obChild,sport:obSport,schedule:obSchedule,goals:obGoals,consent:obConsent};
-const OB_BIND = {welcome:obWelcomeBind,family:obFamilyBind,child:obChildBind,sport:obSportBind,schedule:obScheduleBind,goals:obGoalsBind,consent:obConsentBind};
-function obSteps(){ return OB_FLOW[ob.mode]; }
+const OB_VIEW = {child:obChild,sport:obSport,season:obSeason,goals:obGoals,reveal:obReveal,account:obAccount};
+const OB_BIND = {child:obChildBind,sport:obSportBind,season:obSeasonBind,goals:obGoalsBind,reveal:obRevealBind,account:obAccountBind};
+// Only the four QUESTION steps get a progress dot. The reveal is a reward and the
+// account step is the finish line; putting them on the same bar made a five-second
+// screen look like more work left to do.
+const OB_DOTS = ['child','sport','season','goals'];
+function obSteps(){
+  const steps = OB_FLOW[ob.mode] || OB_FLOW.create;
+  // Already signed in — adding a sibling, or finishing a profile whose first save
+  // failed. Asking them to create an account again would be nonsense.
+  return state.user ? steps.filter(x=>x!=='account') : steps;
+}
 function obStep(){
   const steps = obSteps();
   const name = steps[ob.i];
-  const dots = steps.map((_,k)=>`<i class="${k<=ob.i?'on':''}"></i>`).join('');
+  // Dots track the QUESTION steps only — see OB_DOTS.
+  const qSteps = steps.filter(x=>OB_DOTS.includes(x));
+  const qIndex = qSteps.indexOf(name);
+  const dots = qIndex<0 ? '' : qSteps.map((_,k)=>`<i class="${k<=qIndex?'on':''}"></i>`).join('');
   // Onboarding has no bottom nav and no top bar, so a signed-in user with no athletes —
   // e.g. straight after deleting their last one — had NO way back to the sign-in screen.
   // Back stops at step 0, and there was nothing else on the page. That is a dead end you
@@ -67,7 +81,7 @@ function obStep(){
   root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
     ${state.user?`<div style="display:flex;justify-content:flex-end;margin-bottom:2px">
       <button class="pill" id="obLogout">Log out</button></div>`:''}
-    <div class="steps">${dots}</div>
+    ${dots?`<div class="steps">${dots}</div>`:''}
     ${OB_VIEW[name]()}
   </div>`;
   OB_BIND[name]();
@@ -161,21 +175,12 @@ function obChild(){ return H`
     Got a code from your coach? <a href="#" id="obWelcomeCode" style="color:var(--green-d)">Enter it</a> and we'll fill in the team's schedule.</p>`}
   <div class="field"><label>First name</label><input id="cf" placeholder="Marcus" value="${esc(ob.athlete.first)}"/></div>
   <div class="field"><label>Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${new Date().toISOString().slice(0,10)}"/></div>
-  <div class="field"><label>Dominant hand (optional)</label>
-    <div class="chipgrid" id="hand">
-      ${['left','right','both'].map(h=>`<div class="chip ${ob.athlete.hand===h?'on':''}" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
-    </div></div>
   <div class="err" id="oberr"></div>
-  <div class="row2" style="margin-top:8px">
-    <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
-  </div>`; }
+  <div style="margin-top:8px"><button class="btn" id="n">Continue</button></div>
+  ${state.user?'':`<p class="muted-note" style="margin-top:14px">Already have an account? <a href="#" id="obLogin" style="color:var(--green-d)">Log in</a></p>`}`; }
 function obChildBind(){
-  $("#b").onclick=obBack;
+  { const l=$("#obLogin"); if(l) l.onclick=e=>{ e.preventDefault(); renderAuth('login'); }; }
   obBindTeamCodeLink();
-  $("#hand").querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
-    ob.athlete.hand = ob.athlete.hand===c.dataset.h?'':c.dataset.h;
-    $("#hand").querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.h===ob.athlete.hand));
-  });
   $("#n").onclick=()=>{
     const f=$("#cf").value.trim(), b=$("#cb").value;
     if(!f){$("#oberr").textContent="What's your athlete's first name?";return;}
@@ -200,9 +205,17 @@ function posChips(sportKey, selected, id){
 }
 
 // step: sport + position + level
+// The six most likely first taps, then everything else behind one button. Eighteen
+// chips up front reads as a form; six reads as a question.
+const OB_COMMON_SPORTS = ['football','basketball','soccer','baseball','track','volleyball'];
 function obSport(){
   const sports = state.ref.sports;
   const chosen = ob.sport;
+  // Expand automatically if their sport isn't in the short list — otherwise the chip
+  // they already picked would vanish when they came back to this step.
+  const allShown = ob.showAllSports || (chosen && !OB_COMMON_SPORTS.includes(chosen));
+  const shown = allShown ? sports
+    : OB_COMMON_SPORTS.map(k=>sports.find(x=>x.key===k)).filter(Boolean);
   const positions = chosen ? state.ref.positions.filter(p=>p.sport_key===chosen) : [];
   const levels = chosen ? (sports.find(s=>s.key===chosen)?.level_vocab||[]) : [];
   return H`
@@ -224,9 +237,11 @@ function obSport(){
     <div class="err" id="obTeamErr"></div>
   </div>`}
   <div class="field"><label>Sport</label>
-    <div class="chipgrid" id="sports">
-      ${sports.map(s=>`<div class="chip ${chosen===s.key?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
-    </div></div>
+    <div class="chipgrid two" id="sports">
+      ${shown.map(s=>`<div class="chip ${chosen===s.key?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+    </div>
+    ${allShown?'':`<button class="btn sm ghost" id="obAllSports" style="width:100%;margin-top:9px">All ${sports.length} sports ›</button>`}
+  </div>
   ${chosen?H`
     <div class="field"><label>Position(s) — optional</label>
       ${posChips(chosen, ob.positions, 'pos')}
@@ -236,12 +251,7 @@ function obSport(){
       <select id="lvl"><option value="">Select level…</option>
         ${levels.map(l=>`<option ${ob.level===l?'selected':''}>${esc(l)}</option>`).join('')}
       </select></div>
-    <div class="field"><label>Did you play ${esc(sports.find(s=>s.key===chosen)?.name||'this sport')}? (optional)</label>
-      <div class="chipgrid" id="pexp" style="grid-template-columns:repeat(3,1fr)">
-        ${PARENT_EXP.map(([v,l])=>`<div class="chip ${ob.parentExp===v?'on':''}" data-e="${v}">${esc(l)}</div>`).join('')}
-      </div>
-      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">We'll add a "Coach's Corner" note for you on drills you already know.</p>
-    </div>`:''}
+`:''}
   <div class="err" id="oberr"></div>
   <div class="row2" style="margin-top:8px">
     <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
@@ -274,9 +284,10 @@ function obSportBind(){
     c.classList.toggle('on');
   });
   const lvl=$("#lvl"); if(lvl) lvl.onchange=()=>ob.level=lvl.value;
-  const pexp=$("#pexp"); if(pexp) pexp.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
-    ob.parentExp=c.dataset.e; pexp.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
-  });
+  // Parent experience moved to Profile → Coach's Corner. It was the last optional
+  // question in a flow we were trying to shorten, and it works better once they have
+  // seen a drill it would annotate.
+  { const all=$("#obAllSports"); if(all) all.onclick=()=>{ ob.showAllSports=true; obStep(); }; }
   $("#n").onclick=()=>{
     if(!ob.sport){$("#oberr").textContent="Pick a sport to continue.";return;}
     // Position and level are optional now — the engine handles both being unset, and
@@ -401,7 +412,7 @@ function obGoals(){
   <div class="chipgrid" id="gphys">${grp('physical')}</div>
   <div class="err" id="oberr"></div>
   <div class="row2" style="margin-top:16px">
-    <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
+    <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Build the playbook</button>
   </div>`;
 }
 function obGoalsBind(){
@@ -413,6 +424,237 @@ function obGoalsBind(){
     c.classList.toggle('on');
   });
   $("#n").onclick=()=>{ if(ob.goals.length===0){$("#oberr").textContent="Pick at least one goal.";return;} obNext(); };
+}
+
+// ===================================================================
+//  step: season — where in the year they are
+// ===================================================================
+// New in the app-screens handoff, and the honest answer to "is this only useful three
+// months a year?". SEASON_STATE in program.js is what each option actually does.
+function obSeason(){
+  const nm=esc(ob.athlete.first);
+  const opts=[
+    ['in_season','In season','Games every week. Home work stays light, recovery is protected.'],
+    ['offseason','Offseason','No games. Where kids actually get better — more skill work, more strength.'],
+    ['between_sports','Between sports',"One just ended, the next hasn't started. Athletic base and rest."],
+  ];
+  return H`
+  <div class="ob-head"><div class="k">The calendar</div><h2>Where are you in the year?</h2>
+  <p>A week in October shouldn't look like a week in February.</p></div>
+  <div role="radiogroup" aria-label="Season">
+    ${opts.map(o=>H`<div class="pickcard ${ob.seasonState===o[0]?'on':''}" data-v="${esc(o[0])}" role="radio" tabindex="0" aria-checked="${ob.seasonState===o[0]?'true':'false'}">
+      <b>${esc(o[1])}</b><span>${esc(o[2])}</span></div>`).join('')}
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin:12px 2px 0;line-height:1.5">Whichever you pick, ${nm} gets a week. Change it any time — seasons move.</p>
+  <div class="err" id="oberr"></div>
+  <div class="row2" style="margin-top:16px">
+    <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
+  </div>`;
+}
+function obSeasonBind(){
+  $("#b").onclick=obBack;
+  const pick=el=>{ ob.seasonState=el.dataset.v;
+    document.querySelectorAll('.pickcard').forEach(x=>{ const on=(x===el);
+      x.classList.toggle('on',on); x.setAttribute('aria-checked',String(on)); }); };
+  document.querySelectorAll('.pickcard').forEach(el=>{
+    el.onclick=()=>pick(el);
+    el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); pick(el); } };
+  });
+  $("#n").onclick=()=>{
+    if(!ob.seasonState){ $("#oberr").textContent="Pick one — it changes what the week looks like."; return; }
+    obNext();
+  };
+}
+
+// ===================================================================
+//  step: the reveal — the whole reason the account moved last
+// ===================================================================
+// buildProgram is pure and needs no session, so a real week is generated and shown
+// BEFORE anyone is asked for an email. They see the thing before they pay for it in
+// effort. The reference catalogue is anon-readable for exactly this screen.
+function obPreviewProgram(){
+  const age=ageFrom(ob.athlete.bd);
+  const roster=[{ sportKey:ob.sport, sportName:(state.ref?.sports.find(s=>s.key===ob.sport)?.name||ob.sport),
+                  positions:ob.positions, level:ob.level||null,
+                  practiceDays:ob.practiceDays, gameDay:ob.gameDay, gamesOn:true, isPrimary:true }];
+  return buildProgram(age, ob.goals, ob.sport, ob.positions, 0,
+    { sports:roster, cancelled:[], practiceDays:ob.practiceDays, gameDay:ob.gameDay,
+      inSeason:true, seasonStart:ob.seasonStart, seasonState:ob.seasonState||null,
+      level:ob.level||null, growth:null });
+}
+const OB_STRIP={train:'#17936F',gym:'#8B6DD0',game:'#C0603F',practice:'#2A5F97',rest:'#EFA33B',moved:'#8A877C'};
+function obReveal(){
+  const nm=esc(ob.athlete.first);
+  const age=ageFrom(ob.athlete.bd);
+  const prog=obPreviewProgram();
+  const sportName=state.ref?.sports.find(s=>s.key===ob.sport)?.name||ob.sport;
+  const todayIdx=(new Date().getDay()+6)%7;
+  // Today if there's something on today, otherwise the next session AHEAD of today —
+  // wrapping to next week rather than pointing at a Monday that has already gone.
+  // "First up · Mon" on a Thursday reads as a plan that's already behind.
+  let firstIdx=-1;
+  for(let n=0;n<7;n++){
+    const i=(todayIdx+n)%7, d=prog.days[i];
+    if(d && (d.t==='train'||d.t==='gym'||d.t==='game'||d.t==='practice')){ firstIdx=i; break; }
+  }
+  if(firstIdx<0) firstIdx=todayIdx;                 // an all-rest week is a real answer
+  const first=prog.days[firstIdx];
+  const startsToday=firstIdx===todayIdx;
+  const nextWeek=firstIdx<todayIdx;
+  const goalLine=ob.goals.length
+    ? ' Built around '+ob.goals.map(g=>g.label.toLowerCase()).join(' and ')+'.' : '';
+  const seasonWord={in_season:'in season',offseason:'offseason',between_sports:'between sports'}[ob.seasonState]||'';
+  return H`
+  <div class="ob-reveal">
+    <div class="k">Built for ${nm}</div>
+    <h2>${nm}'s first week is ready.</h2>
+    <p>${age!=null?'Age '+age+' · ':''}${esc(sportName)}${ob.positions.length?', '+esc(ob.positions.join('/')):''}${seasonWord?' · '+seasonWord:''}.${esc(goalLine)}</p>
+
+    <div class="k" style="margin-top:20px">This week</div>
+    <div class="strip">
+      ${prog.days.map((d,i)=>H`<div><i style="background:${OB_STRIP[d.t]||'#8A877C'}"></i><span>${DAY_LABELS[i][0]}</span></div>`).join('')}
+    </div>
+    <div class="legend">
+      ${[['train','Skill'],['gym','Strength'],['rest','Rest'],['game','Game']].map(l=>
+        H`<span><i style="background:${OB_STRIP[l[0]]}"></i>${l[1]}</span>`).join('')}
+    </div>
+
+    ${first&&first.act?H`<div class="firstact">
+      <div class="k">${startsToday?'Starts today':(nextWeek?'First up · next '+DAY_LABELS[firstIdx]:'First up · '+DAY_LABELS[firstIdx])}</div>
+      <b>${esc(first.title)}</b>
+      <span>${esc(first.sub||first.act.dur||'')}</span>
+    </div>`:''}
+  </div>
+  <div style="margin-top:18px">
+    <button class="btn amber" id="n">Save ${nm}'s playbook</button>
+    <p class="muted-note" style="margin-top:10px">${state.user?'Adds them to your household — nothing else changes.':"Takes 20 seconds — then it's yours to keep."}</p>
+  </div>
+  <div style="margin-top:6px"><button class="btn ghost" id="b">Back</button></div>`;
+}
+function obRevealBind(){
+  $("#b").onclick=obBack;
+  // Already signed in? There is no account step after this — save straight away.
+  $("#n").onclick=()=>{ if(state.user) return finishOnboarding(); obNext(); };
+}
+
+// ===================================================================
+//  step: the account — last, not first
+// ===================================================================
+function obAccount(){
+  const nm=esc(ob.athlete.first);
+  return H`
+  <div class="ob-head"><div class="k">Last step</div><h2>Save it to your phone</h2>
+  <p>One account holds every kid, every sport, every season.</p></div>
+  <div class="field"><label>Email</label>
+    <input id="obEmail" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(ob.email||'')}"/></div>
+  <div class="field"><label>Password</label>
+    <input id="obPw" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
+  <div class="card app-pad">
+    ${CONSENTS.map(c=>H`
+      <label style="display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)">
+        <input type="checkbox" data-c="${c.key}" ${ob.consents[c.key]?'checked':''} style="width:20px;height:20px;margin-top:1px;flex:0 0 auto" />
+        <span style="font-size:13.5px;line-height:1.45">${esc(c.label)} ${c.req?'<b style="color:var(--danger)">*</b>':''}</span>
+      </label>`).join('')}
+  </div>
+  <div class="err" id="oberr"></div>
+  <div class="row2" style="margin-top:16px">
+    <button class="btn ghost" id="b">Back</button><button class="btn amber" id="n">Create account</button>
+  </div>
+  <p class="muted-note">By finishing you provide verifiable parental consent under COPPA for the data you've entered.<br>
+    Read the <a href="/privacy" target="_blank" rel="noopener" style="color:var(--green-d)">Privacy Policy</a> and
+    <a href="/terms" target="_blank" rel="noopener" style="color:var(--green-d)">Terms</a> — the consent above refers to them.</p>
+  <p class="muted-note" style="margin-top:4px">Already have an account? <a href="#" id="obLogin2" style="color:var(--green-d)">Log in</a></p>`;
+}
+function obAccountBind(){
+  $("#b").onclick=obBack;
+  { const l=$("#obLogin2"); if(l) l.onclick=e=>{ e.preventDefault(); renderAuth('login'); }; }
+  document.querySelectorAll('input[data-c]').forEach(x=>x.onchange=()=>ob.consents[x.dataset.c]=x.checked);
+  $("#n").onclick=obCreateAccount;
+}
+
+// ===================================================================
+//  Account-last plumbing
+// ===================================================================
+// Email confirmation is ON, so signUp() returns NO session — and the RPC that saves the
+// profile needs one. Without somewhere to put the answers, moving the account last would
+// simply lose everything the parent typed.
+//
+// So the profile is stashed on their own device, and replayed by afterLogin() the moment
+// a session exists. It never touches the network before the account is real, which is
+// also what the handoff's consent-timing note requires.
+//
+// If they confirm on a DIFFERENT device the stash isn't there — they land back in
+// onboarding and re-enter it. Annoying, not broken, and it beats every alternative that
+// involves writing a child's name to a server before consent has been captured.
+const OB_STASH_KEY='pp_pending_profile';
+const OB_STASH_TTL=7*24*60*60*1000;
+function obStash(){
+  try{ localStorage.setItem(OB_STASH_KEY, JSON.stringify({ at:Date.now(), ob })); }catch(e){ console.error(e); }
+}
+function obReadStash(){
+  try{
+    const raw=localStorage.getItem(OB_STASH_KEY); if(!raw) return null;
+    const p=JSON.parse(raw);
+    if(!p||!p.ob||!p.ob.athlete||!p.ob.athlete.first) return null;
+    if(!p.at || (Date.now()-p.at)>OB_STASH_TTL){ obClearStash(); return null; }
+    return p.ob;
+  }catch(e){ return null; }
+}
+function obClearStash(){ try{ localStorage.removeItem(OB_STASH_KEY); }catch(e){} }
+
+async function obCreateAccount(){
+  const errEl=$("#oberr"); errEl.textContent='';
+  const email=($("#obEmail").value||'').trim();
+  const pw=$("#obPw").value||'';
+  const missing=CONSENTS.filter(c=>c.req && !ob.consents[c.key]);
+  if(!email||!/.+@.+\..+/.test(email)){ errEl.textContent='Enter a valid email address.'; return; }
+  if(pw.length<8){ errEl.textContent='Password needs at least 8 characters.'; return; }
+  if(missing.length){ errEl.textContent='Please check the required consent boxes.'; return; }
+  ob.email=email;
+
+  const btn=$("#n"); const label=btn.textContent;
+  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  try{
+    const res=await sb.auth.signUp({ email, password:pw, options:{ emailRedirectTo:authRedirectUrl() } });
+    if(res.error) throw res.error;
+    const u=res.data.user;
+    // Supabase returns a user with an EMPTY identities array when the email is already
+    // registered (enumeration protection). Send them to log in instead of failing later.
+    if(u && Array.isArray(u.identities) && u.identities.length===0){
+      errEl.textContent='';
+      toast('You already have an account — please log in');
+      obStash();                      // keep the profile; afterLogin will finish it
+      return renderAuth('login', email);
+    }
+    obStash();
+    if(!res.data.session){ return obConfirmNotice(email); }
+    // Confirmation turned off at some point: we have a session, finish immediately.
+    state.user=res.data.user;
+    await finishOnboarding();
+  }catch(err){
+    console.error(err); reportError(err,'onboarding:createAccount');
+    errEl.textContent = (typeof friendlyAuthErr==='function' ? friendlyAuthErr(err) : (err.message||'Could not create your account.'));
+    btn.innerHTML=label; btn.disabled=false;
+  }
+}
+
+// The confirm screen has to say the work is safe, or a parent who just spent three
+// minutes on this reasonably assumes they lost it.
+function obConfirmNotice(email){
+  const nm=esc(ob.athlete.first);
+  root.innerHTML = H`<div class="app-pad" style="padding-top:64px;text-align:center">
+    <div class="brandmark" style="background:var(--amber);color:var(--pine-900)">✓</div>
+    <h2 style="font-size:22px;margin-top:4px">Check your email</h2>
+    <p style="color:var(--muted);margin:10px auto 0;max-width:320px;line-height:1.55">
+      We sent a confirmation link to <b>${esc(email)}</b>. Tap it and ${nm}'s playbook will be waiting.</p>
+    <div class="card app-pad" style="max-width:320px;margin:22px auto 0;text-align:left">
+      <div class="grow" style="border:none;padding:0"><div class="gi">📋</div>
+        <div class="gt"><b>${nm}'s week is saved</b><span>Held on this device until you confirm. Use the same phone or laptop.</span></div></div>
+    </div>
+    <div style="max-width:320px;margin:20px auto 0">
+      <button class="btn ghost" id="obBackLogin">Back to log in</button></div>
+  </div>`;
+  $("#obBackLogin").onclick=()=>renderAuth('login', email);
 }
 
 // step: consent (COPPA) + finish
@@ -449,10 +691,13 @@ function obConsentBind(){
 }
 
 async function finishOnboarding(){
-  const errEl=$("#oberr"); errEl.textContent="";
+  // Reachable from three places now: the reveal (sibling flow), the account step, and
+  // afterLogin() replaying a stash. Only the first two have a visible button.
+  const errEl=$("#oberr"); if(errEl) errEl.textContent="";
   const missing = CONSENTS.filter(c=>c.req && !ob.consents[c.key]);
   if(missing.length){ errEl.textContent="Please check the required consent boxes."; return; }
-  const btn=$("#n"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  const btn=$("#n"); const label=btn?btn.textContent:'';
+  if(btn){ btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true; }
   try{
     // One transactional RPC: family + athlete + sport + goals + consent are saved
     // together or not at all. Guarantees the COPPA consent record is never dropped.
@@ -464,7 +709,7 @@ async function finishOnboarding(){
       p_family_name: (ob.familyName||'').trim() || 'My Family',
       p_first: ob.athlete.first,
       p_birthdate: ob.athlete.bd,
-      p_hand: ob.athlete.hand || null,
+      p_hand: null,   // dominant hand was cut from onboarding; unused by buildProgram
       p_sport: ob.sport,
       p_positions: ob.positions,
       p_level: ob.level,
@@ -477,7 +722,8 @@ async function finishOnboarding(){
     // Non-consent extras, written after the transactional RPC (which doesn't take them).
     // Best-effort: both are editable later from Profile, so a hiccup here isn't fatal.
     const extra={};
-    if(ob.parentExp) extra.parent_experience=ob.parentExp;
+    // parent_experience now asked in Profile -> Coach's Corner, not here.
+    if(ob.seasonState) extra.season_state=ob.seasonState;
     if(ob.practiceDays.length) extra.practice_days=ob.practiceDays;
     if(ob.gameDay!=null) extra.game_day=ob.gameDay;
     if(ob.seasonStart) extra.season_start=ob.seasonStart;
@@ -495,8 +741,8 @@ async function finishOnboarding(){
     // source MUST be a value of the measure_source enum: manual | guided | photo | import.
     // This used to say 'onboarding', which is not one of them, so every single height and
     // weight entered at intake was rejected by the database and silently thrown away.
-    if(ob.athlete.height) seed.push({athlete_id:athleteId,metric_key:'height',value:parseFloat(ob.athlete.height),unit:'in',measured_on:today,source:'manual',created_by:state.user.id});
-    if(ob.athlete.weight) seed.push({athlete_id:athleteId,metric_key:'weight',value:parseFloat(ob.athlete.weight),unit:'lb',measured_on:today,source:'manual',created_by:state.user.id});
+    // Height and weight are no longer asked at intake — they live in Growth, where
+    // the trend bars give them a reason to exist. Nothing to seed.
     if(seed.length){
       // supabase-js RETURNS {error} rather than throwing, so a try/catch around this
       // catches nothing. That is how the bug above survived: the insert failed on every
@@ -511,13 +757,17 @@ async function finishOnboarding(){
       // be on a different team, and a silently pre-filled wrong schedule is worse than none.
       clearTeamCode();
     }
+    obClearStash();          // the profile is on the server now
     await loadAthletes();
     state.active = state.athletes.find(a=>a.id===athleteId) || state.athletes[0];
     toast('Profile created 🎉');
     renderApp('week');
   }catch(err){
     console.error(err);
-    errEl.textContent = "Something went wrong saving. "+(err.message||''); btn.innerHTML=label; btn.disabled=false;
+    reportError(err,'onboarding:finish');
+    if(errEl) errEl.textContent = "Something went wrong saving. "+(err.message||'');
+    if(btn){ btn.innerHTML=label; btn.disabled=false; }
+    else { toast("Could not save the profile — try again"); obStep(); }
   }
 }
 

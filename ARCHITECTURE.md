@@ -16,7 +16,7 @@ don't hoist across separate `<script>` tags).
 | `js/background.js` | Rotating per-sport photo background | `BG`, `SPORT_BG`, `pickBg`, `setAppBg`, `inviteTokenFromUrl` |
 | `js/reference.js` | Load sports/positions/metrics config **+ the `drills` content library** | `loadRef` |
 | `js/auth.js` | Session lifecycle + login/signup screen | `afterLogin`, `loadAthletes`, `renderAuth`, `authRedirectUrl` |
-| `js/onboarding.js` | First-run child/sport/goals/consent flow | `renderOnboarding`, `ob*`, `finishOnboarding` |
+| `js/onboarding.js` | Six-step account-LAST flow + the reveal | `renderOnboarding`, `ob*`, `obCreateAccount`, `obStash`, `finishOnboarding` |
 | `js/program.js` | Age-appropriate activity/plan engine | `ageBand`, `SKILLS`, `POSITION_SKILLS`, `skillsFor`, `weeksSince`, `buildProgram`, `SEASON_STATE`, `rebalanceWeek`, `weekStreak` |
 | `js/shell.js` | App frame: router, bottom nav, top bar | `APP_TABS`, `renderApp`, `navBtn`, `topBar` |
 | `js/screen-week.js` | Weekly plan screen | `screenWeek` |
@@ -104,6 +104,31 @@ These look like styling choices and are not. Each one is load-bearing:
 
 `rebalanceWeek` is a view transform, not a write — the plan regenerates every render, so
 there is nothing to persist and nothing that can drift out of sync.
+
+## Onboarding puts the account LAST
+
+Six steps: child → sport → season → goals → **reveal** → account. The first five run with
+**no session at all**, which is why /// carry anon
+SELECT policies.  is pure, so the reveal shows a real generated week before
+anyone is asked for an email.
+
+**The catch, and how it is handled.** Email confirmation is ON, so  returns no
+session — and the RPC that saves the profile needs one. So  writes the answers
+to  (, 7-day TTL) and  replays them the
+moment a session appears. Consequences worth knowing:
+
+- **Nothing about the child touches the network before the account exists.** Verified:
+  zero DB calls between the first screen and . That is the handoff's
+  consent-timing requirement, not an implementation detail.
+- Confirming on a **different device** loses the stash — they land back in onboarding and
+  re-enter it. Annoying, not broken, and better than writing a child's name to a server
+  before consent has been captured.
+-  is now reachable from three places (the reveal for siblings, the
+  account step, and the  replay). Only two have a visible button, so every
+  DOM lookup in it is null-guarded.
+
+ drops the account step whenever  exists — siblings and
+half-finished signups both end at the reveal.
 
 ## Growth, Profile and Account
 

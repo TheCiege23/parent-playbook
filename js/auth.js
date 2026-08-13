@@ -5,6 +5,17 @@ async function afterLogin(){
   // and throws on save. Load it on every entry into the app, not just first-run.
   await Promise.all([ loadAthletes(), loadRef() ]);
   if(state.athletes.length===0){
+    // Account-last onboarding: the profile was built before the account existed and
+    // stashed on this device. A session now exists, so finish the job silently — the
+    // parent should land on the week they were already shown, not fill it in twice.
+    const pending = (typeof obReadStash==='function') ? obReadStash() : null;
+    if(pending){
+      document.body.classList.remove('auth'); setAppBg();
+      root.innerHTML = H`<div class="center-screen"><span class="spinner"></span><div>Building ${esc(pending.athlete.first)}'s playbook…</div></div>`;
+      const familyId = await myFamilyId();
+      obReset({ ...pending, mode: familyId?'addChild':'create', familyId: familyId||null });
+      return finishOnboarding();
+    }
     // No athletes doesn't mean no household. renderOnboarding() runs the `create` flow,
     // which mints a SECOND family and orphans the first along with its members and any
     // pending invites. If they already belong to one, add the child into it instead.
@@ -107,7 +118,7 @@ function renderAuth(mode='login', prefill=''){
       <p class="muted-note">
         ${mode==='signup'
           ? `Already have an account? <a href="#" id="swap">Log in</a>`
-          : `New here? <a href="#" id="swap">Create an account</a>`}
+          : `New here? <a href="#" id="swap">Start your athlete's playbook</a>`}
       </p>
       ${mode==='login' ? `<p class="muted-note" style="margin-top:2px"><a href="#" id="forgot">Forgot password?</a></p>` : ''}
     </div>
@@ -116,7 +127,11 @@ function renderAuth(mode='login', prefill=''){
       <a href="/terms" target="_blank" rel="noopener">Terms</a>.</p>
   </div>`;
 
-  $("#swap").onclick = e=>{e.preventDefault();renderAuth(mode==='signup'?'login':'signup');};
+  // From login, "new here" goes to ONBOARDING, not a signup form — the account comes
+  // last now, and a bare email box before they have seen anything converts far worse.
+  $("#swap").onclick = e=>{ e.preventDefault();
+    if(mode==='login') return renderOnboarding();
+    renderAuth('login'); };
   { const f=$("#forgot"); if(f) f.onclick=e=>{ e.preventDefault(); renderForgot($("#email").value.trim()); }; }
   // A real <form> so Enter submits and password managers recognise the login.
   $("#authform").onsubmit = async (ev)=>{
