@@ -13,18 +13,18 @@ async function loadRole(){
   const r=(data&&data[0])?data[0].role:null;
   // No access row means they reach the athlete through family_members, i.e. they own it.
   if(r){ state.role=r; state.canEdit = (r==='owner'||r==='co_parent'); }
-  // Read-only copy names who does the doing ("Chris marks these off") rather than
-  // using the passive voice, which reads like the app is withholding something.
-  // One extra query, and only for the guardians who actually need it.
+  // Read-only copy names who does the doing ("CeeJay marks these off") rather than
+  // the passive voice, which reads like the app is withholding something.
+  //
+  // This CANNOT be done from the client: the owner reaches the athlete through
+  // family_members, and an invited viewer is not in that family, so RLS hides it —
+  // which is correct. The RPC is scoped to callers who can already see the athlete
+  // and returns a first name only.
   if(!state.canEdit && !state.ownerName){
-    const { data:own } = await sb.from('athlete_access')
-      .select('guardian_id').eq('athlete_id',a.id).eq('role','owner').is('revoked_at',null).limit(1);
-    const oid=(own&&own[0])?own[0].guardian_id:null;
-    if(oid){
-      const { data:g } = await sb.from('guardians').select('display_name').eq('id',oid).limit(1);
-      const n=(g&&g[0]&&g[0].display_name||'').trim();
-      if(n) state.ownerName=n.split(/\s+/)[0];
-    }
+    try{
+      const { data:n } = await sb.rpc('athlete_owner_first_name',{ p_athlete:a.id });
+      if(n) state.ownerName=String(n);
+    }catch(e){ console.error(e); }
   }
 }
 // First name of whoever owns this athlete, for read-only copy. Falls back to a neutral
