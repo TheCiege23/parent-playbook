@@ -285,6 +285,18 @@ async function screenWeek(){
     days:days.map(w=>({d:w.d,t:w.t,type:w.type,title:w.title,sub:w.sub||''})),
     done:loggableIdx.filter(done),
   });
+  // Publish which days are nudge-able so notify-daily never has to reimplement
+  // buildProgram. Day indexes only — no titles, no names. Best-effort: a failure here
+  // costs a nudge, never the week.
+  if(state.canEdit!==false){
+    const nudge=days.map((w,i)=>({w,i}))
+      .filter(o=>o.w.t==='train'||o.w.t==='gym')
+      .filter(o=>!done(o.i))
+      .map(o=>o.i);
+    sb.from('week_plan_days').upsert({ athlete_id:a.id, week_start:weekStart,
+      nudge_days:nudge, updated_at:new Date().toISOString() },{ onConflict:'athlete_id,week_start' })
+      .then(r=>{ if(r&&r.error) console.error('week_plan_days',r.error); });
+  }
   bindTop();
   { const gb=$("#goalBanner"); if(gb) gb.onclick=()=>openAddGoal(goals||[]); }
   { const sc=$("#schedBanner"); if(sc&&primary) sc.onclick=()=>openPracticeSchedule(primary.sport_key,
