@@ -164,10 +164,10 @@ function obFamilyBind(){
 
 // step: child
 function obChild(){ return H`
-  <div class="ob-head"><div class="k">Add your athlete</div><h2>Tell us about your child</h2>
-  <p>This creates a profile <b>you</b> own and control — your child never logs in.</p></div>
-  <div class="teach"><div class="ic">🎓</div><div><h4>Age shapes everything</h4>
-    <p>We use your child's age to pick the right drills, durations, and rest. Under-13s develop coordination and love-of-the-game first; specialization can wait.</p></div></div>
+  <div class="ob-head"><div class="k">Your athlete</div><h2>Who are we building this for?</h2>
+  <p>You own this profile. Your child never logs in.</p></div>
+  <div class="teach"><div class="ic">i</div><div><h4>Age shapes everything</h4>
+    <p>Under 13, coordination and loving the game come first. We'll size every drill to where ${ob.athlete.first?esc(ob.athlete.first):'your child'} actually is.</p></div></div>
   ${ob.teamName?H`<div class="card app-pad" style="margin-bottom:14px;border-color:#CFE3DC;background:#EAF3F0">
     <div class="grow" style="border:none;padding:0"><div class="gi" style="background:#fff">🏅</div>
       <div class="gt"><b>${esc(ob.teamName)}</b><span>Your coach's code is applied — sport, level and practice days are set.</span></div></div>
@@ -219,10 +219,8 @@ function obSport(){
   const positions = chosen ? state.ref.positions.filter(p=>p.sport_key===chosen) : [];
   const levels = chosen ? (sports.find(s=>s.key===chosen)?.level_vocab||[]) : [];
   return H`
-  <div class="ob-head"><div class="k">The sport</div><h2>What is ${esc(ob.athlete.first)} playing?</h2>
-  <p>Just the sport is enough to start — position and level are optional and easy to add later.</p></div>
-  <div class="teach"><div class="ic">🎓</div><div><h4>Explore before you specialize</h4>
-    <p>Multi-sport kids get hurt less and often go further. Picking one now just sets today's focus — it's not a lifetime commitment.</p></div></div>
+  <div class="ob-head"><div class="k">The sport</div><h2>What's ${esc(ob.athlete.first)} playing right now?</h2>
+  <p>Just today's focus. You can add more any time — most kids play a few.</p></div>
   ${ob.teamName?H`<div class="card app-pad" style="margin-bottom:14px;border-color:#CFE3DC;background:#EAF3F0">
     <div class="grow" style="border:none;padding:0"><div class="gi" style="background:#fff">🏈</div>
       <div class="gt"><b>${esc(ob.teamName)}</b><span>Sport, level and practice days filled in from your coach's code.</span></div>
@@ -403,9 +401,9 @@ function obGoals(){
   const grp = (type)=>lib[type].map(g=>`<div class="chip ${on(g.key)?'on':''}" data-k="${g.key}" data-t="${type}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
   return H`
   <div class="ob-head"><div class="k">Goals</div><h2>What should we work toward?</h2>
-  <p>Pick 1–3 to start. These shape ${esc(ob.athlete.first)}'s weekly playbook.</p></div>
-  <div class="teach"><div class="ic">🎓</div><div><h4>Process beats outcome</h4>
-    <p>"Get faster" is a direction; the week turns it into small daily reps. Kids stay motivated when they can feel steady progress, not chase a scoreboard.</p></div></div>
+  <p>Pick up to three. This is what shapes ${esc(ob.athlete.first)}'s week.</p></div>
+  <div class="teach"><div class="ic">i</div><div><h4>Process beats outcome</h4>
+    <p>"Get faster" is a direction. The week turns it into small reps ${esc(ob.athlete.first)} can feel themselves winning.</p></div></div>
   <div class="sec-title" style="margin-top:8px">Skill</div>
   <div class="chipgrid" id="gskill">${grp('skill')}</div>
   <div class="sec-title">Physical</div>

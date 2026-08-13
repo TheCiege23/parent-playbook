@@ -96,6 +96,12 @@ body.in-app #landing{display:none}
 .mk-focus .lp-k{font-size:10px;letter-spacing:.13em;color:rgba(246,242,233,.72)}
 .mk-focus h4{font-family:'Archivo';font-weight:800;font-size:22px;line-height:1.15;margin:7px 0 5px}
 .mk-focus p{font-size:12px;color:rgba(246,242,233,.78);margin:0}
+/* Week progress. The original landing handoff cut this because completion tracking
+   didn't exist — it does now (sessions + markSessionDone), so the mockup shows the
+   real thing rather than a promise. */
+.mk-bar-wrap{height:5px;border-radius:3px;background:rgba(246,242,233,.22);overflow:hidden;margin-top:11px}
+.mk-bar-wrap i{display:block;height:100%;background:var(--pp-amber);border-radius:3px}
+.mk-prog{font-size:11px;color:rgba(246,242,233,.75);margin:6px 0 0}
 .mk-lab{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;letter-spacing:.12em;
   text-transform:uppercase;color:var(--pp-muted);margin:2px 2px -4px}
 .mk-day{display:flex;gap:12px;padding:13px;border-radius:15px;background:#fff;border:1px solid #E7E2D8;align-items:center}
