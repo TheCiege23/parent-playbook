@@ -181,9 +181,11 @@ function obChildBind(){
     if(!f){$("#oberr").textContent="What's your athlete's first name?";return;}
     if(!b){$("#oberr").textContent="Add a birthdate so plans fit their age.";return;}
     const a=ageFrom(b); if(a===null||a<3||a>19){$("#oberr").textContent="Enter a realistic birthdate (ages 3–19).";return;}
-
-    if(h&&!(parseFloat(h)>0)){$("#oberr").textContent="Height should be a number in inches, or left blank.";return;}
-    if(w&&!(parseFloat(w)>0)){$("#oberr").textContent="Weight should be a number in pounds, or left blank.";return;}
+    // NOTE: height/weight validation used to live here and referenced `h`/`w` after the
+    // inputs themselves had been moved to Growth. That threw a ReferenceError on every
+    // Continue tap — signup was dead and the parent saw no error at all, because the
+    // throw happened before anything could be written to #oberr. Never validate a field
+    // you haven't read in this scope.
     ob.athlete.first=f; ob.athlete.bd=b; obNext();
   };
 }
