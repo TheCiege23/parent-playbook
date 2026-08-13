@@ -23,6 +23,7 @@ don't hoist across separate `<script>` tags).
 | `js/screen-growth.js` | The active goal, its evidencing metric, trend bars | `screenGrowth`, `GOAL_METRIC`, `SUGGEST_METRICS`, `trendBars` |
 | `js/screen-profile.js` | The athlete, Coach's Corner, who can see them | `screenProfile` |
 | `js/account.js` | Account & settings route + its sheets | `screenAccount`, `openSeasonState`, `openExportEverything`, `openChangePassword`, `openRenameHousehold` |
+| `js/screen-activity.js` | Activity as a route + the three media states | `openActivity`, `screenActivity` |
 | `js/screen-edit.js` | Edit the athlete (name, birthdate, hand, sport, positions, level) | `openEditAthlete`, `edSave` |
 | `js/trainer-onboarding.js` | Pro Trainer application + post-submit status | `startTrainerOnboarding`, `trainerStatusScreen`, `tr*` |
 | `js/monitoring.js` | Sentry error reporting, scrubbed hard for a children's app (no replay, no PII, no console/UI breadcrumbs) | `reportError` |
@@ -32,7 +33,7 @@ don't hoist across separate `<script>` tags).
 | `js/trainer-services.js` | Trainer-side services + booking requests | `openTrainerServices`, `openTrainerBookings` |
 | `js/journey.js` | Athlete diary screen + sport visuals | `screenJourney`, `sportGradient`, `MEDIA_MAX`, `fmtDate` |
 | `js/sheets.js` | Bottom-sheet actions (log game, milestone, media, goals, measures, invite, delete) | `sheet`, `openLogGame`, `openAddMilestone`, … |
-| `js/invites.js` | Invite redeem flow | `renderRedeem`, `acceptAndEnter` |
+| `js/invites.js` | Invite redeem: the invite, accepted, expired | `renderRedeem`, `acceptAndEnter`, `INVITE_ROLE` |
 | `js/pwa.js` | Install banner + push + service-worker registration | `enablePush`, `initInstallBanner`, `registerServiceWorker` |
 | `js/init.js` | Defines **`boot()`**; auth-state listener; `popstate` router | `boot()`, `bootError` |
 | `js/landing.js` | **Entry point** — decides marketing page vs. app, then calls `boot()`; loaded last | `enterApp` |

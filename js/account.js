@@ -11,6 +11,11 @@ async function screenAccount(){
     sb.from('app_admins').select('guardian_id').limit(1),   // RLS: a row comes back only if the viewer is an admin
     sb.from('notification_prefs').select('*').eq('guardian_id',state.user.id).limit(1),
   ]);
+  // Invites are the only growth mechanism left, and every one of them says who sent it.
+  // With no display_name they all read "A parent wants you to follow…", which is a
+  // worse email and a worse first impression than the product deserves.
+  const { data:me } = await sb.from('guardians').select('display_name').eq('id',state.user.id).maybeSingle();
+  const myName=(me&&me.display_name||'').trim();
   const isAdmin=!!(adminRows&&adminRows.length);
   const household=(fam&&fam[0])||null;
   // No row means both on — this table records preference, not permission.
@@ -29,6 +34,9 @@ async function screenAccount(){
         <div class="mrow"><span>Household</span>
           <b style="display:flex;gap:8px;align-items:center">${esc(household?.name||'My Family')}
             ${household?'<button class="btn sm ghost" id="renameFam">Rename</button>':''}</b></div>
+        <div class="mrow"><span>Your name</span>
+          <b style="display:flex;gap:8px;align-items:center">${myName?esc(myName):'<span style="font-weight:500;color:var(--muted)">Not set</span>'}
+            <button class="btn sm ghost" id="editName">${myName?'Change':'Add'}</button></b></div>
         <div class="mrow"><span>Email</span><b style="font-weight:500;max-width:60%;text-align:right;word-break:break-all">${esc(state.user?.email||'—')}</b></div>
         <div class="mrow"><span>Password</span><b><button class="btn sm ghost" id="changePw">Change</button></b></div>
         <div class="mrow"><span>Athletes</span><b>${state.athletes.length}</b></div>
@@ -91,6 +99,7 @@ async function screenAccount(){
   $("#acctLogout").onclick=async()=>{ await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
+  { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });
@@ -177,6 +186,27 @@ function openSeasonState(sportRow, onSaved){
       errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save'; e.target.disabled=false; return; }
     bg.remove(); toast('Season updated');
     if(onSaved) onSaved(); else renderApp('week');
+  };
+}
+
+// The name on every invite you send. Worth asking for exactly once, here, rather than
+// in onboarding — at signup it's a field with no visible purpose; here it has one.
+function openEditMyName(current){
+  const bg=sheet(H`<h3>What should we call you?</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">This is the name on invites you send. Without it they read "A parent wants you to follow…", which is a stranger asking a grandparent for an account.</p>
+    <div class="field"><label>Your name</label>
+      <input id="gname" value="${esc(current||'')}" maxlength="60" placeholder="e.g. Chris"/></div>
+    <div class="err" id="gnerr"></div>
+    <button class="btn" id="gnSave">Save</button>`);
+  bg.querySelector('#gnSave').onclick=async e=>{
+    const v=bg.querySelector('#gname').value.trim();
+    const errEl=bg.querySelector('#gnerr'); errEl.textContent='';
+    if(!v){ errEl.textContent='Give us something to call you.'; return; }
+    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    const { error }=await sb.from('guardians').update({ display_name:v }).eq('id',state.user.id);
+    if(error){ console.error(error); reportError(error,'account:displayName');
+      errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save'; e.target.disabled=false; return; }
+    bg.remove(); toast('Saved'); renderApp('account');
   };
 }
 
