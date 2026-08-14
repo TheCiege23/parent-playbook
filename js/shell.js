@@ -7,19 +7,30 @@ const APP_TABS=['week','growth','journey','profile','account','activity'];
 async function loadRole(){
   state.canEdit = true; state.role = 'owner';
   const a=state.active; if(!a||!state.user) return;
-  const { data, error } = await sb.from('athlete_access')
-    .select('role').eq('athlete_id',a.id).eq('guardian_id',state.user.id).is('revoked_at',null).limit(1);
-  if(error){ console.error(error); return; }          // fail OPEN in the UI; RLS still refuses
-  const r=(data&&data[0])?data[0].role:null;
-  // No access row means they reach the athlete through family_members, i.e. they own it.
-  if(r){ state.role=r; state.canEdit = (r==='owner'||r==='co_parent'); }
-  // Read-only copy names who does the doing ("CeeJay marks these off") rather than
-  // the passive voice, which reads like the app is withholding something.
-  //
-  // This CANNOT be done from the client: the owner reaches the athlete through
-  // family_members, and an invited viewer is not in that family, so RLS hides it —
-  // which is correct. The RPC is scoped to callers who can already see the athlete
-  // and returns a first name only.
+  // A guardian can reach an athlete two ways, and the HIGHEST privilege wins — exactly
+  // what private.can_edit_athlete() does with an OR. Reading only athlete_access meant
+  // an owner who accepted an invite to their OWN child (easy to do while testing) was
+  // demoted to family view forever: the DB still allowed their writes, but every
+  // control was hidden, which looks identical to the app being broken.
+  const [acc, ath] = await Promise.all([
+    sb.from('athlete_access').select('role').eq('athlete_id',a.id)
+      .eq('guardian_id',state.user.id).is('revoked_at',null).limit(1),
+    sb.from('athletes').select('family_id').eq('id',a.id).maybeSingle(),
+  ]);
+  if(acc.error){ console.error(acc.error); return; }   // fail OPEN in the UI; RLS still refuses
+  let fam=null;
+  if(ath.data&&ath.data.family_id){
+    const { data:m } = await sb.from('family_members').select('role')
+      .eq('family_id',ath.data.family_id).eq('guardian_id',state.user.id).limit(1);
+    fam = (m&&m[0]) ? m[0].role : null;
+  }
+  const viaAccess = (acc.data&&acc.data[0]) ? acc.data[0].role : null;
+  const RANK={ owner:3, co_parent:2, family_view:1 };
+  const best = [viaAccess, fam].filter(Boolean).sort((x,y)=>(RANK[y]||0)-(RANK[x]||0))[0];
+  // No row on either side means they got here through the household with no explicit
+  // grant — treat as owner, which is what loadAthletes already allowed them to see.
+  if(best){ state.role=best; state.canEdit = (best==='owner'||best==='co_parent'); }
+
   if(!state.canEdit && !state.ownerName){
     try{
       const { data:n } = await sb.rpc('athlete_owner_first_name',{ p_athlete:a.id });
