@@ -6,10 +6,42 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "categories": ["sports", "education", "lifestyle"],
+  "categories": [
+    "sports",
+    "education",
+    "lifestyle"
+  ],
   "background_color": "#F6F2E9",
   "theme_color": "#0B1F1A",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/img/screenshot-week.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "One thing today, the whole week underneath"
+    },
+    {
+      "src": "/img/screenshot-journey.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Every game, milestone and photo, kept private"
+    },
+    {
+      "src": "/img/screenshot-setup.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Set up in three minutes, built for their age and sport"
+    }
   ]
 }
