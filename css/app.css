@@ -578,8 +578,11 @@
   .gcard .score{font-family:'Archivo';font-size:20px;font-weight:700;white-space:nowrap}
   .gcard .meta{font-size:12.5px;color:var(--muted);margin-top:2px}
   .result-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:7px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
-  .r-win{background:#E9F1EF;color:var(--good)} .r-loss{background:#FBE9DC;color:#9a4a12}
-  .r-tie{background:#EDEBE4;color:#6d6a60} .r-na{background:var(--soft);color:var(--muted)}
+  /* Taken from the component sheet, not re-derived. The tie badge had been invented
+     inline at 4.54:1 and the no-score badge used --muted, which is 4.52:1 on #EFEAE0 —
+     muted passes on bone and fails one step darker. Contrast is a pairing. */
+  .r-win{background:#E3EDE8;color:#0E3B31} .r-loss{background:#F6E1D8;color:#9a4a12}
+  .r-tie{background:#EFEAE0;color:#565449} .r-na{background:#EFEAE0;color:#565449}
   .statchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .statchip{font-size:11.5px;font-weight:600;background:var(--soft);color:var(--muted);padding:4px 9px;border-radius:8px}
   .statchip b{color:var(--ink)}
@@ -629,3 +632,80 @@
   .drill-step figcaption{font-size:12px;color:var(--muted);line-height:1.4;margin-top:6px}
   .drill-step figcaption::before{content:counter(dstep) ". ";font-weight:700;color:var(--ink)}
   @media (min-width:600px){ .drill-step{flex:0 0 46%} }
+
+/* ===================================================================
+   DESKTOP & TABLET — design handoff, desktop bundle
+   ===================================================================
+   Until now every board was a 390px phone, and on a laptop the app was a
+   phone-width column floating on the sport photo. That reads as a mistake
+   rather than a choice.
+
+   One DOM, three breakpoints, no duplicated templates:
+     < 768      the phone design, untouched. Bottom tab bar.
+     768–1180   icon rail (78px), one content column.
+     >= 1180    full sidebar (264px), content capped at 1180 and centred.
+
+   The bottom tab bar and the sidebar are the SAME element — it moves from
+   fixed-bottom to fixed-left. Same four destinations, same order, same
+   labels: nothing is added to the IA. */
+
+.sb-brand,.sb-foot{display:none}
+
+@media (min-width:768px){
+  /* The photo frames a narrow column and reads as an unfinished page. It keeps
+     doing real work on the landing page and the login screen, so it only comes
+     off the app routes — body.auth is the login state. */
+  body:not(.auth) #appbg,
+  body:not(.auth) #appveil{display:none}
+  body:not(.auth){background:var(--bg)}
+
+  /* The tab bar becomes the sidebar. */
+  .nav{top:0;bottom:0;left:0;right:auto;width:78px;max-width:none;margin:0;
+    flex-direction:column;align-items:stretch;gap:4px;
+    background:var(--ink-deep);border-top:none;border-right:1px solid rgba(246,242,233,.10);
+    padding:18px 10px calc(18px + env(safe-area-inset-bottom));overflow-y:auto}
+  .nav button{flex:0 0 auto;border-radius:12px;padding:11px 0;
+    color:rgba(246,242,233,.75);gap:5px}
+  .nav button:hover{background:rgba(246,242,233,.08);color:var(--pp-bone,#F6F2E9)}
+  /* Active is the amber mark, not a green tint — the sidebar is pine. */
+  .nav button.on{background:rgba(239,163,59,.16);color:#EFA33B}
+  .nav svg{width:23px;height:23px}
+
+  .sb-brand{display:flex;align-items:center;gap:10px;padding:2px 4px 16px;
+    margin-bottom:6px;border-bottom:1px solid rgba(246,242,233,.10)}
+  .sb-brand .mk{flex:0 0 34px;height:34px;border-radius:11px;background:#EFA33B;
+    color:var(--ink-deep);display:grid;place-items:center;
+    font-family:'Archivo',sans-serif;font-weight:900;font-size:16px}
+  .sb-brand b{display:none;font-family:'Archivo',sans-serif;font-weight:800;
+    font-size:15px;color:#F6F2E9;letter-spacing:-.01em;white-space:nowrap}
+
+  .sb-foot{display:block;margin-top:auto;padding-top:18px;text-align:center}
+  /* Never below the 64px floor. */
+  .sb-foot img{width:64px;height:64px;object-fit:contain;opacity:.95}
+  .sb-foot span{display:none;font-size:11.5px;color:rgba(246,242,233,.7);
+    line-height:1.5;margin-top:6px}
+
+  /* #root IS .wrap — the 480px phone column. Release it, or the sidebar just
+     eats half of an already-narrow strip. The 88px bottom padding existed to
+     clear the tab bar and has nothing to clear now. */
+  body:not(.auth) .wrap{max-width:none;margin:0;padding-bottom:0}
+  body:not(.auth) #screen,
+  body:not(.auth) .roview{margin-left:78px}
+  body:not(.auth) #screen{padding-bottom:32px}
+  .act-foot{left:78px}
+}
+
+@media (min-width:1180px){
+  .nav{width:264px;padding:20px 14px}
+  .nav button{flex-direction:row;justify-content:flex-start;gap:13px;
+    padding:12px 14px;font-size:14.5px;font-weight:700;
+    font-family:'Archivo',sans-serif}
+  .sb-brand b,.sb-foot span{display:block}
+  .sb-foot img{width:112px;height:112px}
+
+  body:not(.auth) #screen,
+  body:not(.auth) .roview{margin-left:264px}
+  .act-foot{left:264px}
+  /* A 2560px monitor gets margins, not 2200px-wide rows. */
+  body:not(.auth) #screen > *{max-width:1180px;margin-left:auto;margin-right:auto}
+}

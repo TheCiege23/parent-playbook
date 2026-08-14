@@ -63,10 +63,15 @@ async function renderApp(tab, fromPop){
     ${state.canEdit?'':'<div class="roview" role="status"><i>👁</i> Family view · you can look, not change</div>'}
     <div id="screen"></div>
     <nav class="nav" id="nav">
+      <div class="sb-brand" aria-hidden="true"><span class="mk">P</span><b>Parent Playbook</b></div>
       ${navBtn('week','Week','M4 5h16M4 12h16M4 19h10')}
       ${state.canEdit?navBtn('growth','Growth','M4 19V5m0 14l6-6 4 4 6-8'):''}
       ${navBtn('journey','Journey','M12 6.5C10 5 7 5 4 6v12c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V6c-3-1-6-1-8 .5z M12 6.5V19')}
       ${navBtn('profile','Profile','M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0')}
+      <div class="sb-foot" aria-hidden="true">
+        <img src="/assets/brownpig-logo-ondark.png" alt="" width="112" height="112"/>
+        <span>A Brown Pig company</span>
+      </div>
     </nav>`;
   bindNav(tab);
   try{
