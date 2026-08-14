@@ -177,6 +177,30 @@ async function screenWeek(){
       <span class="pill">Open ›</span></div>`;
   const refCount=(prog.strength||[]).length+(prog.speed||[]).length+(prog.fuel||[]).length;
 
+  // The design's week screen is header -> today -> the week -> one collapsed reference
+  // row. Six teach cards could stack between today and the list, pushing the week —
+  // the entire point of the screen — below the fold on a phone. These explain WHY the
+  // week is shaped the way it is, which is worth reading once and never again, so they
+  // collapse. The two that change what a parent does today (a heavy team week, a growth
+  // spurt) stay inline above.
+  const wkNotes = [];
+  if(!prog.overloaded) wkNotes.push({ ic:'🛡️', h: hasSchedule?'Built around practice':'Safe by design',
+    p: !hasSchedule
+      ? H`Built for ${esc(bandAges)} — age-appropriate and rest-first. Tap any item for how-to, what to say, and when to stop.`
+      : prog.cancelled.length
+        ? H`A team session came off the schedule, so there's room for ${prog.homeDays===0?'<b>rest</b> — the week was already full':'<b>'+prog.homeDays+(prog.homeDays===1?'</b> session':'</b> sessions')+' at home instead'}. Tap any item for how-to and when to stop.`
+        : H`Practice days are left alone — ${esc(a.first_name)} does ${prog.homeDays===0?'<b>nothing extra</b> at home this week':'<b>'+prog.homeDays+(prog.homeDays===1?'</b> home session':'</b> home sessions')} on top of the team's schedule. Tap any item for how-to and when to stop.` });
+  if(prog.seasonState==='offseason') wkNotes.push({ ic:'🌱', h:'Offseason — this is the part that matters',
+    p:"No games competing for the week, so there's room for <b>one more session</b> than in season. Skill and age-safe strength now is what shows up in September. Change the season in Profile whenever it moves." });
+  if(prog.seasonState==='between_sports') wkNotes.push({ ic:'🔄', h:'Between sports',
+    p:"One's finished and the next hasn't started, so the week leads with general athleticism — strength, speed and movement — instead of sport-specific work. It's the best window of the year for it." });
+  if(prog.assumeTeamLoad) wkNotes.push({ ic:'🏅', h:"We've assumed a busy team week",
+    p: H`At ${esc(primary?.level||'this level')}, ${esc(a.first_name)} is probably training more with the team than a rec season — so we've added <b>one session fewer</b> at home rather than stack on top of a week we can't see. Tell us the actual practice days and we'll use those instead of guessing.` });
+  if((preseason||offseason)&&primary?.game_day!=null) wkNotes.push({ ic:'📆', h: preseason?'Preseason — no games yet':"Season's over",
+    p: preseason
+      ? H`Games start around <b>${esc(fmtDate(seasonStart))}</b>, so Saturdays are open until then. Practices still count as training.`
+      : H`The season ended <b>${esc(fmtDate(seasonEnd))}</b> — game days are off the plan. Update the dates in Profile when the next one starts.` });
+
   $("#screen").innerHTML = H`
     ${topBar(sub, streak>0?H`<span class="streak" title="${streak} full ${streak===1?'week':'weeks'} in a row"><b>${streak}</b><span>${streak===1?'Week':'Weeks'}</span></span>`:'')}
     <div class="app-pad" style="padding-top:6px">
@@ -194,37 +218,12 @@ async function screenWeek(){
 
       ${prog.overloaded?H`<div class="teach" style="background:#FBE9DC;border-color:#E6C9BC"><div class="ic">⚠️</div><div>
         <h4>That's a heavy team week</h4>
-        <p>${esc(a.first_name)}'s team has them going <b>${prog.committed} days</b> this week${prog.budget?` — for ${esc(bandAges)} the guidance we follow is about ${prog.budget}`:''}. We've added <b>nothing</b> at home, and we won't while it stays this full. Worth a conversation with the coach.</p></div></div>`
-      :H`<div class="teach"><div class="ic">🛡️</div><div>
-        <h4>${hasSchedule?'Built around practice':'Safe by design'}</h4>
-        <p>${!hasSchedule
-          ? H`Built for ${esc(bandAges)} — age-appropriate and rest-first. Tap any item for how-to, what to say, and when to stop.`
-          : prog.cancelled.length
-            // a cancelled session isn't "on top of" the team's week — it replaced part of it
-            ? H`A team session came off the schedule, so there's room for ${prog.homeDays===0?'<b>rest</b> — the week was already full':'<b>'+prog.homeDays+(prog.homeDays===1?'</b> session':'</b> sessions')+' at home instead'}. Tap any item for how-to and when to stop.`
-            : H`Practice days are left alone — ${esc(a.first_name)} does ${prog.homeDays===0?'<b>nothing extra</b> at home this week':'<b>'+prog.homeDays+(prog.homeDays===1?'</b> home session':'</b> home sessions')} on top of the team's schedule. Tap any item for how-to and when to stop.`}</p></div></div>`}
-
-      ${prog.seasonState==='offseason'?H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🌱</div><div>
-        <h4>Offseason — this is the part that matters</h4>
-        <p>No games competing for the week, so there's room for <b>one more session</b> than in season. Skill and age-safe strength now is what shows up in September. Change the season in Profile whenever it moves.</p></div></div>`:''}
-      ${prog.seasonState==='between_sports'?H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🔄</div><div>
-        <h4>Between sports</h4>
-        <p>One's finished and the next hasn't started, so the week leads with general athleticism — strength, speed and movement — instead of sport-specific work. It's the best window of the year for it.</p></div></div>`:''}
-
-      ${prog.assumeTeamLoad?H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🏅</div><div>
-        <h4>We've assumed a busy team week</h4>
-        <p>At ${esc(primary?.level||'this level')}, ${esc(a.first_name)} is probably training more with the team than a rec season — so we've added <b>one session fewer</b> at home rather than stack on top of a week we can't see. Tell us the actual practice days and we'll use those instead of guessing.</p></div></div>`:''}
+        <p>${esc(a.first_name)}'s team has them going <b>${prog.committed} days</b> this week${prog.budget?` — for ${esc(bandAges)} the guidance we follow is about ${prog.budget}`:''}. We've added <b>nothing</b> at home, and we won't while it stays this full. Worth a conversation with the coach.</p></div></div>`:''}
 
       ${prog.growth?H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">📏</div><div>
         <h4>${esc(a.first_name)} is growing fast right now</h4>
         <p><b>${esc(prog.growth.gainIn)}"</b> in the last ${esc(Math.round(prog.growth.days/30))} months — about ${esc(prog.growth.inPerYear)}" a year. During a stretch like this bone grows faster than the tendons attached to it, so knees and heels get sore easily and coordination can go backwards for a while. Both are normal.<br><br>
         We've taken <b>one session off</b> this week rather than adding to it. Keep an eye out for pain just below the kneecap or at the back of the heel — if it lasts more than a couple of weeks, or they're limping or swollen, see a doctor.</p></div></div>`:''}
-
-      ${(preseason||offseason)&&primary?.game_day!=null?H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">📆</div><div>
-        <h4>${preseason?'Preseason — no games yet':'Season\'s over'}</h4>
-        <p>${preseason
-          ? H`Games start around <b>${esc(fmtDate(seasonStart))}</b>, so Saturdays are open until then. Practices still count as training.`
-          : H`The season ended <b>${esc(fmtDate(seasonEnd))}</b> — game days are off the plan. Update the dates in Profile when the next one starts.`}</p></div></div>`:''}
 
       ${!(goals&&goals.length)?H`<div class="card app-pad" id="goalBanner" style="cursor:pointer;margin-top:14px">
         <div class="grow"><div class="gi">🎯</div>
@@ -261,6 +260,16 @@ async function screenWeek(){
           <div class="body"><h4>${esc(w.title)}</h4><p>${esc(w.t==='rest'?(w.sub||'')+' — counts as done':(w.sub||''))}</p></div>
           <span class="tag t-${w.t}">${esc(w.type)}</span>
         </div>`;}).join('')}
+
+      ${wkNotes.length?H`<div class="refbar" id="whyToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="whyList">
+        <div class="gi">💡</div>
+        <div class="gt"><b>Why this week looks like this</b><span>How we sized it — read once, then forget it</span></div>
+        <span class="pill"><b>${wkNotes.length}</b> <i class="caret">›</i></span>
+      </div>
+      <div id="whyList" hidden>
+        ${wkNotes.map(n=>H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">${n.ic}</div><div>
+          <h4>${n.h}</h4><p>${n.p}</p></div></div>`).join('')}
+      </div>`:''}
 
       <div class="refbar" id="refToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="refList">
         <div class="gi">📚</div>
@@ -331,6 +340,10 @@ async function screenWeek(){
 
   // Reference material stays collapsed: it is not the plan, and seven days plus three
   // more lists was the reason the actual plan got scrolled past.
+  { const t=$("#whyToggle"), l=$("#whyList");
+    if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;
+        t.setAttribute('aria-expanded',String(open)); t.classList.toggle('open',open); };
+      t.onclick=go; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; } }
   { const t=$("#refToggle"), l=$("#refList");
     const flip=()=>{ const open=l.hidden; l.hidden=!open; t.setAttribute('aria-expanded',String(open)); t.classList.toggle('open',open); };
     if(t&&l){ t.onclick=flip; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } }; } }
