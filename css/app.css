@@ -708,4 +708,27 @@
   .act-foot{left:264px}
   /* A 2560px monitor gets margins, not 2200px-wide rows. */
   body:not(.auth) #screen > *{max-width:1180px;margin-left:auto;margin-right:auto}
+
+  /* ---- Journey at desktop ----
+     The README is right that this is the screen worth building: a season of games
+     in a three-up grid with photos big enough to look at is a genuinely different
+     experience from scrolling cards on a phone.
+
+     `align-items:start` matters — without it every card in a row stretches to the
+     tallest, and a game with a note and four photos would pad out two that have
+     neither. Milestones stack in a grid cell rather than interrupting the flow,
+     which is what the phone layout does. */
+  .jrn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+  .jrn-grid>*{margin-top:0;margin-bottom:0}
+  /* The season summary goes horizontal: the headline on the left, the four counts
+     inline beside it rather than stacked underneath. */
+  .jhero{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+    gap:28px;padding:26px 28px}
+  .jhero h2{font-size:30px !important}
+  .rec{margin-top:0;grid-template-columns:repeat(4,minmax(84px,1fr));gap:10px}
+  .rec .b{padding:13px 10px}
+  .rec .b b{font-size:26px}
+  .jrn-season{margin-top:30px}
+  /* Photos get room to be looked at. */
+  .gal{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 }

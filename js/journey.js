@@ -213,12 +213,18 @@ async function screenJourney(){
         const mine=myMiles.filter(m=>lo&&hi ? (m.milestone_date>=lo&&m.milestone_date<=hi)
                                            : sn===seasons[seasons.length-1]);
         const rows=jrnTimeline(inSeason, mine);
+        // The season's record, inline in the header. A parent scanning a season wants
+        // "5 – 2 – 1" before they want eight individual scores.
+        const rec = inSeason.reduce((t,g)=>{ const r=gameResult(g);
+          if(r==='win')t.w++; else if(r==='loss')t.l++; else if(r==='tie')t.t++; return t; },
+          {w:0,l:0,t:0});
+        const recLine = (rec.w||rec.l||rec.t) ? `${rec.w} – ${rec.l} – ${rec.t}` : '';
         return H`
         <div class="jrn-season">
           <div class="sec-title">${esc(sn)}</div>
-          <span class="pill">${inSeason.length} game${inSeason.length===1?'':'s'}</span>
+          <span class="pill">${inSeason.length} game${inSeason.length===1?'':'s'}${recLine?' · '+recLine:''}</span>
         </div>
-        ${rows.map(r=>r.kind==='game'?gameCard(r.data):mileCard(r.data)).join('')}`;
+        <div class="jrn-grid">${rows.map(r=>r.kind==='game'?gameCard(r.data):mileCard(r.data)).join('')}</div>`;
       }).join('')
       :H`<div class="card app-pad" style="margin-top:16px"><div class="empty">No ${esc(sportName)} games logged yet${canEdit?' — tap <b>＋ Game</b> after the next one':''}.</div></div>`}
 
