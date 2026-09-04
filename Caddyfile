@@ -1,0 +1,45 @@
+# Static hosting for Parent Playbook on Railway.
+#
+# Replicates the two Vercel behaviours the app depends on:
+#   cleanUrls: true  ->  /privacy serves privacy.html   (try_files below)
+#   404.html         ->  served for anything unmatched  (handle_errors below)
+#
+# Railway injects $PORT; 8080 is the local fallback.
+:{$PORT:8080} {
+	root * /srv
+	encode gzip zstd
+
+	# cleanUrls. /terms -> terms.html, and a real file always wins over the guess.
+	try_files {path} {path}.html {path}/index.html
+
+	# The service worker and the manifest must never be served stale — a cached sw.js
+	# is how an installed phone keeps running last week's app forever. Everything else
+	# is fingerprint-free too, so nothing here gets a long max-age; correctness beats
+	# a few hundred milliseconds on a site this small.
+	@nocache path /sw.js /manifest.webmanifest
+	header @nocache Cache-Control "public, max-age=0, must-revalidate"
+
+	@static path /css/* /js/* /assets/* /img/*
+	header @static Cache-Control "public, max-age=0, must-revalidate"
+
+	# Caddy has no built-in type for .webmanifest, and a wrong type makes Chrome
+	# ignore the manifest entirely — no install prompt, no screenshots.
+	@manifest path *.webmanifest
+	header @manifest Content-Type "application/manifest+json"
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	file_server
+
+	handle_errors {
+		@404 expression {err.status_code} == 404
+		handle @404 {
+			rewrite * /404.html
+			file_server
+		}
+	}
+}

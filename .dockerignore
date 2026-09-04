@@ -1,0 +1,8 @@
+node_modules
+.git
+supabase
+.claude
+.env*
+*.md
+!llms.txt
+.vercel
