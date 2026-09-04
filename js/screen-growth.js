@@ -65,14 +65,23 @@ function trendBars(list, lowerIsBetter){
 
 async function screenGrowth(){
   const a=state.active; const age=ageFrom(a.birthdate); const band=ageBand(age);
-  const [{data:goals},{data:meas},{data:sess},{data:sports}] = await Promise.all([
+  const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow}] = await Promise.all([
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),
     sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(60),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(60),
-    sb.from('athlete_sports').select('sport_key,is_primary').eq('athlete_id',a.id),
+    sb.from('athlete_sports').select('sport_key,is_primary,age_cutoff_md').eq('athlete_id',a.id),
+    // sex + parent heights drive the maturity card. Read fresh rather than from
+    // state.active, which is cached from a login that predates these columns.
+    sb.from('athletes').select('sex_at_birth,mother_height_in,father_height_in,birthdate')
+      .eq('id',a.id).maybeSingle(),
   ]);
   const primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=primary?.sport_key||state.activeSportKey||'general'; setAppBg();
+
+  // Growth & maturation. Arithmetic on self-reported numbers only — see js/maturity.js
+  // for why there is no body scan here, and no early/late maturity band.
+  const mat = maturityReport({ ...(grow||{}), birthdate:(grow&&grow.birthdate)||a.birthdate },
+                             meas||[], primary||null);
 
   const byMetric={}; (meas||[]).forEach(m=>{ (byMetric[m.metric_key]=byMetric[m.metric_key]||[]).push(m); });
   const metricKeys=Object.keys(byMetric);
@@ -153,7 +162,9 @@ async function screenGrowth(){
       </div>
       <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
         <h4>Same test, same conditions</h4>
-        <p>Every few weeks is plenty. The trend is the point — one number means nothing.</p></div></div>`
+        <p>Every few weeks is plenty. The trend is the point — one number means nothing.</p></div></div>
+      ${growthCard(mat, a)}
+      ${growthPrompt(mat)}`
       :H`
       <div class="sec-title">Worth tracking for ${age!=null?'a '+age+'-year-old':'this age'}</div>
       <div class="card app-pad">
@@ -192,6 +203,12 @@ async function screenGrowth(){
   bindTop();
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
+  { const b=$("#growAsk"); if(b) b.onclick=()=>openGrowthInputs(grow||{}, primary||null); }
+  // Predicted height stays folded until asked for — same idiom as the other collapsers.
+  { const t=$("#phToggle"), l=$("#phList");
+    if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;
+        t.setAttribute('aria-expanded',String(open)); t.classList.toggle('open',open); };
+      t.onclick=go; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; } }
   { const b=$("#addMeas"); if(b) b.onclick=()=>openAddMeasure(); }
   { const b=$("#heroRecord"); if(b&&leadKey) b.onclick=()=>openAddMeasure(leadKey); }
   { const b=$("#mpBanner"); if(b) b.onclick=openMarketplace; }
