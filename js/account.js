@@ -285,11 +285,17 @@ async function openExportEverything(){
     if(errs.length){ console.error(errs); reportError(errs[0],'account:export'); }
     let mediaOut=(media.data||[]);
     if(mediaOut.length){
+      // 6 hours, matching the Journey. These are links to photographs of a child, and a
+      // week is long enough for one to be forwarded, sit unread in an inbox, or end up
+      // in a screenshot — all while still resolving for anyone holding it. An export is
+      // something a parent does and uses in one sitting; it does not need to outlive the
+      // afternoon. Re-export for fresh links.
       const { data:signed }=await sb.storage.from('athlete-media')
-        .createSignedUrls(mediaOut.map(m=>m.path), 60*60*24*7);   // 7 days
+        .createSignedUrls(mediaOut.map(m=>m.path), 60*60*6);
       const byPath={}; (signed||[]).forEach(s=>{ if(s.signedUrl&&!s.error) byPath[s.path]=s.signedUrl; });
       mediaOut=mediaOut.map(m=>({ ...m, download_url:byPath[m.path]||null,
-        note:byPath[m.path]?'Link expires 7 days after export':'Could not sign — open the app to view' }));
+        note:byPath[m.path]?'Link expires 6 hours after export — re-export for fresh links'
+                           :'Could not sign — open the app to view' }));
     }
     const payload={
       exported_at:new Date().toISOString(),
