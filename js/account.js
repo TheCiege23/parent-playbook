@@ -55,6 +55,15 @@ async function screenAccount(){
         <div id="pushState"></div>
       </div>
 
+      <!-- Adult-only by construction: openBodyScan refuses below 18 and says so on screen.
+           It sits here rather than on a child's Growth screen precisely because it is not
+           part of the child-facing product. -->
+      <div class="sec-title">Body scan <span style="font-family:'Public Sans';font-weight:600;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0">· adults only</span></div>
+      <div class="card app-pad">
+        <div class="navrow" id="bodyScanRow" role="button" tabindex="0"><div class="gi">📷</div>
+          <div class="gt"><b>Scan yourself</b><span>Four photos, never saved. Measurements only, and only for adults.</span></div><i>›</i></div>
+      </div>
+
       <div class="sec-title">Your data</div>
       <div class="card app-pad">
         <div class="navrow" id="exportAll" role="button" tabindex="0"><div class="gi">📦</div>
@@ -100,6 +109,8 @@ async function screenAccount(){
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
+  go('bodyScanRow', ()=>openBodyScan({ id:state.user.id, first_name:'You',
+      birthdate:(state.guardian&&state.guardian.birthdate)||null }));
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });

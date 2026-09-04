@@ -1,5 +1,5 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v28';
+const CACHE = 'pp-v29';
 // /privacy and /terms are standalone pages, not part of the SPA. Precached so an offline
 // navigation to them serves the real page instead of the index.html fallback.
 const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
@@ -7,7 +7,7 @@ const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/manifest.webmanifest
   '/js/monitoring.js','/js/core.js','/js/offline.js','/js/background.js','/js/reference.js','/js/auth.js','/js/onboarding.js',
   '/js/program.js','/js/shell.js','/js/screen-week.js','/js/cdc-stature.js','/js/maturity.js','/js/screen-growth.js','/js/screen-profile.js','/js/screen-edit.js','/js/screen-activity.js',
   '/js/trainer-onboarding.js','/js/admin.js','/js/admin-drills.js','/js/marketplace.js','/js/trainer-services.js',
-  '/js/journey.js','/js/sheets.js','/js/log-game.js','/js/account.js','/js/invites.js','/js/pwa.js','/js/init.js'];
+  '/js/journey.js','/js/sheets.js','/js/log-game.js','/js/account.js','/js/body-scan.js','/js/invites.js','/js/pwa.js','/js/init.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).catch(() => {}));
