@@ -24,10 +24,10 @@ Four blockers. Two are an afternoon of writing, one is a config change, one is a
 ## 🔴 Blockers — fix before one parent who isn't you signs up
 
 ### 1. ~~No privacy policy and no terms of service exist~~ — **DRAFTED 2026-08-12**
-`privacy.html` and `terms.html` now exist, served at `/privacy` and `/terms` (`cleanUrls` enabled in `vercel.json`), linked from the consent step where the promise is made and from Profile → Help & legal. Both precached by the service worker.
+`privacy.html` and `terms.html` now exist, served at `/privacy` and `/terms` (clean URLs, now via `try_files` in the `Caddyfile` — this was `cleanUrls` in `vercel.json` before the move to Railway), linked from the consent step where the promise is made and from Profile → Help & legal. Both precached by the service worker.
 
 **Two things you must fill in before this counts as done:**
-1. **`[STATE]`** in section 12 of the Terms — governing law. I don't know where you're incorporated or resident, and guessing would be worse than a placeholder.
+1. ~~**`[STATE]`** in section 12 of the Terms — governing law.~~ — **DONE 2026-09-04.** Set to Wyoming, with jurisdiction in Laramie County. Zero placeholders remain in either legal page.
 2. **`support@chimaura.com`** must exist and be monitored. Both documents commit you to answering it, and it's already the VAPID contact in your push function.
 
 **And have a lawyer read them.** They describe your actual data handling accurately and cover the safety disclaimers a youth-training app needs, but I am not a lawyer and this is a children's product — the review is worth the money.

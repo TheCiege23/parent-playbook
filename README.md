@@ -4,7 +4,7 @@ A private weekly playbook for sports parents — weekly plans, at‑home activit
 
 - **Live:** https://playbook.chimaura.com
 - **Backend:** Supabase (auth, database, storage)
-- **Hosting:** Vercel (static)
+- **Hosting:** Railway — Caddy serving static files from a container (project `ParentPlaybook`)
 
 ## Project structure
 
@@ -17,8 +17,28 @@ Single‑page app split into small, single‑purpose modules so agents/developer
 
 ## Deploy
 
-Static, no build step. From this folder:
+Push to `main`. Railway builds and deploys on its own — there is no deploy command to run.
 
 ```
-npx vercel deploy --prod --yes
+git push origin main
 ```
+
+The app itself still has no build step: no bundler, no transpile, classic `<script src>` tags.
+What Railway builds is the *container* that serves those files.
+
+- **`Dockerfile`** — copies the public assets into a `caddy:2-alpine` image. Every `COPY` is an
+  **allowlist**: a new file at the repo root is not served until someone adds a line on purpose.
+  The build asserts that no private file (`AUDIT.md`, `supabase/`, `.env`, `.claude/`) reached the
+  image and that the expected public ones did, and **fails** rather than shipping a leak.
+- **`Caddyfile`** — clean URLs (`/privacy` serves `privacy.html`), `404.html` for unmatched routes,
+  `application/manifest+json` on the manifest, and `must-revalidate` on `sw.js`.
+
+To check a deployment, or to deploy from this folder without a push:
+
+```
+railway deployment list --service <service-id> --json
+railway up --detach
+```
+
+> Railway does **not** read `.vercelignore`. That file is kept only in case the site ever moves
+> back to Vercel — the Dockerfile's allowlist is what actually keeps private files out today.
