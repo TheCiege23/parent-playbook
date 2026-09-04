@@ -157,10 +157,16 @@ function maturityReport(athlete, heightRows, sportRow){
   const pct = (predicted && isFinite(latestIn)) ? pctAdultHeight(latestIn, predicted) : null;
   const rae = relativeAge(athlete&&athlete.birthdate, sportRow&&sportRow.age_cutoff_md);
 
+  // Height against the CDC reference for age and sex. This is the piece that turns a
+  // measurement into something a parent can act on — "48 inches" is data, "48th
+  // percentile" is meaning, and a percentile CROSSING is the bit a doctor asks about.
+  const track = (typeof percentileTrack === 'function')
+    ? percentileTrack(heightRows, athlete && athlete.birthdate, sex) : null;
+
   return {
     velocity: vel,
     spurt: inGrowthSpurt(vel),
-    predicted, pctAdult: pct, relativeAge: rae,
+    sex, predicted, pctAdult: pct, relativeAge: rae, track,
     // What the parent would have to add to unlock the rest, in the order it helps.
     missing: [
       !sex && 'sex',
@@ -190,6 +196,29 @@ function growthCard(mat, a){
   const nm = esc(a.first_name);
   const v = mat.velocity, rae = mat.relativeAge, pred = mat.predicted, pct = mat.pctAdult;
   const bits = [];
+
+  // 0. Where this height sits against every American child of the same age and sex.
+  //    Leads the card because it is the one line a parent understands instantly, and
+  //    the only one here backed by a national reference rather than a rule of thumb.
+  const tr = mat.track;
+  if(tr && tr.latest){
+    const p = Math.round(tr.latest.pct);
+    bits.push(H`<div class="card app-pad" style="margin-bottom:12px">
+      <div class="k-mono" style="color:var(--clay-ink)">Height for age</div>
+      <div style="font-family:'Archivo';font-weight:900;font-size:26px;letter-spacing:-.02em;margin:6px 0 4px">
+        ${esc(ordinalPct(tr.latest.pct))} percentile</div>
+      <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.55">
+        Taller than about <b>${p}</b> out of every 100 ${esc(mat.sex==='female'?'girls':'boys')} the same
+        age, on the CDC growth chart. It is a description, not a score — the 20th and the 80th are both
+        completely normal places for a child to be.</p>
+      ${tr.crossed?H`<p style="font-size:13px;margin:10px 0 0;line-height:1.55">
+        <b>${nm} has moved from the ${esc(ordinalPct(tr.prior.pct))} to the ${esc(ordinalPct(tr.latest.pct))}</b>
+        over ${tr.crossed.months} months. Children normally track along roughly the same line, so a shift this
+        size is worth mentioning at the next check-up — ${tr.crossed.dir==='up'
+          ? 'usually it is simply a growth spurt arriving.'
+          : 'often it just means the spurt has not started yet.'}</p>`:''}
+    </div>`);
+  }
 
   // 1. In a spurt right now — the one piece that changes today.
   if(mat.spurt && v){
