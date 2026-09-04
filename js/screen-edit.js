@@ -5,7 +5,8 @@
 //  was deleting the athlete — losing every game, milestone, photo and
 //  measurement along with them.
 // ===================================================================
-const ed = { first:'', nick:'', bd:'', hand:'', sport:'', origSport:'', positions:[], level:'', sportRowId:null };
+const ed = { first:'', nick:'', bd:'', hand:'', sport:'', origSport:'', positions:[], level:'', sportRowId:null,
+             sex:'', cutoff:'' };
 
 async function openEditAthlete(){
   document.body.classList.remove('auth'); setAppBg();
@@ -24,10 +25,12 @@ async function openEditAthlete(){
     nick:a.nickname||'',
     bd:(a.birthdate||'').slice(0,10),
     hand:a.dominant_hand||'',
+    sex:a.sex_at_birth||'',
     sport:sportKey,
     origSport:sportKey,
     positions:primary?[...(primary.positions||[])]:[],
     level:primary?(primary.level||''):'',
+    cutoff:primary?(primary.age_cutoff_md||''):'',
     sportRowId:primary?primary.id:null,
   });
   edRender();
@@ -64,6 +67,13 @@ function edRender(){
     <div class="field"><label>Birthdate</label>
       <input id="edBd" type="date" value="${esc(ed.bd)}" max="${new Date().toISOString().slice(0,10)}"/>
       <div id="edBand">${edBandNote(ed.bd)}</div></div>
+    <div class="field"><label>Sex at birth (optional)</label>
+      <div class="chipgrid two" id="edSex">
+        ${['male','female'].map(x=>`<div class="chip ${ed.sex===x?'on':''}" data-x="${x}">${x[0].toUpperCase()+x.slice(1)}</div>`).join('')}
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Only used for the growth chart on Growth —
+        height percentiles and the adult-height estimate are different for boys and girls. Nothing else reads it.</p></div>
+
     <div class="field"><label>Dominant hand (optional)</label>
       <div class="chipgrid" id="edHand">
         ${['left','right','both'].map(h=>`<div class="chip ${ed.hand===h?'on':''}" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
@@ -81,6 +91,12 @@ function edRender(){
         ${posChips(ed.sport, ed.positions, 'edPos')}
         <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply — the weekly drills follow these.</p>
       </div>
+      <div class="field"><label>League age cut-off (optional)</label>
+        <input id="edCutoff" placeholder="MM-DD — e.g. 08-01" value="${esc(ed.cutoff||'')}"/>
+        <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">The date the league uses to set age groups —
+          it's on the registration form. Lets Growth show how ${esc(ed.first||'your athlete')} sits against the
+          oldest kids in the same band. Left blank, we don't guess.</p></div>
+
       <div class="field"><label>Level</label>
         <select id="edLevel"><option value="">Select level…</option>
           ${levels.map(l=>`<option ${ed.level===l?'selected':''}>${esc(l)}</option>`).join('')}
@@ -112,6 +128,12 @@ function edRender(){
       ed.positions = ed.positions.includes(code)?ed.positions.filter(x=>x!==code):[...ed.positions,code];
       c.classList.toggle('on');
     }); }
+  { const g=$("#edSex");
+    if(g) g.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+      ed.sex = ed.sex===c.dataset.x ? '' : c.dataset.x;
+      g.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', x.dataset.x===ed.sex));
+    }); }
+  { const c=$("#edCutoff"); if(c) c.oninput=()=>ed.cutoff=c.value.trim(); }
   { const l=$("#edLevel"); if(l) l.onchange=()=>ed.level=l.value; }
   $("#edSave").onclick=edSave;
 }
@@ -126,6 +148,8 @@ async function edSave(){
   if(ed.sport){
     if(!ed.positions.length){ errEl.textContent='Choose at least one position.'; return; }
     if(!ed.level){ errEl.textContent='Select a level.'; return; }
+    if(ed.cutoff && !/^\d{2}-\d{2}$/.test(ed.cutoff)){
+      errEl.textContent='Cut-off should look like 08-01 (month-day).'; return; }
   }
   const btn=$("#edSave"); const label=btn.textContent;
   btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;

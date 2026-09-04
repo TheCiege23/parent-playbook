@@ -163,8 +163,7 @@ async function screenGrowth(){
       <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
         <h4>Same test, same conditions</h4>
         <p>Every few weeks is plenty. The trend is the point — one number means nothing.</p></div></div>
-      ${growthCard(mat, a)}
-      ${growthPrompt(mat)}`
+      ${growthCard(mat, a)}`
       :H`
       <div class="sec-title">Worth tracking for ${age!=null?'a '+age+'-year-old':'this age'}</div>
       <div class="card app-pad">
@@ -178,7 +177,9 @@ async function screenGrowth(){
       ${age!=null&&age<13?`<p class="muted-note" style="margin-top:10px">No weigh-ins suggested for under-13s. Ask your pediatrician before tracking weight.</p>`:''}`}
 
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="sec-title">Goals</div>
+        ${growthPrompt(mat)}
+
+      <div class="sec-title">Goals</div>
         <button class="btn sm ghost" id="addGoal">＋ Goal</button>
       </div>
       <div class="card app-pad">

@@ -283,7 +283,8 @@ function growthCard(mat, a){
 function growthPrompt(mat){
   if(!mat || !mat.missing.length) return '';
   const need = mat.missing;
-  if(need.includes('height')) return '';   // Measurements already asks for this
+  // No longer gated on height: the prompt is the only place the growth read is
+  // announced, and an athlete with no measurements is exactly who needs to see it.
   const wantsParents = need.includes('parentHeights') || need.includes('sex');
   if(!wantsParents) return '';
   return H`<div class="card app-pad" id="growAsk" style="cursor:pointer;margin-top:12px">
