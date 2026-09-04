@@ -322,6 +322,11 @@ function openGrowthInputs(cur, sportRow, onSaved){
     <p style="font-size:11.5px;color:var(--muted);margin:-6px 2px 14px">5′4″ is 64. 5′10″ is 70. Estimates are fine —
       the result is a range either way.</p>
 
+    <div class="field"><label>${esc(state.active.first_name)}'s height today (inches)</label>
+      <input id="gxH" inputmode="decimal" placeholder="e.g. 48"/>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Shoes off, heels to the wall.
+        One reading gives a percentile; a second one a few months later is what shows the trend.</p></div>
+
     <div class="field"><label>League age cut-off (optional)</label>
       <input id="gxC" placeholder="MM-DD — e.g. 08-01" value="${esc(sportRow&&sportRow.age_cutoff_md||'')}"/>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">The date the league uses to set age groups.
@@ -359,6 +364,20 @@ function openGrowthInputs(cur, sportRow, onSaved){
       const { error }=await sb.from('athletes').update(upd).eq('id',state.active.id);
       if(error){ console.error(error); err.textContent='Could not save. '+(error.message||'');
                  e.target.innerHTML='Save'; e.target.disabled=false; return; }
+    }
+    const hIn = num(bg.querySelector('#gxH').value);
+    if(!Number.isNaN(hIn) && hIn !== null){
+      if(hIn < 20 || hIn > 84){
+        err.textContent = "That height looks off — we expect inches, roughly 20 to 84.";
+        e.target.innerHTML='Save'; e.target.disabled=false; return;
+      }
+      // Written to `measurements`, not somewhere new — the trend bars, the velocity and
+      // the percentile track all read that table already.
+      const { error }=await sb.from('measurements').insert({
+        athlete_id:state.active.id, metric_key:'height', value:hIn, unit:'in',
+        measured_on:new Date().toISOString().slice(0,10), source:'manual',
+        created_by:state.user.id });
+      if(error) console.error(error);   // non-fatal: the rest of the save still stands
     }
     if(cut && sportRow && sportRow.sport_key){
       const { error }=await sb.from('athlete_sports').update({age_cutoff_md:cut})
