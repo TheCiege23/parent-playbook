@@ -732,3 +732,146 @@
   /* Photos get room to be looked at. */
   .gal{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 }
+
+/* ===================================================================
+   GROWTH READ — the five cards
+   ===================================================================
+   Design handoff, growth + body scan bundle. Every diagram here is stroke-only
+   line art on purpose: this is a description of a child's body, and a filled,
+   coloured, gym-styled chart would make it read as a score. */
+
+  /* 1. Height-for-age. A position on a distribution, never a score — so a bell
+     curve with a marker, and explicitly NOT a gauge, dial or progress bar.
+     There is no "full" end of a growth chart. The curve is identical on every
+     screen; only the marker's x-position moves. */
+  .pct-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px}
+  .pct-card .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--clay-ink)}
+  .pct-card h4{font-family:'Archivo',sans-serif;font-weight:900;font-size:26px;
+    letter-spacing:-.02em;margin:6px 0 2px}
+  .pct-curve{display:block;width:100%;height:70px;margin:10px 0 0;overflow:visible}
+  .pct-curve .bell{fill:none;stroke:var(--line);stroke-width:1.5}
+  .pct-curve .mark{stroke:var(--green);stroke-width:1.5;stroke-dasharray:3 3}
+  .pct-curve .dot{fill:var(--green)}
+  .pct-axis{display:flex;justify-content:space-between;font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:9.5px;color:var(--muted);margin-top:4px}
+  .pct-card p{font-size:13px;color:var(--muted);line-height:1.55;margin:10px 0 0}
+
+  /* 2. Percentile crossing. Two points and the line between them — the whole
+     story is "it moved". Calm, never an alert: no red, no warning glyph. */
+  .cross-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;
+    margin-top:10px}
+  .cross-top{display:flex;align-items:center;gap:14px}
+  .cross-spark{flex:0 0 78px;height:44px;overflow:visible}
+  .cross-spark .ln{fill:none;stroke:var(--green);stroke-width:2;stroke-linecap:round}
+  .cross-spark .old{fill:var(--line)}
+  .cross-spark .new{fill:var(--green)}
+  .cross-top b{display:block;font-family:'Archivo',sans-serif;font-weight:900;font-size:19px;
+    letter-spacing:-.02em}
+  .cross-top span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .cross-card p{font-size:13px;color:var(--muted);line-height:1.55;margin:11px 0 0}
+
+  /* 4. Relative age. Four equal segments = the four quarters of the cut-off
+     year, with the child's quarter filled. Built in BOTH directions; the marker
+     flips ends and the copy inverts. */
+  .ra-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;
+    margin-top:10px}
+  .ra-band{display:flex;gap:2px;margin:12px 0 6px}
+  .ra-band i{flex:1;height:14px;background:var(--soft);border-radius:4px;position:relative}
+  .ra-band i:first-child{border-radius:7px 4px 4px 7px}
+  .ra-band i:last-child{border-radius:4px 7px 7px 4px}
+  .ra-band i.on{background:var(--amber)}
+  .ra-band i.on::after{content:'';position:absolute;left:50%;top:50%;width:6px;height:6px;
+    margin:-3px 0 0 -3px;border-radius:50%;background:var(--ink-deep)}
+  .ra-ends{display:flex;justify-content:space-between;font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:9.5px;color:var(--muted)}
+  .ra-card p{font-size:13px;color:var(--muted);line-height:1.55;margin:11px 0 0}
+
+  /* 5. Predicted adult height. Deliberately subordinate — a collapsed row that
+     expands in place to a RANGE, never a single figure. */
+  .ph-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:13px 15px;margin-top:10px;cursor:pointer}
+  .ph-row .gt{flex:1;min-width:0}
+  .ph-row .gt b{display:block;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px}
+  .ph-row .gt span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+  .ph-row .caret{color:var(--muted);transition:transform .15s}
+  .ph-row.open .caret{transform:rotate(90deg)}
+  .ph-body{background:var(--pine-900);border-radius:14px;padding:16px;margin-top:8px;color:var(--paper)}
+  .ph-body .rng{font-family:'Archivo',sans-serif;font-weight:900;font-size:27px;letter-spacing:-.025em}
+  .ph-body p{font-size:12.5px;color:rgba(246,242,233,.75);line-height:1.55;margin:9px 0 0}
+
+/* ===================================================================
+   BODY SCAN — clinical, line-only, adults only
+   ===================================================================
+   Every guide here is stroke-only with no fill and no gym palette. This is a
+   measuring tool, not a fitness app: closer to a tailor than a mirror. Nothing
+   in this block may ever appear on a child's route. */
+
+  .bs-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;padding:3px 8px;border-radius:999px;
+    background:#F6E1D8;color:var(--clay-ink);vertical-align:middle;margin-left:8px}
+
+  /* Refusal. Full-bleed pine, not a red error page — this is a deliberate product
+     decision and it should read as confident rather than apologetic. */
+  .bs-refuse{background:var(--pine-900);color:var(--paper);border-radius:18px;
+    padding:26px 22px;margin-top:4px}
+  .bs-refuse .ic{width:44px;height:44px;border-radius:13px;border:1.5px solid rgba(239,163,59,.5);
+    display:grid;place-items:center;margin-bottom:18px}
+  .bs-refuse h3{font-size:25px;font-weight:900;letter-spacing:-.028em;margin:0 0 10px}
+  .bs-refuse > p{font-size:14.5px;line-height:1.6;color:rgba(246,242,233,.75);margin:0 0 18px}
+  .bs-alt{background:rgba(246,242,233,.07);border:1px solid rgba(246,242,233,.16);
+    border-radius:15px;padding:14px;margin-bottom:16px}
+  .bs-alt b{display:block;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;margin-bottom:3px}
+  .bs-alt span{font-size:13px;color:rgba(246,242,233,.72);line-height:1.5}
+  .bs-foot{font-size:11px;color:rgba(246,242,233,.55);line-height:1.5;margin-top:16px}
+
+  /* Consent promises. */
+  .bs-promise{display:flex;gap:12px;align-items:flex-start;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:9px}
+  .bs-promise .tick{flex:0 0 26px;height:26px;border-radius:8px;background:#E3EDE8;color:var(--green-d);
+    display:grid;place-items:center;font-size:13px}
+  .bs-promise b{display:block;font-family:'Archivo',sans-serif;font-weight:700;font-size:13.5px}
+  .bs-promise span{font-size:12.5px;color:var(--muted);line-height:1.5}
+  /* Present even when empty, and honest about being empty. */
+  .bs-slot{border:1.5px dashed #D5CEBF;border-radius:14px;padding:13px;margin-bottom:9px;
+    font-size:12.5px;color:var(--muted);line-height:1.5}
+
+  /* Capture. A viewfinder, not a photo booth. */
+  .bs-view{position:relative;background:var(--pine-900);border-radius:18px;overflow:hidden;
+    aspect-ratio:3/4;display:grid;place-items:center;margin:12px 0}
+  .bs-view .brk{position:absolute;width:26px;height:26px;border:2px solid rgba(239,163,59,.75)}
+  .bs-view .brk.tl{top:14px;left:14px;border-right:none;border-bottom:none;border-radius:6px 0 0 0}
+  .bs-view .brk.tr{top:14px;right:14px;border-left:none;border-bottom:none;border-radius:0 6px 0 0}
+  .bs-view .brk.bl{bottom:14px;left:14px;border-right:none;border-top:none;border-radius:0 0 0 6px}
+  .bs-view .brk.br{bottom:14px;right:14px;border-left:none;border-top:none;border-radius:0 0 6px 0}
+  .bs-sil{width:52%;max-height:74%;opacity:.85}
+  .bs-sil path,.bs-sil circle,.bs-sil line{fill:none;stroke:rgba(246,242,233,.85);
+    stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* Left is Right mirrored — one asset, not two hand-drawn ones. */
+  .bs-sil.flip{transform:scaleX(-1)}
+  .bs-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    background:rgba(4,18,14,.82);color:var(--paper);font-size:12.5px;font-weight:600;
+    padding:8px 14px;border-radius:999px;white-space:nowrap;max-width:88%;text-align:center}
+
+  /* Four dots, labelled, tappable back to a completed step. */
+  .bs-dots{display:flex;gap:8px;justify-content:center;margin:2px 0 0}
+  .bs-dots div{text-align:center;flex:0 0 auto;width:54px}
+  .bs-dots i{display:block;width:8px;height:8px;border-radius:50%;background:var(--line);margin:0 auto 5px}
+  .bs-dots i.on{background:var(--green)}
+  .bs-dots i.done{background:var(--green-d)}
+  .bs-dots span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+
+  .bs-shutter{width:68px;height:68px;border-radius:50%;background:var(--paper);
+    border:4px solid var(--green);margin:14px auto 0;display:block}
+  .bs-shutter:active{transform:scale(.94)}
+
+  /* Setup diagram. */
+  .bs-setup{background:var(--pine-900);border-radius:18px;padding:18px;margin-top:4px}
+  .bs-setup svg{display:block;width:100%;height:auto}
+  .bs-setup svg path,.bs-setup svg line,.bs-setup svg rect,.bs-setup svg circle{
+    fill:none;stroke:rgba(246,242,233,.8);stroke-width:1.6;stroke-linecap:round}
+  .bs-setup svg .dash{stroke:rgba(239,163,59,.8);stroke-dasharray:4 4}
+  .bs-pills{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+  .bs-pills span{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:999px;
+    background:rgba(246,242,233,.12);color:rgba(246,242,233,.85)}

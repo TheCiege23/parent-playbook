@@ -184,6 +184,63 @@ function fmtHeightIn(v){
   return `${Math.floor(total/12)}′ ${total%12}″`;
 }
 
+
+// ---------------------------------------------------------------------------
+//  DIAGRAMS — stroke-only line art, redrawn rather than embedded
+// ---------------------------------------------------------------------------
+// All of these are outline only. This is a description of a child's body, and a
+// filled, coloured, gym-styled chart would make it read as a score.
+
+// A normal curve with the child's position marked. The curve is IDENTICAL on
+// every screen — only the marker moves — which is the whole point: it shows a
+// position in a population, not an achievement. Deliberately not a gauge, dial
+// or progress bar; a growth chart has no "full" end.
+function pctCurveSVG(pct){
+  const W = 260, H = 62, pad = 10;
+  // z from -2.5 to +2.5 maps across the width; 3rd/50th/97th land at -1.88/0/+1.88.
+  const zOf = p => { const c = Math.min(99.4, Math.max(0.6, p)) / 100;
+    // crude inverse-normal, good to ~0.02 across the drawn range
+    const t = Math.sqrt(-2 * Math.log(c < 0.5 ? c : 1 - c));
+    const z = t - (2.30753 + 0.27061*t) / (1 + 0.99229*t + 0.04481*t*t);
+    return c < 0.5 ? -z : z; };
+  const x = z => pad + ((z + 2.5) / 5) * (W - pad*2);
+  const y = z => H - 4 - Math.exp(-0.5*z*z) * (H - 14);
+  let d = '';
+  for(let i = 0; i <= 60; i++){ const z = -2.5 + (i/60)*5;
+    d += (i ? 'L' : 'M') + x(z).toFixed(1) + ' ' + y(z).toFixed(1); }
+  const mz = zOf(pct), mx = x(mz), my = y(mz);
+  return `<svg class="pct-curve" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Height for age, ${Math.round(pct)}th percentile on a normal distribution">
+    <path class="bell" d="${d}"/>
+    <line class="mark" x1="${mx.toFixed(1)}" y1="${my.toFixed(1)}" x2="${mx.toFixed(1)}" y2="${H-4}"/>
+    <circle class="dot" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4"/>
+  </svg>`;
+}
+
+// Two points and the line between them. The entire story is "it moved", so the
+// diagram is two dots — older muted, newer green — and nothing else.
+function crossSparkSVG(fromPct, toPct){
+  const W = 78, H = 44, pad = 6;
+  const y = p => H - pad - (Math.min(100, Math.max(0, p)) / 100) * (H - pad*2);
+  const y1 = y(fromPct), y2 = y(toPct), x1 = pad, x2 = W - pad;
+  const cx = (x1 + x2) / 2;
+  return `<svg class="cross-spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+    <path class="ln" d="M${x1} ${y1.toFixed(1)} Q${cx} ${y1.toFixed(1)} ${cx} ${((y1+y2)/2).toFixed(1)} T${x2} ${y2.toFixed(1)}"/>
+    <circle class="old" cx="${x1}" cy="${y1.toFixed(1)}" r="3.5"/>
+    <circle class="new" cx="${x2}" cy="${y2.toFixed(1)}" r="4.5"/>
+  </svg>`;
+}
+
+// Four equal segments — the four quarters of the cut-off year — with the child's
+// quarter filled and dotted. Q1 is the oldest, so the band reads oldest to
+// youngest left to right and the marker simply moves.
+function raBandSVG(quartile){
+  return `<div class="ra-band" role="img" aria-label="Born in quarter ${quartile} of four, oldest to youngest">
+    ${[1,2,3,4].map(q=>`<i class="${q===quartile?'on':''}"></i>`).join('')}
+  </div>
+  <div class="ra-ends"><span>Oldest quarter</span><span>Youngest quarter</span></div>`;
+}
+
 // ===================================================================
 //  THE CARD
 // ===================================================================
@@ -195,83 +252,83 @@ function growthCard(mat, a){
   if(!mat) return '';
   const nm = esc(a.first_name);
   const v = mat.velocity, rae = mat.relativeAge, pred = mat.predicted, pct = mat.pctAdult;
+  const tr = mat.track;
   const bits = [];
 
-  // 0. Where this height sits against every American child of the same age and sex.
-  //    Leads the card because it is the one line a parent understands instantly, and
-  //    the only one here backed by a national reference rather than a rule of thumb.
-  const tr = mat.track;
+  // 1. Height for age — a position on a distribution.
   if(tr && tr.latest){
     const p = Math.round(tr.latest.pct);
-    bits.push(H`<div class="card app-pad" style="margin-bottom:12px">
-      <div class="k-mono" style="color:var(--clay-ink)">Height for age</div>
-      <div style="font-family:'Archivo';font-weight:900;font-size:26px;letter-spacing:-.02em;margin:6px 0 4px">
-        ${esc(ordinalPct(tr.latest.pct))} percentile</div>
-      <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.55">
-        Taller than about <b>${p}</b> out of every 100 ${esc(mat.sex==='female'?'girls':'boys')} the same
-        age, on the CDC growth chart. It is a description, not a score — the 20th and the 80th are both
-        completely normal places for a child to be.</p>
-      ${tr.crossed?H`<p style="font-size:13px;margin:10px 0 0;line-height:1.55">
-        <b>${nm} has moved from the ${esc(ordinalPct(tr.prior.pct))} to the ${esc(ordinalPct(tr.latest.pct))}</b>
-        over ${tr.crossed.months} months. Children normally track along roughly the same line, so a shift this
-        size is worth mentioning at the next check-up — ${tr.crossed.dir==='up'
-          ? 'usually it is simply a growth spurt arriving.'
-          : 'often it just means the spurt has not started yet.'}</p>`:''}
+    bits.push(H`<div class="pct-card">
+      <div class="k">Height for age</div>
+      <h4>${esc(ordinalPct(tr.latest.pct))} percentile</h4>
+      ${pctCurveSVG(tr.latest.pct)}
+      <div class="pct-axis"><span>3rd</span><span>50th</span><span>97th</span></div>
+      <p>Taller than about ${p} out of every 100 ${esc(mat.sex==='female'?'girls':'boys')} the same age, on the
+        CDC growth chart. A description, not a score — the 20th and the 80th are both completely normal places
+        to be.</p>
     </div>`);
   }
 
-  // 1. In a spurt right now — the one piece that changes today.
-  if(mat.spurt && v){
-    bits.push(H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">📏</div><div>
-      <h4>${nm} is growing fast right now</h4>
-      <p><b>${v.inPerYear.toFixed(1)}″ a year</b> over the last ${Math.round(v.days/30)} months. Bone outruns the
-      tendons attached to it during a stretch like this, so knees and heels get sore and coordination can go
-      backwards for a while — both normal. The week already takes a session off rather than adding one.
-      Pain just below the kneecap or at the back of the heel that lasts more than a couple of weeks is worth a
-      doctor's look.</p></div></div>`);
-  } else if(v){
-    bits.push(H`<div class="mt-note"><b>${v.inPerYear.toFixed(1)}″ a year</b> — steady. We'll flag it here if that
-      speeds up, because a growth spurt is when the plan should get lighter, not heavier.</div>`);
-  }
-
-  // 2. Relative age. No reference table, no model — a birthdate and a cut-off date.
-  //    This is the thing nobody tells a youth sports parent.
-  if(rae && (rae.isYoungest || rae.isOldest)){
-    bits.push(rae.isYoungest
-      ? H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🗓️</div><div>
-          <h4>${nm} is one of the youngest on the field</h4>
-          <p>Born in the last quarter before the cut-off, so teammates can be up to
-          <b>${rae.monthsYoungerThanOldest} months older</b> — at this age that's a real gap in size and
-          coordination, and it is routinely mistaken for talent. Kids in this quarter get less playing time,
-          get told they're behind, and quit. They are not behind. Judge the effort, not the depth chart.</p>
-          </div></div>`
-      : H`<div class="teach" style="background:#EAF3F0;border-color:#CFE3DC"><div class="ic">🗓️</div><div>
-          <h4>${nm} is one of the oldest on the field</h4>
-          <p>Born just after the cut-off, so ${nm} can be up to a year older than teammates. That usually
-          looks like an edge at this age and it evens out. Worth knowing so early wins get read as a head
-          start rather than a ceiling.</p></div></div>`);
-  }
-
-  // 3. Predicted adult height, last and folded away.
-  if(pred && pct){
-    bits.push(H`<div class="refbar" id="phToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="phList">
-        <div class="gi">📐</div>
-        <div class="gt"><b>Predicted adult height</b><span>A range, not a number — tap if you want it</span></div>
-        <span class="pill"><i class="caret">›</i></span>
+  // 2. Crossing — mounts only when the rule fires, so its absence leaves no gap.
+  if(tr && tr.crossed && tr.prior){
+    bits.push(H`<div class="cross-card">
+      <div class="cross-top">
+        ${crossSparkSVG(tr.prior.pct, tr.latest.pct)}
+        <div><b>${esc(ordinalPct(tr.prior.pct))} → ${esc(ordinalPct(tr.latest.pct))}</b>
+          <span>over ${tr.crossed.months} months</span></div>
       </div>
-      <div id="phList" hidden>
-        <div class="card app-pad">
-          <div style="font-family:'Archivo';font-weight:900;font-size:26px;letter-spacing:-.02em">
-            ${esc(fmtHeightIn(pred.lo))} – ${esc(fmtHeightIn(pred.hi))}</div>
-          <p style="font-size:13px;color:var(--muted);margin:8px 0 0;line-height:1.55">
-            ${nm} is about <b>${Math.round(pct.pct)}%</b> of the way there. This is the mid-parental method —
-            the parents' own heights and nothing measured off your child. It is a wide, rough estimate: two children
-            with identical parents can finish more than six inches apart, and the range above is the honest
-            width of it.</p>
-          <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.55">
-            It is not a target, and not a prediction of what your child can do. Plenty of the best athletes in every
-            sport finished shorter than this estimate.</p>
-        </div>
+      <p>${nm} has moved from the ${esc(ordinalPct(tr.prior.pct))} to the ${esc(ordinalPct(tr.latest.pct))}.
+        Children normally track along roughly the same line, so a shift this size is worth mentioning at the
+        next check-up — ${tr.crossed.dir==='up'
+          ? "usually it's simply a growth spurt arriving."
+          : "often it just means the spurt hasn't started yet."}</p>
+    </div>`);
+  }
+
+  // 3. Growth spurt — the app's existing amber teach card, reused rather than a new
+  //    type. The doctor sentence is bold and never collapsed: it is the one line here
+  //    with a real-world consequence.
+  if(mat.spurt && v){
+    bits.push(H`<div class="teach" style="margin-top:10px"><div class="ic">📏</div><div>
+      <h4>Growing fast right now</h4>
+      <p>${v.inPerYear.toFixed(1)}″ a year. Bone outruns the tendons attached to it during a stretch like this,
+      so knees and heels get sore and coordination can go backwards for a while — both normal. This week already
+      takes a session off rather than adding one. <b>Pain just below the kneecap or at the back of the heel that
+      lasts more than a couple of weeks is worth a doctor's look.</b></p></div></div>`);
+  } else if(v){
+    bits.push(H`<div class="mt-note" style="margin-top:10px"><b>${v.inPerYear.toFixed(1)}″ a year</b> — steady.
+      We'll flag it here if that speeds up, because a growth spurt is when the plan should get lighter, not
+      heavier.</div>`);
+  }
+
+  // 4. Relative age — both directions, same layout, marker flips ends.
+  if(rae && (rae.isYoungest || rae.isOldest)){
+    bits.push(H`<div class="ra-card">
+      <div class="k-mono" style="color:var(--clay-ink)">Where ${nm} falls in the age band</div>
+      ${raBandSVG(rae.quartile)}
+      <p>${rae.isYoungest
+        ? H`Born in the last quarter before the cut-off, so teammates can be up to
+            ${rae.monthsYoungerThanOldest} months older — at this age that's a real gap in size and coordination,
+            and it's routinely mistaken for talent. ${nm} is not behind. Judge the effort, not the depth chart.`
+        : H`Born in the first quarter after the cut-off, so some teammates can be up to
+            ${11-rae.monthsYoungerThanOldest} months younger — size and coordination that look like a head start
+            are often just a birthdate. Easy to mistake for being ahead. Judge the effort, not the calendar.`}</p>
+    </div>`);
+  }
+
+  // 5. Predicted adult height — subordinate, collapsed, always a range.
+  if(pred && pct){
+    bits.push(H`<div class="ph-row" id="phToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="phBody">
+        <div class="gi">📐</div>
+        <div class="gt"><b>Predicted adult height</b><span>Not a target. Tap to see the range.</span></div>
+        <i class="caret">›</i>
+      </div>
+      <div class="ph-body" id="phBody" hidden>
+        <div class="rng">${esc(fmtHeightIn(pred.lo))} – ${esc(fmtHeightIn(pred.hi))}</div>
+        <p>${nm} is about ${Math.round(pct.pct)}% of the way there. Mid-parental method — the parents' own
+          heights, nothing measured off your child. Two children with identical parents can finish more than six
+          inches apart, and the range above is the honest width of that. It is not a target, and not a prediction
+          of what your child can do.</p>
       </div>`);
   }
 

@@ -206,7 +206,7 @@ async function screenGrowth(){
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#growAsk"); if(b) b.onclick=()=>openGrowthInputs(grow||{}, primary||null); }
   // Predicted height stays folded until asked for — same idiom as the other collapsers.
-  { const t=$("#phToggle"), l=$("#phList");
+  { const t=$("#phToggle"), l=$("#phBody");
     if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;
         t.setAttribute('aria-expanded',String(open)); t.classList.toggle('open',open); };
       t.onclick=go; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; } }
