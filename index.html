@@ -513,6 +513,10 @@
 <script src="/js/log-game.js"></script>
 <script src="/js/account.js"></script>
 <script src="/js/body-scan.js"></script>
+<!-- AFTER body-scan.js, not before: this calls registerBodyProvider() as it loads, and
+     that function is defined there. Nothing heavy runs here — MediaPipe itself is
+     dynamic-imported on the first scan, so a parent who never scans never fetches it. -->
+<script src="/js/pose-measure.js"></script>
 <script src="/js/invites.js"></script>
 <script src="/js/pwa.js"></script>
 <script src="/js/init.js"></script>

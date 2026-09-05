@@ -912,3 +912,53 @@
     body:not(.auth) .two-col{display:block}
     .col-rail{position:static;margin-top:18px}
   }
+
+/* ===================================================================
+   BODY SCAN — the release, and the ratios that lead the result
+   =================================================================== */
+
+/* The written release. Two things it must not look like: a terms-and-conditions
+   footer, and a form. The box is large, the text is full size, and the tick is
+   20px because a checkbox that governs a child's biometric data should not be the
+   same size as one that remembers a filter. */
+.bs-release{border:1.5px solid var(--line);border-radius:14px;padding:4px 14px;margin:16px 0 4px;
+  background:var(--card)}
+.bs-release label{display:flex;gap:12px;align-items:flex-start;padding:13px 0;cursor:pointer}
+.bs-release label + label{border-top:1px solid var(--line)}
+.bs-release input[type=checkbox]{width:20px;height:20px;flex:0 0 auto;margin-top:1px;accent-color:var(--green-d)}
+.bs-release span{font-size:13.5px;line-height:1.55;color:var(--ink)}
+
+/* The ratios go above the inches because they are the numbers the method actually
+   supports. Deliberately no bar, no target and no colour beyond the ink: a child's
+   proportions are not a score, and there is no better value to be nearer to. */
+.bs-ratios{display:grid;gap:10px;margin-top:4px}
+@media (min-width:560px){ .bs-ratios{grid-template-columns:1fr 1fr} }
+.bs-ratio{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.bs-ratio .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted)}
+.bs-ratio b{display:block;font-family:'Archivo',sans-serif;font-size:27px;font-weight:900;
+  letter-spacing:-.03em;color:var(--ink);margin:3px 0 5px}
+.bs-ratio span{display:block;font-size:12.5px;line-height:1.5;color:var(--muted)}
+
+/* ===================================================================
+   INVITE — the confirmation code
+   =================================================================== */
+
+/* Six boxes rather than one field. A grandmother reading digits off a text message
+   loses her place in a run of six; separated cells give her somewhere to land, and
+   they make a wrong count visible before Continue is pressed rather than after. */
+.code-row{display:flex;gap:8px;justify-content:center;margin:18px 0 4px}
+.code-row input{width:46px;height:56px;text-align:center;font-family:'Archivo',sans-serif;
+  font-size:24px;font-weight:800;color:var(--ink);background:var(--card);
+  border:1.5px solid var(--line);border-radius:12px;padding:0;
+  -moz-appearance:textfield}
+.code-row input::-webkit-outer-spin-button,
+.code-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.code-row input:focus{outline:none;border-color:var(--green-d);box-shadow:0 0 0 3px rgba(20,83,66,.12)}
+.code-row input.filled{border-color:#B9C6BE}
+
+/* The code as the sender sees it: big, monospaced by weight rather than family, and
+   selectable, because half of them will send it by reading it aloud on the phone. */
+.code-show{font-family:'Archivo',sans-serif;font-size:34px;font-weight:900;letter-spacing:.18em;
+  text-align:center;color:var(--ink);background:#E3EDE8;border-radius:14px;padding:16px 10px;
+  margin:14px 0 6px;user-select:all}

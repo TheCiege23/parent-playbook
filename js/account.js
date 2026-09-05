@@ -55,14 +55,16 @@ async function screenAccount(){
         <div id="pushState"></div>
       </div>
 
-      <!-- Adult-only by construction: openBodyScan refuses below 18 and says so on screen.
-           It sits here rather than on a child's Growth screen precisely because it is not
-           part of the child-facing product. -->
-      <div class="sec-title">Body scan <span class="bs-tag">Adults only</span></div>
-      <div class="card app-pad">
-        <div class="navrow" id="bodyScanRow" role="button" tabindex="0"><div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8v3M10 8v5M14 8v3M18 8v5"/></svg></div>
-          <div class="gt"><b>Scan yourself</b><span>Four photos, never saved. Measurements only, and only for adults.</span></div><i>›</i></div>
+      <!-- Not a launcher — the scan itself starts from an athlete's Growth screen, because
+           the subject is always an athlete. This is where a release given there is reviewed
+           and withdrawn, which is the half of a biometric permission that usually has no
+           home in the interface at all. Filled asynchronously; it must never delay Account. -->
+      <div class="sec-title">Body scan permissions</div>
+      <div class="card app-pad" id="scanConsents">
+        <div class="rail-empty" style="padding:4px 0">Checking…</div>
       </div>
+      <p class="muted-note">Withdrawing stops any future scan immediately. It does not delete measurements
+        already saved — those are removed from Growth, alongside every other measurement.</p>
 
       <div class="sec-title">Your data</div>
       <div class="card app-pad">
@@ -109,11 +111,7 @@ async function screenAccount(){
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
-  // The subject is the SIGNED-IN ADULT, never state.active — that is a child, and
-  // passing it here is the one mistake that would defeat the age guard.
-  // A null birthdate is not a refusal: the consent step asks for it.
-  go('bodyScanRow', ()=>openBodyScan({ id:state.user.id, first_name:'You',
-      birthdate:(me&&me.birthdate)||null }));
+  fillScanConsents();
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });

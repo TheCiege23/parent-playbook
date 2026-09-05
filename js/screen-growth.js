@@ -193,6 +193,19 @@ async function screenGrowth(){
           :`<p class="empty">No goals yet — add one to shape the week.</p>`}
       </div>
 
+      <!-- The scan lives HERE, on the athlete it measures, and not in Account where it
+           used to sit pointed at the signed-in adult. Editors only: a grandparent with
+           family view cannot give a release for someone else's child. -->
+      ${state.canEdit?H`<div class="sec-title" style="margin-top:18px">Body scan</div>
+      <div class="card app-pad">
+        <div class="navrow" id="growScan" role="button" tabindex="0">
+          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8v3M10 8v5M14 8v3M18 8v5"/></svg></div>
+          <div class="gt"><b>Measure ${esc(a.first_name)} from four photos</b>
+            <span>Wingspan, reach, shoulders and leg length. Measured on this phone — the photos are never
+              uploaded and never saved.</span></div><i>›</i></div>
+      </div>
+      <p class="muted-note">Asks your permission first, and you can withdraw it in Account at any time.</p>`:''}
+
       ${MARKETPLACE_ENABLED?H`<div class="card app-pad" id="mpBanner" style="cursor:pointer;margin-top:14px">
         <div class="grow" style="border:none;padding:0"><div class="gi">🔎</div>
           <div class="gt"><b>Find a Pro Trainer</b><span>Book a verified coach for ${esc(a.first_name)}.</span></div>
@@ -205,6 +218,11 @@ async function screenGrowth(){
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#growAsk"); if(b) b.onclick=()=>openGrowthInputs(grow||{}, primary||null); }
+  // `a` is the athlete this screen is rendering — the subject of the scan, and the row
+  // measurements will be written against.
+  { const s=$("#growScan");
+    if(s){ const open=()=>openBodyScan(a);
+      s.onclick=open; s.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   // Predicted height stays folded until asked for — same idiom as the other collapsers.
   { const t=$("#phToggle"), l=$("#phBody");
     if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;

@@ -1,34 +1,52 @@
 // ===================================================================
-//  BODY SCAN — the capture surface, and the seam a model plugs into
+//  BODY SCAN — capture, consent, and the seam a measuring engine plugs into
 // ===================================================================
-// This file deliberately contains NO measurement model, and never will. Turning
-// photographs into anthropometrics is a trained computer-vision problem that needs a
-// children's 3D body-scan dataset with paired ground truth. No such public dataset
-// exists, for reasons anyone would agree with. Writing a plausible-looking estimator
-// here would produce confident numbers about a child's body with nothing behind them,
-// which is worse than having no feature.
+// This file is the surface: capture, pose guidance, the release, retention, revocation
+// and the result. It still contains no measurement model of its own, deliberately — the
+// engine arrives through registerBodyProvider(), and today that is js/pose-measure.js
+// running MediaPipe on the phone.
 //
-// What this file IS: the complete surface around that gap — capture, pose guidance,
-// consent, retention, and a documented adapter seam. Register a provider and the
-// feature works end to end. Register nothing and it says so plainly rather than
-// inventing a result.
+// The distinction is worth keeping straight, because it is the reason this feature is
+// honest. GIRTHS — chest, waist, hip — need a parametric body model fitted to a
+// silhouette, and the standard one is not licensed for commercial use. Nothing here
+// estimates one, and a plausible-looking guess at a child's waist would be worse than
+// no feature at all. LENGTHS between joints the model can see are a different problem:
+// two detected points, the distance between them, scaled by a height someone measured
+// with a tape. That is what the engine returns and all it returns.
 //
 // ---------------------------------------------------------------------------
 //  THE THREE RULES THIS FILE ENFORCES IN CODE, NOT IN DOCUMENTATION
 // ---------------------------------------------------------------------------
-//  1. NEVER A MINOR. Body geometry is a biometric identifier in Illinois (BIPA,
-//     private right of action), Texas (CUBI) and Washington (My Health My Data).
-//     Collecting it from a child is a category of risk this product does not take,
-//     and scanAllowed() refuses below ADULT_AGE regardless of what any caller asks.
-//  2. THE IMAGE IS NEVER PERSISTED. Frames live in memory as Blobs, go to the
-//     provider, and are released. Nothing is written to storage, no row references a
-//     photo. This is the same posture the commercial platforms advertise, and it is
-//     the only version of this that survives a diligence question.
+//  1. NO SCAN WITHOUT A RECORDED RELEASE. This file used to refuse minors outright.
+//     That block was a business decision standing in for a legal one, and it has been
+//     replaced — not removed — by the thing the statutes actually ask for: a written
+//     release from the subject or, for a child, their legally authorised
+//     representative, obtained BEFORE capture, pinned to the exact wording agreed to,
+//     carrying a retention date, and revocable. A missing or stale consent refuses
+//     just as hard as the age check ever did. See bsConsent() and the
+//     biometric_consents table.
+//  2. THE IMAGE IS NEVER PERSISTED. Frames live in memory as Blobs, are measured, and
+//     are released. Nothing is written to storage and no row references a photo. With
+//     the on-device engine this is stronger than a promise: the frames are never sent
+//     anywhere at all, so there is no server that could keep one.
 //  3. DERIVED NUMBERS ONLY. What may be stored is what a tape measure could also have
-//     produced — a girth, a length. Never the frames, never a composition estimate
-//     for a minor, never an identifier.
+//     produced — a length. Never the frames, never a composition estimate, never an
+//     identifier.
 // ---------------------------------------------------------------------------
 
+// The wording a parent agreed to, versioned. Change the release text and this MUST
+// change with it: an old consent then stops matching, and the parent is asked again.
+// Silently reusing a release for terms it never covered is the failure this prevents.
+const SCAN_POLICY_VERSION = '2026-09-05.ondevice.v1';
+
+// BIPA wants a retention schedule that is published and honoured, with destruction no
+// later than the purpose being satisfied. A season is the purpose, so a year is the
+// schedule — long enough to compare this autumn with last, short enough that a family
+// who drifts away is not on file indefinitely.
+const SCAN_RETENTION_MONTHS = 12;
+
+// Kept, but no longer a gate. It decides which release text is shown and whether the
+// signer is attesting for themselves or for a child in their care.
 const ADULT_AGE = 18;
 
 // ---------------------------------------------------------------------------
@@ -136,21 +154,62 @@ function bodyProvider(){ return BODY_PROVIDER; }
 // ---------------------------------------------------------------------------
 //  GUARDS
 // ---------------------------------------------------------------------------
-// Called before the flow opens AND again before anything is sent. Two checks, because
-// a guard that only runs at the entrance is one refactor away from being bypassed.
-function scanAllowed(subject){
+// Called before the flow opens AND again before any frame is measured. Two checks,
+// because a guard that only runs at the entrance is one refactor away from being
+// bypassed — and because a parent can revoke consent from another device while the
+// camera is open on this one.
+//
+// What changed: the question is no longer "how old is this person" but "is there a
+// live release covering this person, this wording, and this engine". Age still matters,
+// but only to decide which release was needed — not whether one exists.
+function scanAllowed(subject, consent){
   const age = subject && subject.birthdate ? ageFrom(subject.birthdate) : null;
-  // A missing date of birth is NOT a refusal — it is a question we have not asked yet,
-  // and the consent step asks it. Conflating the two is what made this whole feature
-  // unreachable: no adult had a DOB stored anywhere, so everyone hit the refusal screen
-  // forever. `needsDob` is the difference between "you may not" and "we don't know".
-  if(age == null)     return { ok:false, why:'needs_dob', needsDob:true };
-  if(age < ADULT_AGE) return { ok:false, why:'minor', age,
-    msg:`Body scanning is available for adults only. ${esc(subject.first_name||'This profile')} is ${age}. `
-      + 'Body geometry is a biometric identifier for a minor in several states, and this product does not '
-      + 'collect it. The growth read gives the useful part — percentile, trend and spurt timing — from a '
-      + 'tape measure.' };
+  // A missing date of birth is a question we have not asked, not a refusal. It has to
+  // be answered before consent can be recorded, because the release text and the
+  // signer's role both depend on it.
+  if(age == null) return { ok:false, why:'needs_dob', needsDob:true };
+  if(!consent)    return { ok:false, why:'needs_consent', age };
   return { ok:true, age };
+}
+
+// The live release for this athlete, or null. Four things can make one dead, and all
+// four have to be checked here rather than trusted from a cached flag:
+//   revoked  — a parent withdrew it, possibly from another device a minute ago
+//   expired  — the retention date passed, which is the schedule doing its job
+//   stale    — the release wording moved on and this consent predates it
+//   engine   — consent to on-device measurement is not consent to send a child's
+//              photograph to a third party, and vice versa
+async function loadScanConsent(athleteId, engineId){
+  if(!athleteId) return null;
+  try{
+    const { data, error } = await sb.from('biometric_consents')
+      .select('id, policy_version, scan_engine, retention_until, granted_at')
+      .eq('athlete_id', athleteId)
+      .is('revoked_at', null)
+      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .eq('policy_version', SCAN_POLICY_VERSION)
+      .eq('scan_engine', engineId || 'none')
+      .order('granted_at', { ascending: false })
+      .limit(1);
+    if(error){ console.error(error); return null; }
+    return (data && data[0]) || null;
+  }catch(e){ console.error(e); return null; }
+}
+
+// The scan measures proportions; a measured height turns them into lengths. Without one
+// there is nothing to scale against, so this is a hard prerequisite rather than a
+// nice-to-have — and it is deliberately the athlete's OWN most recent height, never a
+// default for their age, because a default would silently make every child average.
+async function latestHeightIn(athleteId){
+  try{
+    const { data } = await sb.from('measurements')
+      .select('value, measured_on')
+      .eq('athlete_id', athleteId).eq('metric_key', 'height')
+      .order('measured_on', { ascending: false }).limit(1);
+    if(!data || !data[0]) return null;
+    const v = Number(data[0].value);
+    return isFinite(v) && v > 0 ? { value: v, on: data[0].measured_on } : null;
+  }catch(e){ console.error(e); return null; }
 }
 
 
@@ -228,121 +287,221 @@ function bsInterruptedNotice(){
 // ---------------------------------------------------------------------------
 //  THE FLOW
 // ---------------------------------------------------------------------------
-const BS = { frames:{}, consent:false, subject:null };
+const BS = { frames:{}, consent:false, subject:null, heightIn:null, consentId:null };
 
-function openBodyScan(subject){
-  BS.frames = {}; BS.consent = false; BS.subject = subject || state.active;
-  const gate = scanAllowed(BS.subject);
-  // Refuse only a known minor. An unknown age goes to consent, which asks for it.
-  if(!gate.ok && !gate.needsDob) return bsRefuse(gate);
-  bsConsent(!!gate.needsDob);
+// The subject is an ATHLETE row, always. It used to be the signed-in adult, because the
+// feature was adults-only and there was no adult athlete to point at — which quietly
+// broke the save path, since measurements.athlete_id is a foreign key to athletes and a
+// user id is not an athlete id. Nothing ever hit it, because no provider existed to
+// produce a result worth saving. Now one does.
+async function openBodyScan(subject){
+  BS.frames = {}; BS.consent = false; BS.consentId = null; BS.heightIn = null;
+  BS.subject = subject || state.active;
+  if(!BS.subject || !BS.subject.id) return;
+
+  if(!state.canEdit) return bsBlocked('Only a parent or co-parent can start a scan.',
+    `You have view access to ${esc(BS.subject.first_name || 'this athlete')}, which does not include this.`);
+
+  const p = bodyProvider();
+  if(!p) return bsNoProviderUp();
+
+  const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
+    <span class="spinner"></span><div>Checking…</div></div>`);
+  const [consent, height] = await Promise.all([
+    loadScanConsent(BS.subject.id, p.id),
+    latestHeightIn(BS.subject.id),
+  ]);
+  bg.remove();
+
+  const gate = scanAllowed(BS.subject, consent);
+  if(!gate.ok && gate.needsDob) return bsBlocked('We need a date of birth first.',
+    `Add ${esc(BS.subject.first_name || 'their')} date of birth in Edit, then come back — `
+    + 'it decides which release applies and it is part of the record.');
+
+  // A scan measures proportions. Without a real height there is nothing to scale them
+  // against, and the honest move is to say so rather than to invent a starting point.
+  if(!height) return bsNeedsHeight();
+  BS.heightIn = height.value;
+
+  if(consent){ BS.consent = true; BS.consentId = consent.id; return bsSetup(); }
+  bsConsent(gate.age, p, height);
 }
 
-// The refusal is a screen, not a silent no-op. A buyer reading this flow should be
-// able to see exactly where the line is and that the code holds it.
+// Generic "not from here, not yet". Replaces the old refusal screen for everything that
+// is a missing prerequisite rather than a prohibition.
+function bsBlocked(title, why){
+  const bg = sheet(H`<h3>${esc(title)}</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">${esc(why)}</p>
+    <button class="btn" id="bsOkay" style="margin-top:16px">Got it</button>`);
+  bg.querySelector('#bsOkay').onclick = () => bg.remove();
+}
+
+function bsNoProviderUp(){
+  const bg = sheet(H`<h3>The measuring engine didn't load</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">Nothing is connected to measure with, so there
+      is no point taking the photos. This is usually a script that failed to load — reopening the app fixes it.</p>
+    <button class="btn" id="bsOkay" style="margin-top:16px">Close</button>`);
+  bg.querySelector('#bsOkay').onclick = () => bg.remove();
+}
+
+function bsNeedsHeight(){
+  const nm = esc(BS.subject.first_name || 'This athlete');
+  const bg = sheet(H`<h3>Measure ${nm} first</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">A scan works out <b>proportions</b> — how long a
+      leg is compared with a torso. Turning those into inches needs one real number to scale against, and that
+      is a height someone measured with a tape.</p>
+    <div class="teach" style="margin-top:14px"><div class="ic">📏</div><div>
+      <h4>Against a door frame, shoes off</h4>
+      <p>Heels and back to the wall, a book flat on the head, mark and measure. Thirty seconds, and every
+      number the scan produces afterwards rests on it.</p></div></div>
+    <button class="btn amber" id="bsAddH" style="margin-top:16px">Add a height</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="bsHLater" style="background:transparent;color:var(--muted)">Not now</button>
+    </div>`);
+  bg.querySelector('#bsHLater').onclick = () => bg.remove();
+  bg.querySelector('#bsAddH').onclick = () => { bg.remove(); renderApp('growth'); };
+}
+
+// The refusal is a screen, not a silent no-op. It fires when the SECOND guard fails —
+// consent that was live when the camera opened and is not live now, because a parent
+// withdrew it on another device while these four photos were being taken. Rare, and
+// exactly the case a single entrance check would get wrong.
 function bsRefuse(gate){
   const bg = sheet(H`<div class="bs-refuse">
     <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
       stroke="#EFA33B" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="2"/>
       <path d="M6 8v3M10 8v5M14 8v3M18 8v5"/></svg></div>
-    <h3>This is for adults.</h3>
-    <p>${gate.msg}</p>
+    <h3>This scan was stopped.</h3>
+    <p>${esc((gate && gate.msg) || 'The permission covering this scan is no longer active, so nothing was '
+      + 'measured. The photos have been discarded.')}</p>
     <div class="bs-alt">
-      <b>The growth read does the useful part</b>
-      <span>Height percentile, how that is trending, and when a growth spurt is loading the knees — all from a
-        tape measure, with nothing measured off a photograph.</span>
+      <b>Nothing was kept</b>
+      <span>No measurement was produced and no photograph was stored. If this is a surprise, someone with
+        access withdrew the scan permission — it can be given again from Growth.</span>
     </div>
     <button class="btn amber" id="bsToGrowth">Go to Growth</button>
     <div style="text-align:center;margin-top:12px">
       <button class="pill" id="bsBackLink" style="background:transparent;color:rgba(246,242,233,.7)">Back</button>
     </div>
-    <p class="bs-foot">Body geometry taken from photographs is treated as a biometric identifier for a minor
-      under the Illinois Biometric Information Privacy Act, the Texas Capture or Use of Biometric Identifier Act,
-      and Washington's My Health My Data Act. This product does not collect it from children.</p>
+    <p class="bs-foot">Body measurements taken from photographs are treated as biometric information under the
+      Illinois Biometric Information Privacy Act, the Texas Capture or Use of Biometric Identifier Act and
+      Washington's My Health My Data Act. This app measures only with a recorded release, keeps no photograph,
+      and destroys the measurements on the schedule shown when the release was given.</p>
   </div>`);
   bg.querySelector('#bsBackLink').onclick = () => bg.remove();
   { const g = bg.querySelector('#bsToGrowth');
     if(g) g.onclick = () => { bg.remove(); renderApp('growth'); }; }
 }
 
-function bsConsent(needsDob){
-  const p = bodyProvider();
-  const bg = sheet(H`<h3>Body scan</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Four photos, about a minute. Read this
-      first — it is short, and it is the whole deal.</p>
+// The retention date, computed once and shown to the parent BEFORE they agree rather
+// than buried in a policy page. A schedule nobody was told about is not a schedule.
+function bsRetentionDate(){
+  const d = new Date();
+  d.setMonth(d.getMonth() + SCAN_RETENTION_MONTHS);
+  return d.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+//  THE RELEASE
+// ---------------------------------------------------------------------------
+// This screen is the compliance artefact, so it is written to be read rather than
+// scrolled past. Three things the statutes actually require, in the order a person
+// would ask them: what is collected, what happens to it, and for how long. Then a
+// specific affirmative act — not a pre-ticked box, not a continue button that implies
+// agreement.
+//
+// For a minor there are TWO ticks, because two separate things are being attested and
+// bundling them into one is how a release gets argued away later: that the signer is
+// the child's legally authorised representative, and that they understand what is
+// being collected.
+function bsConsent(age, p, height){
+  const minor = age < ADULT_AGE;
+  const nm = esc(BS.subject.first_name || 'this athlete');
+  const until = bsRetentionDate();
+  const untilHuman = new Date(until + 'T00:00:00')
+    .toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+
+  const bg = sheet(H`<h3>Scan ${nm}</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Four photos, about a minute. This part is
+      the agreement — it is short, and it is the whole of it.</p>
+
+    <div class="bs-promise"><div class="tick">✓</div><div>
+      <b>What gets measured</b>
+      <span>${esc((p.produces || []).join(', ') || 'Lengths between joints')}. ${esc(p.excludes || '')}</span></div></div>
 
     <div class="bs-promise"><div class="tick">✓</div><div>
       <b>The photos are never saved</b>
-      <span>They exist in this browser for as long as the scan takes, go to the measurement service, and are
-        released. Nothing is uploaded to your account and no record points at an image.</span></div></div>
+      <span>${esc(p.notice || 'They are measured and released.')} They exist in this browser for as long as the
+        scan takes and are then discarded. Nothing is uploaded to your account and no record points at an
+        image.</span></div></div>
 
-    <div class="bs-promise"><div class="tick">✓</div><div>
-      <b>Only measurements are kept</b>
-      <span>Numbers a tape measure could also have produced. Delete them any time from Growth.</span></div></div>
+    <div class="bs-promise"><div class="tick">🗓️</div><div>
+      <b>Kept until ${esc(untilHuman)}</b>
+      <span>Then deleted, unless ${nm} is scanned again — which starts the ${SCAN_RETENTION_MONTHS} months
+        over. You can delete the measurements and withdraw this permission from Growth at any time, and it
+        takes effect immediately.</span></div></div>
 
-    ${p ? H`<div class="bs-promise"><div class="tick">🔌</div><div>
-      <b>${esc(p.label||p.id)}</b><span>${esc(p.notice||'Connected measurement service.')}</span></div></div>`
-        : H`<div class="bs-slot"><b style="font-family:'Archivo',sans-serif;color:var(--ink)">Nothing is
-      connected today.</b><br/>You can walk the whole capture, but no measurement will be produced and none
-      saved. This app does not estimate body measurements itself — that needs a trained model, and a made-up
-      number here would be worse than no feature.</div>`}
+    <div class="bs-slot" style="margin-top:12px">
+      <b style="font-family:'Archivo',sans-serif;color:var(--ink)">Scaled against ${esc(String(height.value))}"</b><br/>
+      That height, measured ${esc(fmtDate(height.on))}, is what turns the proportions into inches. If it is out
+      of date, every number from this scan will be out with it.
+    </div>
 
-    ${needsDob ? H`<div class="field" style="margin-top:14px">
-      <label>Your date of birth</label>
-      <input id="bsDob" type="date" max="${esc(new Date().toISOString().slice(0,10))}"/>
-      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Asked once, and only here. This is the
-        one feature in the app restricted to adults, so it records a date rather than taking a tick on trust.
-        Nothing else reads it.</p></div>` : ''}
-
-    <label style="display:flex;gap:11px;align-items:flex-start;margin:14px 2px;cursor:pointer">
-      <input type="checkbox" id="bsOk" style="width:20px;height:20px;flex:0 0 auto;margin-top:1px"/>
-      <span style="font-size:13.5px;line-height:1.5">I'm scanning myself, and I'm over ${ADULT_AGE}.</span></label>
+    <div class="bs-release">
+      ${minor
+        ? H`<label><input type="checkbox" id="bsOk1"/>
+              <span>I am ${nm}'s parent or legal guardian, and I authorise this app to measure their body from
+                photographs I take.</span></label>
+            <label><input type="checkbox" id="bsOk2"/>
+              <span>I understand what is measured, that the photographs are not uploaded or kept, and that the
+                measurements are deleted on the date above.</span></label>`
+        : H`<label><input type="checkbox" id="bsOk1"/>
+              <span>${nm} is ${esc(String(age))} and has agreed to be measured this way. Over 18, the release
+                is theirs to give — I am recording it, not giving it for them.</span></label>`}
+    </div>
 
     <div class="err" id="bsCErr"></div>
-    <button class="btn amber" id="bsGo" disabled>Continue</button>
+    <button class="btn amber" id="bsGo" disabled>Agree and start</button>
     <div style="text-align:center;margin-top:12px">
       <button class="pill" id="bsCancel" style="background:transparent;color:var(--muted)">Cancel</button>
     </div>`);
 
-  const go = bg.querySelector('#bsGo'), box = bg.querySelector('#bsOk');
-  const dob = needsDob ? bg.querySelector('#bsDob') : null;
-  // Continue needs the tick AND, when we are asking for it, a date. Reuses the app's
-  // existing disabled-button token rather than inventing a state.
-  const sync = () => { go.disabled = !(box.checked && (!dob || dob.value)); };
-  box.onchange = sync;
-  if(dob) dob.oninput = sync;
+  const go = bg.querySelector('#bsGo');
+  const boxes = Array.from(bg.querySelectorAll('.bs-release input[type=checkbox]'));
+  const sync = () => { go.disabled = !boxes.every(b => b.checked); };
+  boxes.forEach(b => { b.onchange = sync; });
   bg.querySelector('#bsCancel').onclick = () => bg.remove();
 
   go.onclick = async e => {
     const err = bg.querySelector('#bsCErr'); err.textContent = '';
-    if(!box.checked) return;
+    if(!boxes.every(b => b.checked)) return;
+    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
 
-    if(dob){
-      const v = dob.value;
-      if(!v){ err.textContent = 'Add your date of birth to continue.'; return; }
-      const age = ageFrom(v);
-      // The date is the authority, not the checkbox above it. Someone can tick "I'm over
-      // 18" and enter a date that says otherwise; the date wins, and it wins BEFORE the
-      // value is written anywhere.
-      if(!(age >= 0 && age < 120)){ err.textContent = "That date doesn't look right."; return; }
-      if(age < ADULT_AGE){
-        bg.remove();
-        return bsRefuse({ msg: `Body scanning is available for adults only, and that date makes you ${age}. `
-          + 'Body geometry is treated as a biometric identifier for a minor in several states, and this '
-          + 'product does not collect it.' });
-      }
-      e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
-      const { error } = await sb.from('guardians')
-        .update({ birthdate: v }).eq('id', state.user.id);
-      if(error){
-        console.error(error);
-        err.textContent = 'Could not save that. ' + (error.message || '');
-        e.target.innerHTML = 'Continue'; e.target.disabled = false; return;
-      }
-      BS.subject = { ...BS.subject, birthdate: v };   // so the second guard in bsRun() passes
+    // Recorded BEFORE the camera opens, never after. A release written once the photos
+    // exist is a release for something that already happened.
+    const { data, error } = await sb.from('biometric_consents').insert({
+      athlete_id: BS.subject.id,
+      guardian_id: state.user.id,
+      subject_is_minor: minor,
+      subject_age_years: age,
+      policy_version: SCAN_POLICY_VERSION,
+      scan_engine: p.id,
+      retention_until: until,
+      method: 'in_app_written_release',
+      detail: { produces: p.produces || [], engine_label: p.label || p.id,
+                height_in: height.value, height_on: height.on },
+    }).select('id').maybeSingle();
+
+    if(error){
+      console.error(error);
+      err.textContent = 'Could not record that permission, so the scan has not started. '
+                      + (error.message || '');
+      e.target.innerHTML = 'Agree and start'; e.target.disabled = false;
+      return;
     }
 
     BS.consent = true;
+    BS.consentId = data ? data.id : null;
     bg.remove();
     bsSetup();
   };
@@ -453,90 +612,155 @@ function bsDiscard(){
 async function bsRun(){
   const p = bodyProvider();
   const subject = BS.subject;
-  // Second check. The first was at the entrance; a lot can change between a menu tap
-  // and four photos later, and this is the one that matters because it is the last
-  // thing before frames would leave the device.
-  const gate = scanAllowed(subject);
-  if(!gate.ok){ bsDiscard(); return bsRefuse(gate); }
-  if(!BS.consent){ bsDiscard(); return bsRefuse({ msg:'Consent was not given.' }); }
 
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div>Measuring…</div></div>`);
+    <span class="spinner"></span><div id="bsProg">Measuring…</div></div>`);
+  const say = t => { const el = bg.querySelector('#bsProg'); if(el) el.textContent = t; };
+
+  // SECOND CHECK, and it re-reads the database rather than trusting BS.consent. The
+  // first check ran before the camera opened; four photos later a co-parent may have
+  // withdrawn the release from another phone, and a flag captured a minute ago would
+  // not know. This is the last moment before a child's frames are measured, so it is
+  // the one that has to be true rather than remembered.
+  const live = await loadScanConsent(subject.id, p && p.id);
+  const gate = scanAllowed(subject, live);
+  if(!p || !gate.ok || !BS.consent){
+    bsDiscard(); bg.remove();
+    return bsRefuse({ msg: !p ? 'The measuring engine is no longer available.'
+      : 'The permission covering this scan is no longer active.' });
+  }
 
   let result = null, failure = null;
-  if(p){
-    try{
-      const hRows = (state.jrnMeasCache || []);
-      result = await p.measure({
-        frames: { ...BS.frames },
-        heightIn: null,           // the provider may ask for a stated height; wire when known
-        sex: subject.sex_at_birth || null,
-        ageYears: gate.age,
-      });
-    }catch(err){ console.error(err); failure = err; }
-  }
+  try{
+    result = await p.measure({
+      frames: { ...BS.frames },
+      heightIn: BS.heightIn,
+      sex: subject.sex_at_birth || null,
+      ageYears: gate.age,
+      onProgress: say,
+    });
+  }catch(err){ console.error(err); failure = err; }
+
   // Frames are gone before anything is rendered, success or failure.
   bsDiscard();
   bg.remove();
 
-  if(!p) return bsNoProvider();
-  if(failure || !result || !result.metrics) return bsFailed(failure);
+  if(failure || !result || !result.metrics || !Object.keys(result.metrics).length)
+    return bsFailed(failure);
   bsResult(result);
 }
 
-// The honest end state of the default build. It is not an error — the capture worked.
-function bsNoProvider(){
-  bsMarkActive(false);
-  const bg = sheet(H`<h3>Capture complete — nothing measured</h3>
-    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">All four photos were taken and have now been
-      discarded. No measurement was produced, because no measurement service is connected.</p>
-    <div class="teach" style="margin-top:14px"><div class="ic">🔌</div><div>
-      <h4>What connecting one changes</h4>
-      <p>A provider implements one function — four frames in, measurements out — and registers itself with
-      <b>registerBodyProvider()</b>. Everything you just walked through stays exactly as it is; only the
-      result screen starts carrying numbers.</p></div></div>
-    <button class="btn" id="bsDone" style="margin-top:16px">Done</button>`);
-  bg.querySelector('#bsDone').onclick = () => bg.remove();
-}
+// Every way this can fail, told apart. A single "try again" for four different causes
+// sends a parent back to redo the identical thing that just didn't work — and three of
+// these are fixed by changing something specific, not by trying harder.
+const BS_FAIL = {
+  needs_height: { h:'No height to scale against',
+    p:'The scan works out proportions; a measured height turns them into inches. Add one in Growth and the '
+    + 'same photos would have worked.' },
+  no_pose: { h:'A body could not be found in those photos',
+    p:'Usually the whole body is not in frame, or the light is behind you so the outline is lost. Head to feet '
+    + 'inside the brackets, light in front, plain wall behind.' },
+  incomplete: { h:'Part of the body was out of frame',
+    p:'Feet and head both need to be in every shot — a leg length with the ankles cropped off is the one thing '
+    + 'this must not guess at. Step back a little and take them again.' },
+  implausible: { h:'Those measurements did not add up',
+    p:'The proportions that came back are not ones a body has — usually someone sitting or leaning, two people '
+    + 'in frame, or a mirror behind. They have been thrown away rather than saved. Standing straight against a '
+    + 'plain wall fixes it.' },
+};
 
 function bsFailed(err){
   bsMarkActive(false);
-  if(err) console.error('body scan provider failed', err);
+  if(err) console.error('body scan measurement failed', err);
+  const code = err && err.message && BS_FAIL[err.message] ? err.message : null;
+  const f = code ? BS_FAIL[code] : { h:'Try better light and re-centre in the guide',
+    p:'Whole body inside the brackets, a plain wall behind, and close-fitting clothes. Loose fabric is what '
+    + 'these get wrong most often.' };
+
   const bg = sheet(H`<h3>That didn't measure</h3>
     <div class="teach" style="background:#FBE9DC;border-color:#E6C9BC;margin-top:12px">
       <div class="ic" style="background:#FBE9DC;color:#B4451F;border:1.5px solid #E6C9BC">!</div>
-      <div><h4 style="color:#B4451F">Try better light and re-centre in the guide</h4>
-        <p>Whole body inside the brackets, a plain wall behind you, and close-fitting clothes. Loose fabric is
-        what these get wrong most often. The photos have been discarded and nothing was saved.</p></div></div>
+      <div><h4 style="color:#B4451F">${esc(f.h)}</h4>
+        <p>${esc(f.p)} The photos have been discarded and nothing was saved.</p></div></div>
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsClose">Not now</button>
-      <button class="btn amber" id="bsRetry">Try again</button>
+      <button class="btn amber" id="bsRetry">${code === 'needs_height' ? 'Add a height' : 'Try again'}</button>
     </div>`);
   bg.querySelector('#bsClose').onclick = () => bg.remove();
-  bg.querySelector('#bsRetry').onclick = () => { bg.remove(); openBodyScan(BS.subject); };
+  bg.querySelector('#bsRetry').onclick = () => {
+    bg.remove();
+    if(code === 'needs_height') renderApp('growth'); else openBodyScan(BS.subject);
+  };
+}
+
+// Reading order is the argument. The RATIOS go first because they are the numbers the
+// method actually supports — they are unaffected by the one modelled quantity in the
+// chain (see pose-measure.js on the crown estimate) and they are what youth sport
+// reads. The inches follow, labelled as close rather than exact.
+//
+// No target, no range, no colour. A child's proportions are not an achievement and
+// there is no better value to be closer to — the same rule that keeps red off every
+// other screen in this app applies hardest here, on a screen about a body.
+function bsRatioCards(result){
+  const r = result.ratios || {};
+  const cards = [];
+  if(r.ape != null){
+    const pct = Math.round((r.ape - 1) * 1000) / 10;
+    cards.push({ k:'Arm span vs height', v:(r.ape).toFixed(2) + '×',
+      s: Math.abs(pct) < 1.5 ? 'Arm span and height are about the same, which is the most common build.'
+        : pct > 0 ? `Arm span is about ${Math.abs(pct).toFixed(0)}% longer than height — reach that shows up in `
+                    + 'catching and blocking.'
+                  : `Height is about ${Math.abs(pct).toFixed(0)}% more than arm span — a build that tends to `
+                    + 'favour running over reaching.' });
+  }
+  if(r.legShare != null){
+    cards.push({ k:'Legs as a share of height', v:Math.round(r.legShare * 1000) / 10 + '%',
+      s:'The number to watch across scans, not today. Legs lengthen first in a growth spurt, so this rising '
+      + 'is the earliest sign one has started — usually months before the height curve bends.' });
+  }
+  if(!cards.length) return '';
+  return H`<div class="bs-ratios">${cards.map(c => H`<div class="bs-ratio">
+    <div class="k">${esc(c.k)}</div><b>${esc(c.v)}</b><span>${esc(c.s)}</span></div>`).join('')}</div>`;
 }
 
 function bsResult(result){
   bsMarkActive(false);
   const rows = Object.entries(result.metrics || {});
+  const nameOf = k => (typeof metricName === 'function' ? metricName(k) : k.replace(/_/g, ' '));
+  const d = result.detail || {};
+  const conf = result.confidence != null ? Math.round(result.confidence * 100) : null;
   // The mesh frame is only put in the DOM if the provider actually returned a URL. An
   // empty 3D box saying "no model available" is worse than no box.
   const wantsMesh = !!result.meshUrl;
   const bg = sheet(H`<h3>Measured</h3>
-    <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos have been discarded. These numbers
-      are what was kept.</p>
+    <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos have been discarded. These
+      numbers are what was kept.</p>
 
     ${wantsMesh ? H`<div class="bs-mesh" id="bsMesh"><div class="bs-mesh-load"><span class="spinner"></span></div></div>` : ''}
 
+    ${bsRatioCards(result)}
+
+    <div class="sec-title" style="margin-top:18px">Lengths</div>
     <div class="card app-pad">
       ${rows.map(([k, v]) => H`<div style="display:flex;justify-content:space-between;padding:9px 0;
         border-bottom:1px solid var(--line)">
-        <span style="font-size:14px">${esc(k.replace(/_/g,' '))}</span>
-        <b style="font-family:'Archivo',sans-serif">${esc(String(v))}</b></div>`).join('')}
+        <span style="font-size:14px">${esc(nameOf(k))}</span>
+        <b style="font-family:'Archivo',sans-serif">${esc(String(v))}"</b></div>`).join('')}
     </div>
-    ${result.confidence != null ? H`<p style="font-size:12.5px;color:var(--muted);margin:10px 2px 0">
-      Provider confidence ${Math.round(result.confidence*100)}%. Close estimates, not tape-measure truth —
-      re-scan in the same spot and light to compare.</p>` : ''}
+
+    <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
+      <h4>Close, and comparable — not a tape measure</h4>
+      <p>These are scaled from the ${esc(String(result.heightIn))}" height on file, so they carry however far
+      out that is. Treat the inches as approximate and the change between scans as the real signal — the same
+      method makes the same small error every time, so it cancels.
+      ${conf != null ? `Read of these four photos: ${conf}% confident.` : ''}
+      ${d.framesMissed && d.framesMissed.length
+        ? `The ${esc(d.framesMissed.join(' and '))} shot could not be read, so this used
+           ${esc(String((d.framesUsed || []).length))}.` : ''}
+      ${d.rejected && d.rejected.length
+        ? `One reading (${esc(d.rejected.map(nameOf).join(', '))}) did not fit the height on file and was
+           dropped rather than saved.` : ''}</p></div></div>
+
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
       <button class="btn amber" id="bsSave">Save to Growth</button>
@@ -559,12 +783,21 @@ function bsResult(result){
   bg.querySelector('#bsSave').onclick = async e => {
     e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
     const today = new Date().toISOString().slice(0,10);
+    // `photo` is a real value of the measure_source enum. This said 'scan' for as long
+    // as the file has existed, which is not one of (manual, guided, photo, import) —
+    // every save would have failed on the enum cast. Nothing caught it because no
+    // provider existed to produce a result anyone could press Save on.
     const payload = rows.map(([k, v]) => ({
       athlete_id: BS.subject.id, metric_key: k, value: Number(v), unit: 'in',
-      measured_on: today, source: 'scan', created_by: state.user.id,
+      measured_on: today, source: 'photo', created_by: state.user.id,
+      note: 'On-device scan, scaled to ' + result.heightIn + '" height',
     })).filter(r => isFinite(r.value));
     const { error } = await sb.from('measurements').insert(payload);
-    if(error){ console.error(error); e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return; }
+    if(error){
+      console.error(error);
+      toast('Could not save that');
+      e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
+    }
     close(); toast('Saved'); renderApp('growth');
   };
 }
@@ -694,4 +927,89 @@ async function renderBodyMesh(host, meshUrl){
     try{ renderer.dispose(); }catch(_){}
   };
   return true;
+}
+
+// ===================================================================
+//  WITHDRAWING A RELEASE — the half nobody builds
+// ===================================================================
+// Every product that collects biometric information promises consent can be withdrawn.
+// Most of them mean "email support and a human will do it", which is a right you have to
+// ask permission to exercise. This is the control, in Account, next to the other things
+// a parent owns rather than requests.
+//
+// It is an UPDATE and never a DELETE. The record that a release was given on one date
+// and withdrawn on another IS the compliance artefact — destroying it to look tidy would
+// destroy the only proof the withdrawal was honoured.
+async function fillScanConsents(){
+  const host = $("#scanConsents");
+  if(!host) return;
+  const set = html => { if(document.body.contains(host)) host.innerHTML = html; };
+
+  let rows = [];
+  try{
+    const { data, error } = await sb.from('biometric_consents')
+      .select('id, athlete_id, granted_at, retention_until, scan_engine, subject_is_minor')
+      .is('revoked_at', null)
+      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .order('granted_at', { ascending: false });
+    if(error) throw error;
+    rows = data || [];
+  }catch(e){
+    console.error(e);
+    return set(H`<div class="rail-empty" style="padding:4px 0">Could not load these.</div>`);
+  }
+
+  if(!rows.length){
+    return set(H`<div class="rail-empty" style="padding:4px 0">No scan permission has been given. The body
+      scan on an athlete's Growth screen asks for one before it opens the camera.</div>`);
+  }
+
+  // One row per athlete: re-scanning inserts a fresh consent, so several can be live for
+  // the same child. The newest is the one that governs, and it is the only one shown —
+  // withdrawing revokes all of them, which is what a parent means by "stop".
+  const seen = new Set();
+  const latest = rows.filter(r => !seen.has(r.athlete_id) && seen.add(r.athlete_id));
+  const nameOf = id => {
+    const a = (state.athletes || []).find(x => x.id === id);
+    return a ? a.first_name : 'An athlete';
+  };
+
+  set(latest.map(r => H`<div class="tgl">
+      <div class="gt"><b>${esc(nameOf(r.athlete_id))}</b>
+        <span>Given ${esc(fmtDate(r.granted_at.slice(0, 10)))} · deletes
+          ${esc(fmtDate(r.retention_until))}</span></div>
+      <button class="btn sm ghost" data-revoke="${esc(r.athlete_id)}">Withdraw</button>
+    </div>`).join(''));
+
+  host.querySelectorAll('[data-revoke]').forEach(btn => {
+    btn.onclick = () => confirmWithdrawScan(btn.getAttribute('data-revoke'), nameOf(btn.getAttribute('data-revoke')));
+  });
+}
+
+function confirmWithdrawScan(athleteId, name){
+  const bg = sheet(H`<h3>Withdraw scan permission for ${esc(name)}?</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">No new scan can be started for ${esc(name)}
+      until you give permission again. It takes effect immediately, including on any other phone with a scan
+      part-way through.</p>
+    <div class="teach" style="margin-top:14px"><div class="ic">📊</div><div>
+      <h4>Measurements already saved stay</h4>
+      <p>They are in ${esc(name)}'s Growth with everything else, and are deleted the same way — from Growth,
+      one at a time, or by deleting the profile. Withdrawing permission stops new ones; it does not quietly
+      erase the record you have been keeping.</p></div></div>
+    <div class="row2" style="margin-top:16px">
+      <button class="btn ghost" id="wdNo">Keep it</button>
+      <button class="btn danger" id="wdYes">Withdraw</button>
+    </div>`);
+  bg.querySelector('#wdNo').onclick = () => bg.remove();
+  bg.querySelector('#wdYes').onclick = async e => {
+    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    const { error } = await sb.from('biometric_consents')
+      .update({ revoked_at: new Date().toISOString(), revoked_by: state.user.id })
+      .eq('athlete_id', athleteId).is('revoked_at', null);
+    if(error){
+      console.error(error); toast('Could not withdraw that');
+      e.target.innerHTML = 'Withdraw'; e.target.disabled = false; return;
+    }
+    bg.remove(); toast('Withdrawn'); fillScanConsents();
+  };
 }
