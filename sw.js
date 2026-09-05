@@ -1,5 +1,5 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v34';
+const CACHE = 'pp-v35';
 // /privacy and /terms are standalone pages, not part of the SPA. Precached so an offline
 // navigation to them serves the real page instead of the index.html fallback.
 const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',

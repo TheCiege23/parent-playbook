@@ -32,6 +32,12 @@ async function afterLogin(){
   // Supabase token fragments — falls back to the week
   const tab=(location.hash||'').slice(1);
   renderApp(APP_TABS.includes(tab)?tab:'week');
+  // If the last page life ended mid-scan, say so. Without this the parent is silently
+  // dumped back on a settings screen with four photos taken and nothing to show for it,
+  // which reads as the feature being broken rather than the OS reclaiming memory.
+  if(typeof bodyScanWasInterrupted === 'function' && bodyScanWasInterrupted()){
+    setTimeout(bsInterruptedNotice, 400);   // after the screen has painted
+  }
 }
 
 // The household this user already belongs to, if any. `fm_select` exposes every member

@@ -153,6 +153,78 @@ function scanAllowed(subject){
   return { ok:true, age };
 }
 
+
+// ---------------------------------------------------------------------------
+//  MEMORY PRESSURE — why a frame is downscaled the instant it is taken
+// ---------------------------------------------------------------------------
+// A modern phone camera returns a 12MP JPEG of roughly 3-5MB, and iOS decodes it to a
+// bitmap several times that in RAM. Holding four of those while the camera app is
+// foregrounded is a good way to have WKWebView evict the page — at which point the
+// frames are gone, the sheet stack is gone, and the parent lands back on whatever
+// route the hash says, with no idea what happened.
+//
+// Downscaling on capture cuts that by an order of magnitude. It also makes the upload
+// to a provider faster and costs nothing in accuracy: photogrammetric fitting works on
+// silhouettes, and no vendor needs 4000px of shoulder.
+const FRAME_MAX_EDGE = 1600;
+const FRAME_QUALITY  = 0.85;
+async function shrinkFrame(file){
+  try{
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, FRAME_MAX_EDGE / Math.max(bmp.width, bmp.height));
+    if(scale >= 1){ bmp.close?.(); return file; }          // already small — leave it alone
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', FRAME_QUALITY));
+    cv.width = cv.height = 0;                               // release the backing store
+    return blob || file;
+  }catch(e){
+    console.warn('frame downscale failed, keeping the original', e);
+    return file;                                            // never lose a shot over this
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  INTERRUPTION BREADCRUMB
+// ---------------------------------------------------------------------------
+// Deliberately NOT the frames — never those. Just a flag saying a scan was underway,
+// so that if the page is reloaded mid-capture the app can say what happened instead of
+// silently dumping someone back on a settings screen. sessionStorage, so it dies with
+// the tab.
+const BS_FLAG = 'pp_scan_active';
+function bsMarkActive(on){
+  try{ on ? sessionStorage.setItem(BS_FLAG, String(Date.now()))
+          : sessionStorage.removeItem(BS_FLAG); }catch(e){}
+}
+// Called on boot. Returns true if the previous page life ended mid-scan.
+function bodyScanWasInterrupted(){
+  try{
+    const t = sessionStorage.getItem(BS_FLAG);
+    if(!t) return false;
+    sessionStorage.removeItem(BS_FLAG);
+    return (Date.now() - Number(t)) < 30 * 60 * 1000;      // stale flags are not news
+  }catch(e){ return false; }
+}
+function bsInterruptedNotice(){
+  const bg = sheet(H`<h3>That scan didn't finish</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">The page reloaded while the camera was open —
+      iOS does this when it needs the memory back. <b>Nothing was saved and no photo was kept</b>, because the
+      frames only ever existed in this browser.</p>
+    <div class="teach" style="margin-top:14px"><div class="ic">💡</div><div>
+      <h4>It usually works second time</h4>
+      <p>Closing other apps and other browser tabs first makes it far less likely. The photos are also smaller
+      now, which is the real fix.</p></div></div>
+    <div class="row2" style="margin-top:16px">
+      <button class="btn ghost" id="bsLater">Not now</button>
+      <button class="btn amber" id="bsAgain">Try again</button>
+    </div>`);
+  bg.querySelector('#bsLater').onclick = () => bg.remove();
+  bg.querySelector('#bsAgain').onclick = () => { bg.remove(); renderApp('account'); };
+}
+
 // ---------------------------------------------------------------------------
 //  THE FLOW
 // ---------------------------------------------------------------------------
@@ -292,7 +364,7 @@ function bsSetup(){
       <button class="pill" id="bsBail" style="background:transparent;color:var(--muted)">Cancel</button>
     </div>`);
   bg.querySelector('#bsBail').onclick = () => { bg.remove(); bsDiscard(); };
-  bg.querySelector('#bsStart').onclick = () => { bg.remove(); bsCapture(0); };
+  bg.querySelector('#bsStart').onclick = () => { bg.remove(); bsMarkActive(true); bsCapture(0); };
 }
 
 function bsDots(i){
@@ -331,10 +403,13 @@ function bsCapture(i){
   bg.querySelectorAll('.bs-dots div').forEach((d, n) => {
     if(n < i || BS.frames[SCAN_POSES[n].key]) d.onclick = () => { bg.remove(); bsCapture(n); };
   });
-  file.onchange = () => {
+  file.onchange = async () => {
     const f = file.files[0];
     if(!f){ bg.querySelector('#bsErr').textContent = 'No photo was taken.'; return; }
-    bg.remove(); bsReview(i, f);
+    // Shrink BEFORE holding it. A full-resolution frame sitting in memory while the
+    // camera is foregrounded is what gets the page evicted on iOS.
+    const small = await shrinkFrame(f);
+    bg.remove(); bsReview(i, small);
   };
 }
 
@@ -366,6 +441,7 @@ function bsReview(i, file){
 // Release every frame. Called on cancel, on failure and after a successful run —
 // there is no path through this file that keeps an image around.
 function bsDiscard(){
+  bsMarkActive(false);
   for(const k of Object.keys(BS.frames)){
     const f = BS.frames[k];
     try{ if(f && f._url) URL.revokeObjectURL(f._url); }catch(e){}
@@ -410,6 +486,7 @@ async function bsRun(){
 
 // The honest end state of the default build. It is not an error — the capture worked.
 function bsNoProvider(){
+  bsMarkActive(false);
   const bg = sheet(H`<h3>Capture complete — nothing measured</h3>
     <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">All four photos were taken and have now been
       discarded. No measurement was produced, because no measurement service is connected.</p>
@@ -423,6 +500,7 @@ function bsNoProvider(){
 }
 
 function bsFailed(err){
+  bsMarkActive(false);
   if(err) console.error('body scan provider failed', err);
   const bg = sheet(H`<h3>That didn't measure</h3>
     <div class="teach" style="background:#FBE9DC;border-color:#E6C9BC;margin-top:12px">
@@ -439,6 +517,7 @@ function bsFailed(err){
 }
 
 function bsResult(result){
+  bsMarkActive(false);
   const rows = Object.entries(result.metrics || {});
   // The mesh frame is only put in the DOM if the provider actually returned a URL. An
   // empty 3D box saying "no model available" is worse than no box.
