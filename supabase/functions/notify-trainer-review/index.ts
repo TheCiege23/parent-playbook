@@ -29,12 +29,26 @@ const MSGS: Record<string, [string, string]> = {
   suspended:   ['Your profile is paused', 'Your listing is temporarily unlisted.'],
 };
 
+// The PUBLISHABLE key, not the legacy anon JWT.
+//
+// SUPABASE_ANON_KEY is auto-injected and holds the legacy anon JWT — the same key
+// the browser app stopped using. Reading it here is what kept that key alive and
+// blocked disabling it. Both keys do the identical job in this file: they create a
+// client that carries the CALLER's Authorization header so RLS evaluates as that
+// user. Neither grants anything on its own.
+//
+// Hardcoding is safe and deliberate: the publishable key is public by design and
+// already ships in js/core.js to every browser. The env lookup comes first so a
+// future rotation needs a secret change, not a redeploy.
+const PUBLISHABLE = Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
+  ?? 'sb_publishable_JKSj0ngr9nwq-YmX7yncpg_8xk2i2vJ';
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     const url = Deno.env.get('SUPABASE_URL')!;
     const auth = req.headers.get('Authorization') || '';
-    const uc = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
+    const uc = createClient(url, PUBLISHABLE, { global: { headers: { Authorization: auth } } });
     const { data: { user } } = await uc.auth.getUser();
     if (!user) return json({ error: 'unauthorized' }, 401);
 
