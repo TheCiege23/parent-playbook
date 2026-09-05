@@ -881,3 +881,30 @@
     border-radius:16px;height:340px;margin-bottom:12px;overflow:hidden}
   .bs-mesh canvas{display:block;width:100%;height:100%}
   .bs-mesh-load{position:absolute;inset:0;display:grid;place-items:center}
+
+  /* ---- The right rail ----
+     Two columns, never three. Left is the thing you came to do; the rail is context
+     you did not ask for but will read. Below 1180 it folds underneath and the LEFT
+     COLUMN NEVER CHANGES — that is the rule that keeps one DOM working at every width,
+     and it is why the rail is a sibling of the main column rather than woven into it. */
+  body:not(.auth) .two-col{display:grid;grid-template-columns:minmax(0,1fr) 336px;
+    gap:26px;align-items:start}
+  .col-rail{display:flex;flex-direction:column;gap:12px;position:sticky;top:22px}
+  .rail-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px}
+  .rail-card .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--clay-ink);margin-bottom:9px}
+  .rail-card h4{font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;margin:0 0 3px}
+  .rail-card .sub{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .rail-empty{font-size:12.5px;color:var(--muted);line-height:1.55}
+  /* Who can see. Same row idiom as Profile, narrower. */
+  .rail-who{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+  .rail-who:first-of-type{border-top:none;padding-top:2px}
+  .rail-who .av{flex:0 0 28px;height:28px;border-radius:9px;display:grid;place-items:center;
+    font-family:'Archivo',sans-serif;font-weight:800;font-size:11px}
+  .rail-who b{display:block;font-family:'Archivo',sans-serif;font-weight:700;font-size:13px}
+  .rail-who span{display:block;font-size:11.5px;color:var(--muted)}
+  /* The rail is desktop-only furniture. Below 1180 it becomes a normal stacked block. */
+  @media (max-width:1179.98px){
+    .two-col{display:block}
+    .col-rail{position:static;margin-top:18px}
+  }

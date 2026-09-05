@@ -124,7 +124,9 @@ async function screenWeek(){
           <div class="gt"><b>${esc(tomorrowW.title)}</b><span>${esc(tomorrowW.sub||'')}</span></div>
           ${tomorrowW.act?'<span class="pill">Open ›</span>':''}
         </div>
-      </div>`;
+      </div>
+      ${railSkeleton()}
+    </div>`;
 
   // Three states, one card. Rest takes the whole thing and offers nothing to complete —
   // that is the screen that proves the product means what it says about rest.
@@ -203,7 +205,8 @@ async function screenWeek(){
 
   $("#screen").innerHTML = H`
     ${topBar(sub, streak>0?H`<span class="streak" title="${streak} full ${streak===1?'week':'weeks'} in a row"><b>${streak}</b><span>${streak===1?'Week':'Weeks'}</span></span>`:'')}
-    <div class="app-pad" style="padding-top:6px">
+    <div class="app-pad two-col" style="padding-top:6px">
+      <div class="col-main">
       <div class="card app-pad" style="position:relative;overflow:hidden;background:${weekGrad};color:#fff;border:none">
         <div class="sportwm" style="background-image:${sportPattern(weekEmoji)}"></div>
         <div style="position:relative">
@@ -305,6 +308,11 @@ async function screenWeek(){
     sb.from('week_plan_days').upsert({ athlete_id:a.id, week_start:weekStart,
       nudge_days:nudge, updated_at:new Date().toISOString() },{ onConflict:'athlete_id,week_start' })
       .then(r=>{ if(r&&r.error) console.error('week_plan_days',r.error); });
+  }
+  // The rail is secondary by design: rendered empty with the week, filled after. A
+  // failure in here can never delay or break the screen a parent actually came for.
+  if(typeof fillWeekRail === 'function'){
+    fillWeekRail(a, goals, days, todayIdx).catch(e => console.error('rail', e));
   }
   bindTop();
   { const gb=$("#goalBanner"); if(gb) gb.onclick=()=>openAddGoal(goals||[]); }
