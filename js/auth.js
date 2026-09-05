@@ -168,7 +168,11 @@ function renderAuth(mode='login', prefill=''){
       }
       state.user = res.data.user;
       const token=inviteTokenFromUrl();
-      if(token) return acceptAndEnter(token);
+      // Back to the redeem screen rather than straight into accept. Invites now carry a
+      // confirmation code, and this path has no way to know it — accepting blind here
+      // would fail the code check and dead-end someone in the second after they created
+      // an account. renderRedeem asks for the code and then accepts.
+      if(token) return renderRedeem(token);
       await afterLogin();
     }catch(err){
       const msg=err.message||'';

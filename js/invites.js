@@ -43,13 +43,15 @@ async function renderRedeem(token){
       'It may have been mistyped, or the invite was deleted. Nothing is wrong on your end.', token);
   }
   if(info.status!=='pending'){
-    // Same layout for all three; only the headline and the first card change.
+    // Same layout for all of them; only the headline and the first card change.
     const head={ revoked:'This invite was turned off',
                  accepted:'This link has already been used',
-                 expired:'This link has expired' }[info.status] || 'This link can no longer be used';
+                 expired:'This link has expired',
+                 locked:'Too many wrong codes' }[info.status] || 'This link can no longer be used';
     const why={ revoked:`${info.inviter} removed this invite. If that's a surprise, ask them for a new one.`,
                 accepted:'Someone already accepted it. If that was you, just log in — the athlete is still there.',
-                expired:'Invite links only last a week, so they can\'t be forwarded around forever. Nothing is wrong on your end.'
+                expired:'Invite links only last a week, so they can\'t be forwarded around forever. Nothing is wrong on your end.',
+                locked:'This invite locked itself after five wrong codes, which is what stops someone guessing their way in. Ask for a new one — it takes about ten seconds and the new code arrives with it.'
               }[info.status] || 'Ask for a fresh link.';
     return renderInviteDead(head, why, token, info);
   }
@@ -84,19 +86,91 @@ async function renderRedeem(token){
   </div>`;
 
   const box=$("#rbox");
+  const needsCode=!!info.needs_code;
   if(state.user){
-    box.innerHTML=H`<button class="btn amber" id="accept">Accept and follow ${nm}</button>
+    // The code is asked for HERE, at the last step, and not before the account exists —
+    // accept_invite is where it is checked and that call needs a signed-in user. Asking
+    // earlier would mean holding it across an email confirmation round trip, which is
+    // exactly where it would get lost.
+    box.innerHTML=H`
+      ${needsCode?H`<div class="sec-title" style="margin:0 0 2px">Your code</div>
+        <p class="muted-note" style="margin:0 0 2px">Six digits, from ${esc(info.sent_hint||'the message they sent you')}.</p>
+        ${codeRow('invCode')}
+        <div class="err" id="codeErr" style="text-align:center"></div>`:''}
+      <button class="btn amber" id="accept"${needsCode?' disabled':''}>Accept and follow ${nm}</button>
       <p class="muted-note" style="margin-top:10px">You're signed in as ${esc(state.user.email)}. <a href="#" id="skip" style="color:var(--green-d)">Not now</a></p>`;
-    $("#accept").onclick=()=>acceptAndEnter(token);
+
+    const btn=$("#accept");
+    let read=()=>null;
+    if(needsCode){
+      read=bindCodeRow('invCode', full=>{ btn.disabled=!full; });
+      btn.disabled=true;
+    }
+    btn.onclick=()=>acceptAndEnter(token, needsCode?read():null);
     $("#skip").onclick=e=>{ e.preventDefault(); history.replaceState({},'',location.pathname); afterLogin(); };
   }else{
     box.innerHTML=H`<button class="btn amber" id="su">Create a free account</button>
-      <p class="muted-note" style="margin-top:10px">Already have one? <a href="#" id="li" style="color:var(--green-d)">Log in</a></p>`;
+      <p class="muted-note" style="margin-top:10px">Already have one? <a href="#" id="li" style="color:var(--green-d)">Log in</a></p>
+      ${needsCode?H`<p class="muted-note" style="margin-top:10px">Keep ${esc(info.sent_hint||'their message')} handy —
+        you'll be asked for the six-digit code once you're in.</p>`:''}`;
     // Both paths keep ?invite= in the URL, so the token survives email confirmation and
     // acceptAndEnter picks it up on the way back in.
     $("#su").onclick=()=>renderAuth('signup');
     $("#li").onclick=e=>{ e.preventDefault(); renderAuth('login'); };
   }
+}
+
+// ---------------------------------------------------------------------------
+//  SIX BOXES, NOT ONE FIELD
+// ---------------------------------------------------------------------------
+// The people typing this are the least technical users the product has — a grandparent
+// reading digits off a text message on the same phone they are typing into. Separate
+// cells give them somewhere to lose their place and find it again, and they make a
+// missing digit visible before the button is pressed rather than after.
+//
+// Paste is handled explicitly because the realistic path is copying the whole code out
+// of the message, and a paste into box one would otherwise put six digits in a
+// maxlength-1 field and silently keep the first.
+function codeRow(id){
+  return H`<div class="code-row" id="${esc(id)}">${
+    [0,1,2,3,4,5].map(i=>H`<input type="text" inputmode="numeric" autocomplete="${i===0?'one-time-code':'off'}"
+      maxlength="1" aria-label="Digit ${i+1} of 6"/>`).join('')}</div>`;
+}
+
+// Returns a reader for the assembled code. `onChange(isComplete)` fires on every edit so
+// the caller can enable its button without polling.
+function bindCodeRow(id, onChange){
+  const row=document.getElementById(id);
+  if(!row) return ()=>null;
+  const cells=Array.from(row.querySelectorAll('input'));
+  const value=()=>cells.map(c=>c.value).join('');
+  const fire=()=>{ cells.forEach(c=>c.classList.toggle('filled',!!c.value));
+                   if(onChange) onChange(value().length===6); };
+
+  cells.forEach((c,i)=>{
+    c.oninput=()=>{
+      c.value=c.value.replace(/\D/g,'').slice(0,1);
+      if(c.value && i<5) cells[i+1].focus();
+      fire();
+    };
+    // Backspace on an empty box steps back rather than doing nothing, which is what
+    // every OTP field people have used already does.
+    c.onkeydown=e=>{
+      if(e.key==='Backspace' && !c.value && i>0){ e.preventDefault(); cells[i-1].focus(); cells[i-1].value=''; fire(); }
+      if(e.key==='ArrowLeft' && i>0){ e.preventDefault(); cells[i-1].focus(); }
+      if(e.key==='ArrowRight' && i<5){ e.preventDefault(); cells[i+1].focus(); }
+    };
+    c.onpaste=e=>{
+      const t=(e.clipboardData||window.clipboardData).getData('text')||'';
+      const d=t.replace(/\D/g,'').slice(0,6);
+      if(!d) return;
+      e.preventDefault();
+      cells.forEach((x,n)=>{ x.value=d[n]||''; });
+      cells[Math.min(d.length,5)].focus();
+      fire();
+    };
+  });
+  return value;
 }
 
 // Screen 4 — invalid, revoked, accepted and expired all land here. The tone is
@@ -132,13 +206,25 @@ function renderInviteDead(title, why, token, info){
   $("#invLogin").onclick=()=>renderAuth('login');
 }
 
-async function acceptAndEnter(token){
+async function acceptAndEnter(token, code){
   root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
-  const { error } = await sb.rpc('accept_invite',{ p_token:token });
-  history.replaceState({},'',location.pathname);
+  const { error } = await sb.rpc('accept_invite',{ p_token:token, p_code:code||null });
   if(error){
-    return renderInviteDead('Could not accept this invite', friendlyAcceptErr(error.message||''), token);
+    const m=error.message||'';
+    // A wrong code is a TYPO, not a dead invite. Sending someone to the "ask for a new
+    // link" screen for a mistyped digit would be the most annoying possible reading of
+    // it — and it would be wrong, because they have four more tries. Back to the same
+    // screen with the mistake named, and the URL left intact so the token survives.
+    if(/code_wrong/.test(m)){
+      await renderRedeem(token);
+      const err=$("#codeErr");
+      if(err) err.textContent='That code is not right. Check the message and try again.';
+      return;
+    }
+    history.replaceState({},'',location.pathname);
+    return renderInviteDead('Could not accept this invite', friendlyAcceptErr(m), token);
   }
+  history.replaceState({},'',location.pathname);
   // Screen 2 — who this child is, what's next, and the install prompt. A grandparent
   // needs "Add to Home Screen" most and will find it least, so it goes here rather
   // than in a banner she'll dismiss.
@@ -190,6 +276,8 @@ async function renderInviteAccepted(){
 function friendlyAcceptErr(m){
   if(/expired/i.test(m)) return 'Invite links only last a week. Ask for a new one — it takes about ten seconds.';
   if(/revoked/i.test(m)) return 'This invite was turned off before you got to it.';
+  if(/locked/i.test(m)) return 'Five wrong codes locked this invite, which is what stops someone guessing their way in. Ask for a new one and a new code comes with it.';
+  if(/code_wrong/i.test(m)) return 'That code is not right. Check the message it came in and try the link again.';
   if(/already/i.test(m)) return 'It was already used. If that was you, just log in — the athlete is still there.';
   if(/authenticated/i.test(m)) return 'Log in first, then open the link again.';
   return m || 'Something went wrong on our end, not yours.';

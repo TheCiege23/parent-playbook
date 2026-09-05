@@ -173,9 +173,24 @@ function openSwitch(){
   bg.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{ state.active=state.athletes.find(a=>a.id===b.dataset.id); bg.remove(); renderApp('week'); });
 }
 
+// US-centric on purpose: every family this ships to dials ten digits, and asking a
+// grandmother for a country code to text her own daughter is a worse failure than not
+// supporting Belgium yet. A number typed WITH a + is respected exactly as given, which
+// is the escape hatch for everyone else.
+function toE164(raw){
+  const s=String(raw||'').trim();
+  if(!s) return null;
+  if(s[0]==='+'){ const d='+'+s.slice(1).replace(/\D/g,''); return /^\+[1-9]\d{7,14}$/.test(d)?d:false; }
+  const d=s.replace(/\D/g,'');
+  if(d.length===10) return '+1'+d;
+  if(d.length===11 && d[0]==='1') return '+'+d;
+  return false;                       // false means "typed something wrong", null means "left it blank"
+}
+
 function openInvite(){
+  const nm=esc(state.active.first_name);
   const bg=sheet(H`<h3>Invite someone to help</h3>
-    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${esc(state.active.first_name)} only.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${nm} only.</p>
     <div class="teach" style="margin-top:12px"><div class="ic">🎓</div><div><h4>You stay in control</h4>
       <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit. You can revoke any invite anytime.</p></div></div>
     <div class="field"><label>Access level</label>
@@ -183,48 +198,112 @@ function openInvite(){
         <div class="chip on" data-r="family_view">Family view</div>
         <div class="chip" data-r="co_parent">Co-parent (edit)</div>
       </div></div>
-    <div class="field"><label>Their email (optional)</label>
+
+    <div class="field"><label>How should it reach them?</label>
+      <div class="chipgrid" id="chan" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="chip on" data-c="text">Text</div>
+        <div class="chip" data-c="email">Email</div>
+        <div class="chip" data-c="link">Just a link</div>
+      </div></div>
+
+    <div class="field" id="fPhone"><label>Their mobile number</label>
+      <input id="invPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="(201) 555-0134"/>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">US numbers only for now — ten digits is
+        enough. Outside the US, type it with a + and the country code.</p></div>
+
+    <div class="field" id="fEmail" hidden><label>Their email</label>
       <input id="invEmail" type="email" autocomplete="off" placeholder="grandma@email.com"/>
-      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Give us an address and we'll send the invite for you. Leave it blank and you'll get a link to copy.</p></div>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">We'll send it for you.</p></div>
+
     <div id="linkout"></div>
     <div class="err" id="inverr"></div>
     <button class="btn" id="gen">Create invite</button>`);
-  let role='family_view';
+
+  let role='family_view', chan='text';
   bg.querySelectorAll('#role .chip').forEach(c=>c.onclick=()=>{ role=c.dataset.r; bg.querySelectorAll('#role .chip').forEach(x=>x.classList.toggle('on',x===c)); });
+  bg.querySelectorAll('#chan .chip').forEach(c=>c.onclick=()=>{
+    chan=c.dataset.c; bg.querySelectorAll('#chan .chip').forEach(x=>x.classList.toggle('on',x===c));
+    bg.querySelector('#fPhone').hidden = chan!=='text';
+    bg.querySelector('#fEmail').hidden = chan!=='email';
+  });
+
   bg.querySelector('#gen').onclick=async(e)=>{
     const btn=e.target; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
     const errEl=bg.querySelector('#inverr'); errEl.textContent='';
-    const email=(bg.querySelector('#invEmail').value||'').trim();
-    if(email && !/.+@.+\..+/.test(email)){
-      errEl.textContent="That email address doesn't look right."; btn.innerHTML='Create invite'; btn.disabled=false; return; }
+    const stop=msg=>{ errEl.textContent=msg; btn.innerHTML='Create invite'; btn.disabled=false; };
+
+    const email = chan==='email' ? (bg.querySelector('#invEmail').value||'').trim() : '';
+    let phone = null;
+    if(chan==='text'){
+      phone = toE164(bg.querySelector('#invPhone').value);
+      if(phone===false) return stop("That number doesn't look right — ten digits for a US mobile.");
+      if(phone===null)  return stop('Add their mobile number, or switch to Email or Just a link.');
+    }
+    if(chan==='email'){
+      if(!email) return stop('Add their email address, or switch to Text or Just a link.');
+      if(!/.+@.+\..+/.test(email)) return stop("That email address doesn't look right.");
+    }
+
     const { data, error } = await sb.from('athlete_invites')
-      .insert({ athlete_id:state.active.id, role, invited_email:email||null }).select().single();
+      .insert({ athlete_id:state.active.id, role,
+                invited_email:email||null, invited_phone:phone||null,
+                sent_via:chan }).select().single();
     if(error){ console.error(error); reportError(error,'invite:create');
       toast('Could not create link'); btn.textContent='Try again'; btn.disabled=false; return; }
+
+    // The code is issued for EVERY invite, including a link the parent copies by hand.
+    // The link on its own used to be the whole credential, which meant one forwarded
+    // message handed a stranger standing access to a child's photos. Now the link gets
+    // them to a door and the code opens it.
+    let code=null;
+    try{
+      const { data:c, error:ce } = await sb.rpc('issue_invite_code',{ p_invite_id:data.id });
+      if(ce) throw ce;
+      code=c;
+    }catch(err){
+      // Not fatal: an invite with no code still works exactly as it did last week. Say
+      // so rather than pretending there is a code the recipient will be asked for.
+      console.error(err); reportError(err,'invite:code');
+    }
+
     const link=inviteLink(data.token);
+    const share = code
+      ? `Follow ${state.active.first_name}'s season on Parent Playbook: ${link}\n\nYour code is ${code}`
+      : `Follow ${state.active.first_name}'s season on Parent Playbook: ${link}`;
+
     bg.querySelector('#linkout').innerHTML=H`
+      ${code?H`<div class="sec-title" style="margin-top:14px">Their code</div>
+        <div class="code-show">${esc(code)}</div>
+        <p style="font-size:11.5px;color:var(--muted);margin:0 2px 10px">Shown once. They'll be asked for it
+          after they open the link, so a forwarded message isn't enough on its own.</p>`:''}
       <div class="linkbox"><span style="flex:1">${esc(link)}</span></div>`;
 
-    // The link ALWAYS works. Sending is a convenience on top of it, so a mail failure
-    // must never look like a failed invite — the parent still has something to paste.
-    if(email){
+    // Delivery is a convenience layered on top; the link and code exist either way, so a
+    // gateway failure must never read as a failed invite.
+    if(chan==='text' || chan==='email'){
       btn.innerHTML='<span class="spinner"></span> Sending…';
+      const fn = chan==='text' ? 'send-invite-sms' : 'send-invite';
       let sent=false, why='';
       try{
-        const { data:r, error:se } = await sb.functions.invoke('send-invite',{ body:{ invite_id:data.id } });
+        const { data:r, error:se } = await sb.functions.invoke(fn,{ body:{ invite_id:data.id, code } });
         if(se) why=se.message||'';
         else if(r && r.ok) sent=true;
         else why=(r&&(r.message||r.error))||'';
-      }catch(e){ console.error(e); why=e.message||''; }
-      if(sent){ toast('Invite sent to '+email); }
+      }catch(err){ console.error(err); why=err.message||''; }
+      if(sent){ toast(chan==='text' ? 'Text sent' : 'Invite sent to '+email); }
       else{
-        errEl.textContent = "We couldn't email it"+(why?' ('+why+')':'')+' — the link below still works, copy it instead.';
-        reportError(new Error('send-invite failed: '+why),'invite:send');
+        errEl.textContent = (chan==='text'
+          ? "We couldn't text it"
+          : "We couldn't email it")+(why?' ('+why+')':'')
+          +' — copy the message below and send it yourself instead.';
+        reportError(new Error(fn+' failed: '+why),'invite:send');
       }
     }
-    btn.textContent='Copy link';
+
+    btn.textContent='Copy the message';
     btn.disabled=false;
-    btn.onclick=()=>{ navigator.clipboard?.writeText(link); toast('Link copied — share it privately'); };
+    btn.onclick=()=>{ navigator.clipboard?.writeText(share);
+      toast('Copied — paste it into a text'); };
   };
 }
 
