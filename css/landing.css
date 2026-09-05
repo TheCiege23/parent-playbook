@@ -164,8 +164,14 @@ body.in-app #landing{display:none}
 .lp-d.rest{background:rgba(239,163,59,.14);border-color:rgba(239,163,59,.4)}
 .lp-d.rest .lp-k{color:rgba(239,163,59,.8)}
 
+/* ---------- growth & scan ---------- */
+.lp-growth{padding:88px 0 96px;background:var(--pp-bone)}
+
 /* ---------- install ---------- */
 .lp-install{padding:88px 0 96px;background:var(--pp-bone)}
+
+/* ---------- invite ---------- */
+.lp-invite{padding:88px 0 96px;background:var(--pp-bone);border-top:1px solid var(--pp-line)}
 .lp-panel{display:grid;grid-template-columns:1fr .8fr;background:#fff;border:1px solid var(--pp-line);
   border-radius:28px;overflow:hidden}
 .lp-panel .copy{padding:56px 52px}
