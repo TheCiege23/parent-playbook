@@ -476,6 +476,16 @@
      If it fails to load, sentryOnLoad is simply never called and the app is unaffected. -->
 <script src="/js/monitoring.js"></script>
 <script src="https://js.sentry-cdn.com/65f6e8bd638edaec1eecc0d7b92d9230.min.js" crossorigin="anonymous"></script>
+<!-- three.js is resolved here but NEVER fetched on load. js/body-scan.js dynamic-imports
+     it only when a measurement provider actually returns a mesh, which today is never.
+     An import map is inert until something imports; this costs nothing to declare, and it
+     is the only way to use the ESM build with no bundler. -->
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="/js/core.js"></script>
 <script src="/js/offline.js"></script>

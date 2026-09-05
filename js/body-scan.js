@@ -390,23 +390,43 @@ function bsFailed(err){
 
 function bsResult(result){
   const rows = Object.entries(result.metrics || {});
+  // The mesh frame is only put in the DOM if the provider actually returned a URL. An
+  // empty 3D box saying "no model available" is worse than no box.
+  const wantsMesh = !!result.meshUrl;
   const bg = sheet(H`<h3>Measured</h3>
     <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos have been discarded. These numbers
       are what was kept.</p>
+
+    ${wantsMesh ? H`<div class="bs-mesh" id="bsMesh"><div class="bs-mesh-load"><span class="spinner"></span></div></div>` : ''}
+
     <div class="card app-pad">
       ${rows.map(([k, v]) => H`<div style="display:flex;justify-content:space-between;padding:9px 0;
         border-bottom:1px solid var(--line)">
         <span style="font-size:14px">${esc(k.replace(/_/g,' '))}</span>
-        <b style="font-family:'Archivo'">${esc(String(v))}</b></div>`).join('')}
+        <b style="font-family:'Archivo',sans-serif">${esc(String(v))}</b></div>`).join('')}
     </div>
     ${result.confidence != null ? H`<p style="font-size:12.5px;color:var(--muted);margin:10px 2px 0">
-      Provider confidence ${Math.round(result.confidence*100)}%. Treat these as close estimates, not tape-measure
-      truth — re-scan in the same spot and light to compare.</p>` : ''}
+      Provider confidence ${Math.round(result.confidence*100)}%. Close estimates, not tape-measure truth —
+      re-scan in the same spot and light to compare.</p>` : ''}
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
       <button class="btn amber" id="bsSave">Save to Growth</button>
     </div>`);
-  bg.querySelector('#bsDrop').onclick = () => bg.remove();
+
+  // Rendered AFTER the sheet exists, and never awaited by anything that matters. If the
+  // mesh fails, the frame is removed and the measurements stand on their own — the
+  // avatar is decoration and decoration must not break a result.
+  if(wantsMesh){
+    const host = bg.querySelector('#bsMesh');
+    renderBodyMesh(host, result.meshUrl).then(ok => { if(!ok && host) host.remove(); });
+  }
+
+  const close = () => {
+    const host = bg.querySelector('#bsMesh');
+    if(host && host._disposeMesh) host._disposeMesh();   // stop the loop, free the GL context
+    bg.remove();
+  };
+  bg.querySelector('#bsDrop').onclick = close;
   bg.querySelector('#bsSave').onclick = async e => {
     e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
     const today = new Date().toISOString().slice(0,10);
@@ -416,6 +436,133 @@ function bsResult(result){
     })).filter(r => isFinite(r.value));
     const { error } = await sb.from('measurements').insert(payload);
     if(error){ console.error(error); e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return; }
-    bg.remove(); toast('Saved'); renderApp('growth');
+    close(); toast('Saved'); renderApp('growth');
   };
+}
+
+// ===================================================================
+//  MESH VIEWER — the 3D slot, wired to the same seam
+// ===================================================================
+// Displaying a body mesh is easy. DERIVING one from four photographs is the entire
+// product, and it is the part this app does not have — see the header. So this is a
+// viewer, not a generator: if a provider returns a mesh alongside its measurements,
+// it renders. If not, nothing here runs and nothing here is downloaded.
+//
+// The provider contract gains one optional field:
+//
+//     return {
+//       metrics:    { waist_girth_in: 31.0, ... },
+//       confidence: 0.82,
+//       meshUrl:    'https://vendor.example/scan/abc.glb',   // OPTIONAL
+//     };
+//
+// A missing or broken meshUrl is NOT an error. The measurements are the deliverable;
+// the avatar is decoration, and decoration must never block a result.
+//
+// three.js is ~600KB and is dynamic-imported on first use only. A parent who never
+// scans never pays for it. Dynamic import() is a function call, so it is legal inside
+// this classic non-module script — no build step, consistent with the rest of the app.
+
+let THREE_CACHE = null;
+async function loadThree(){
+  if(THREE_CACHE) return THREE_CACHE;
+  const [three, gltf] = await Promise.all([
+    import('three'),
+    import('three/addons/loaders/GLTFLoader.js'),
+  ]);
+  THREE_CACHE = { THREE: three, GLTFLoader: gltf.GLTFLoader };
+  return THREE_CACHE;
+}
+
+// Renders `meshUrl` into `host`. Resolves true on success, false on any failure —
+// callers use that to decide whether to leave the frame up or quietly remove it.
+async function renderBodyMesh(host, meshUrl){
+  if(!host || !meshUrl) return false;
+  let lib;
+  try{ lib = await loadThree(); }
+  catch(e){ console.error('three.js failed to load', e); return false; }
+  const { THREE, GLTFLoader } = lib;
+
+  const w = host.clientWidth || 320, h = host.clientHeight || 380;
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  host.innerHTML = '';
+  host.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
+
+  // Deliberately flat and neutral. Dramatic rim lighting on a photogrammetric scan of
+  // a real person's body is the difference between a measuring tool and a mirror, and
+  // this product is the former. Matte grey, soft fill, no shadows, no shine.
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x556059, 2.2));
+  const key = new THREE.DirectionalLight(0xffffff, 0.7);
+  key.position.set(1, 2, 2);
+  scene.add(key);
+
+  let root = null;
+  try{
+    const gltf = await new Promise((res, rej) =>
+      new GLTFLoader().load(meshUrl, res, undefined, rej));
+    root = gltf.scene;
+  }catch(e){
+    console.error('mesh load failed', e);
+    try{ renderer.dispose(); }catch(_){}
+    return false;
+  }
+
+  root.traverse(o => {
+    if(o.isMesh) o.material = new THREE.MeshStandardMaterial({
+      color: 0xB9BEB6, roughness: 0.95, metalness: 0.0, flatShading: false });
+  });
+
+  // Frame the body regardless of what scale the vendor exported in.
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+  root.position.sub(centre);
+  const pivot = new THREE.Group();
+  pivot.add(root);
+  scene.add(pivot);
+  const span = Math.max(size.x, size.y, size.z) || 1;
+  camera.position.set(0, 0, span * 2.4);
+  camera.lookAt(0, 0, 0);
+
+  // Drag to turn it, and a slow idle spin so it reads as three-dimensional at a glance.
+  // Vertical rotation is deliberately NOT offered: nobody needs to look at the underside
+  // of a scan of a person.
+  let dragging = false, lastX = 0, idle = true;
+  const onDown = e => { dragging = true; idle = false;
+    lastX = (e.touches ? e.touches[0].clientX : e.clientX); };
+  const onMove = e => { if(!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX);
+    pivot.rotation.y += (x - lastX) * 0.01; lastX = x; };
+  const onUp = () => { dragging = false; };
+  const el = renderer.domElement;
+  el.style.touchAction = 'pan-y';
+  el.addEventListener('pointerdown', onDown);
+  el.addEventListener('pointermove', onMove);
+  addEventListener('pointerup', onUp);
+
+  let raf = 0, stopped = false;
+  (function tick(){
+    if(stopped) return;
+    if(idle) pivot.rotation.y += 0.004;
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(tick);
+  })();
+
+  // The sheet is removed from the DOM when the parent closes it; without this the loop
+  // and the GL context leak for the life of the session.
+  host._disposeMesh = () => {
+    stopped = true; cancelAnimationFrame(raf);
+    removeEventListener('pointerup', onUp);
+    scene.traverse(o => {
+      if(o.geometry) o.geometry.dispose();
+      if(o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    });
+    try{ renderer.dispose(); }catch(_){}
+  };
+  return true;
 }
