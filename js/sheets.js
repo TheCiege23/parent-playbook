@@ -286,7 +286,18 @@ function openInvite(){
       let sent=false, why='';
       try{
         const { data:r, error:se } = await sb.functions.invoke(fn,{ body:{ invite_id:data.id, code } });
-        if(se) why=se.message||'';
+        if(se){
+          // supabase-js puts se.message at "Edge Function returned a non-2xx status
+          // code" for every failure — the actual reason the function wrote (missing
+          // Twilio config, its rejection message, an unregistered sender) lives in the
+          // response body, reachable only via se.context, a raw Response. Without this,
+          // every carefully-worded error the function returns is invisible here.
+          why = se.message || '';
+          try{
+            const body = se.context && typeof se.context.json==='function' ? await se.context.json() : null;
+            if(body && (body.message || body.error)) why = body.message || body.error;
+          }catch(_){}
+        }
         else if(r && r.ok) sent=true;
         else why=(r&&(r.message||r.error))||'';
       }catch(err){ console.error(err); why=err.message||''; }
