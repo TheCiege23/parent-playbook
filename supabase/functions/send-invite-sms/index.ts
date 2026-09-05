@@ -96,15 +96,36 @@ Deno.serve(async (req) => {
     if (!ok) return json({ error: 'forbidden' }, 403);
 
     const sid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const tok = Deno.env.get('TWILIO_AUTH_TOKEN');
+    // Two ways to authenticate, and the API key pair is the better one: it can be
+    // revoked on its own without rotating the account's master credential, which the
+    // auth token is. Preferred when both are present.
+    const apiKey = Deno.env.get('TWILIO_API_KEY');
+    const apiSecret = Deno.env.get('TWILIO_API_SECRET');
+    const authTok = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const basicUser = apiKey && apiSecret ? apiKey : sid;
+    const basicPass = apiKey && apiSecret ? apiSecret : authTok;
+
     // A Messaging Service is what a registered A2P campaign attaches to, so it wins when
-    // both are set; a bare number is the simpler path while testing.
+    // both are set; a bare number is the simpler path while testing. TWILIO_PHONE_NUMBER
+    // is accepted alongside TWILIO_FROM because that is what the Twilio console calls it,
+    // and a variable that has to be renamed to work is a variable that will be set wrong.
     const msid = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID');
-    const from = Deno.env.get('TWILIO_FROM');
-    if (!sid || !tok || (!msid && !from)) {
+    const from = Deno.env.get('TWILIO_FROM') || Deno.env.get('TWILIO_PHONE_NUMBER');
+
+    if (!sid || !basicPass || (!msid && !from)) {
+      // Say exactly WHICH piece is missing. "Not configured" sends someone to re-check
+      // the three things that are already right.
+      const missing = [
+        !sid ? 'TWILIO_ACCOUNT_SID' : null,
+        !basicPass ? 'TWILIO_AUTH_TOKEN (or TWILIO_API_KEY + TWILIO_API_SECRET)' : null,
+        (!msid && !from) ? 'TWILIO_PHONE_NUMBER (or TWILIO_MESSAGING_SERVICE_SID)' : null,
+      ].filter(Boolean);
       return json({ error: 'sms_not_configured',
-        message: 'No SMS sender is registered on this project yet, so the text could not be sent. '
-               + 'The link and code still work — copy the message and send it yourself.' }, 503);
+        message: 'The text could not be sent: ' + missing.join(', ') + ' is not set on this '
+               + 'Supabase project. Note these are EDGE FUNCTION secrets — setting them on '
+               + 'the web host does nothing, because this code does not run there. '
+               + 'The link and code still work: copy the message and send it yourself.',
+        missing }, 503);
     }
 
     const [{ data: ath }, { data: guardian }] = await Promise.all([
@@ -132,7 +153,8 @@ Deno.serve(async (req) => {
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + btoa(`${sid}:${tok}`),
+        // The URL always carries the ACCOUNT sid; only the credential pair changes.
+        'Authorization': 'Basic ' + btoa(`${basicUser}:${basicPass}`),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: form.toString(),
