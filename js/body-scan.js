@@ -140,12 +140,16 @@ function bodyProvider(){ return BODY_PROVIDER; }
 // a guard that only runs at the entrance is one refactor away from being bypassed.
 function scanAllowed(subject){
   const age = subject && subject.birthdate ? ageFrom(subject.birthdate) : null;
-  if(age == null)          return { ok:false, why:'no_age',
-    msg:'We need a date of birth before this can run, because it is only ever available for adults.' };
-  if(age < ADULT_AGE)      return { ok:false, why:'minor',
+  // A missing date of birth is NOT a refusal — it is a question we have not asked yet,
+  // and the consent step asks it. Conflating the two is what made this whole feature
+  // unreachable: no adult had a DOB stored anywhere, so everyone hit the refusal screen
+  // forever. `needsDob` is the difference between "you may not" and "we don't know".
+  if(age == null)     return { ok:false, why:'needs_dob', needsDob:true };
+  if(age < ADULT_AGE) return { ok:false, why:'minor', age,
     msg:`Body scanning is available for adults only. ${esc(subject.first_name||'This profile')} is ${age}. `
-      + 'Body geometry is a biometric identifier for a minor in several states, and this product does not collect it. '
-      + 'The growth read on this screen gives the useful part — percentile, trend and spurt timing — from a tape measure.' };
+      + 'Body geometry is a biometric identifier for a minor in several states, and this product does not '
+      + 'collect it. The growth read gives the useful part — percentile, trend and spurt timing — from a '
+      + 'tape measure.' };
   return { ok:true, age };
 }
 
@@ -157,8 +161,9 @@ const BS = { frames:{}, consent:false, subject:null };
 function openBodyScan(subject){
   BS.frames = {}; BS.consent = false; BS.subject = subject || state.active;
   const gate = scanAllowed(BS.subject);
-  if(!gate.ok) return bsRefuse(gate);
-  bsConsent();
+  // Refuse only a known minor. An unknown age goes to consent, which asks for it.
+  if(!gate.ok && !gate.needsDob) return bsRefuse(gate);
+  bsConsent(!!gate.needsDob);
 }
 
 // The refusal is a screen, not a silent no-op. A buyer reading this flow should be
@@ -188,7 +193,7 @@ function bsRefuse(gate){
     if(g) g.onclick = () => { bg.remove(); renderApp('growth'); }; }
 }
 
-function bsConsent(){
+function bsConsent(needsDob){
   const p = bodyProvider();
   const bg = sheet(H`<h3>Body scan</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Four photos, about a minute. Read this
@@ -210,20 +215,65 @@ function bsConsent(){
       saved. This app does not estimate body measurements itself — that needs a trained model, and a made-up
       number here would be worse than no feature.</div>`}
 
+    ${needsDob ? H`<div class="field" style="margin-top:14px">
+      <label>Your date of birth</label>
+      <input id="bsDob" type="date" max="${esc(new Date().toISOString().slice(0,10))}"/>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Asked once, and only here. This is the
+        one feature in the app restricted to adults, so it records a date rather than taking a tick on trust.
+        Nothing else reads it.</p></div>` : ''}
+
     <label style="display:flex;gap:11px;align-items:flex-start;margin:14px 2px;cursor:pointer">
       <input type="checkbox" id="bsOk" style="width:20px;height:20px;flex:0 0 auto;margin-top:1px"/>
       <span style="font-size:13.5px;line-height:1.5">I'm scanning myself, and I'm over ${ADULT_AGE}.</span></label>
 
+    <div class="err" id="bsCErr"></div>
     <button class="btn amber" id="bsGo" disabled>Continue</button>
     <div style="text-align:center;margin-top:12px">
       <button class="pill" id="bsCancel" style="background:transparent;color:var(--muted)">Cancel</button>
     </div>`);
 
   const go = bg.querySelector('#bsGo'), box = bg.querySelector('#bsOk');
-  // Reuses the app's existing disabled-button token rather than inventing a state.
-  box.onchange = () => { go.disabled = !box.checked; };
+  const dob = needsDob ? bg.querySelector('#bsDob') : null;
+  // Continue needs the tick AND, when we are asking for it, a date. Reuses the app's
+  // existing disabled-button token rather than inventing a state.
+  const sync = () => { go.disabled = !(box.checked && (!dob || dob.value)); };
+  box.onchange = sync;
+  if(dob) dob.oninput = sync;
   bg.querySelector('#bsCancel').onclick = () => bg.remove();
-  go.onclick = () => { if(!box.checked) return; BS.consent = true; bg.remove(); bsSetup(); };
+
+  go.onclick = async e => {
+    const err = bg.querySelector('#bsCErr'); err.textContent = '';
+    if(!box.checked) return;
+
+    if(dob){
+      const v = dob.value;
+      if(!v){ err.textContent = 'Add your date of birth to continue.'; return; }
+      const age = ageFrom(v);
+      // The date is the authority, not the checkbox above it. Someone can tick "I'm over
+      // 18" and enter a date that says otherwise; the date wins, and it wins BEFORE the
+      // value is written anywhere.
+      if(!(age >= 0 && age < 120)){ err.textContent = "That date doesn't look right."; return; }
+      if(age < ADULT_AGE){
+        bg.remove();
+        return bsRefuse({ msg: `Body scanning is available for adults only, and that date makes you ${age}. `
+          + 'Body geometry is treated as a biometric identifier for a minor in several states, and this '
+          + 'product does not collect it.' });
+      }
+      e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+      const { error } = await sb.from('guardians')
+        .update({ birthdate: v }).eq('id', state.user.id);
+      if(error){
+        console.error(error);
+        err.textContent = 'Could not save that. ' + (error.message || '');
+        e.target.innerHTML = 'Continue'; e.target.disabled = false; return;
+      }
+      BS.subject = { ...BS.subject, birthdate: v };   // so the second guard in bsRun() passes
+    }
+
+    BS.consent = true;
+    bg.remove();
+    bsSetup();
+  };
 }
 
 // One diagram replaces four bullet points. The rules that survive as words become

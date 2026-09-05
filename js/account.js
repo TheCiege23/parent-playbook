@@ -14,7 +14,7 @@ async function screenAccount(){
   // Invites are the only growth mechanism left, and every one of them says who sent it.
   // With no display_name they all read "A parent wants you to follow…", which is a
   // worse email and a worse first impression than the product deserves.
-  const { data:me } = await sb.from('guardians').select('display_name').eq('id',state.user.id).maybeSingle();
+  const { data:me } = await sb.from('guardians').select('display_name,birthdate').eq('id',state.user.id).maybeSingle();
   const myName=(me&&me.display_name||'').trim();
   const isAdmin=!!(adminRows&&adminRows.length);
   const household=(fam&&fam[0])||null;
@@ -109,8 +109,11 @@ async function screenAccount(){
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
+  // The subject is the SIGNED-IN ADULT, never state.active — that is a child, and
+  // passing it here is the one mistake that would defeat the age guard.
+  // A null birthdate is not a refusal: the consent step asks for it.
   go('bodyScanRow', ()=>openBodyScan({ id:state.user.id, first_name:'You',
-      birthdate:(state.guardian&&state.guardian.birthdate)||null }));
+      birthdate:(me&&me.birthdate)||null }));
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });
