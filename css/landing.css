@@ -176,6 +176,14 @@ body.in-app #landing{display:none}
   max-width:12ch;margin:14px 0 16px}
 .lp-scanshow .sub{font-size:18px;line-height:1.55;color:rgba(246,242,233,.76);max-width:520px;margin:0 0 30px}
 .lp-scanshow .lp-fine{max-width:480px}
+.scan-visual{display:flex;flex-direction:column;align-items:flex-end}
+.lp-trend{width:100%;max-width:330px;box-sizing:border-box;margin-top:20px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(246,242,233,.14);border-radius:18px;padding:16px 18px}
+.lp-trend .lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(246,242,233,.55);margin-bottom:10px}
+.lp-trend svg{display:block;width:100%;height:auto}
+.lp-trend .foot{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:rgba(246,242,233,.5)}
+.lp-trend .headline{font-family:'Archivo';font-weight:800;font-size:15px;color:var(--pp-bone);margin-top:10px}
 
 /* ---------- install ---------- */
 .lp-install{padding:88px 0 96px;background:var(--pp-bone)}
@@ -302,6 +310,7 @@ body.in-app #landing{display:none}
   .lp-hero .in{grid-template-columns:1fr;gap:0}
   .lp-scanshow .in{grid-template-columns:1fr;gap:0}
   .lp-phone{margin:44px auto 0}
+  .scan-visual{align-items:center}
   .lp-cards{grid-template-columns:1fr;gap:12px}
   .lp-grid7{display:flex;overflow-x:auto;gap:11px;scroll-snap-type:x mandatory;padding:0 24px 6px;margin:0 -24px}
   .lp-grid7::-webkit-scrollbar{height:0}
@@ -340,6 +349,7 @@ body.in-app #landing{display:none}
   .lp-stats b{font-size:20px}
   .lp-stats span{font-size:11.5px;line-height:1.35}
   .lp-phone{width:268px;border-radius:38px;margin:36px auto 0;transform:translateY(1px)}
+  .lp-trend{max-width:268px}
   .lp-phone .scr{border-radius:30px;height:520px}
   .lp-hero .in{padding-bottom:0}
   .lp-tick{padding:11px 0}
