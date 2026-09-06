@@ -294,8 +294,17 @@ function openInvite(){
           // every carefully-worded error the function returns is invisible here.
           why = se.message || '';
           try{
-            const body = se.context && typeof se.context.json==='function' ? await se.context.json() : null;
-            if(body && (body.message || body.error)) why = body.message || body.error;
+            // Read as text first, not .json() directly — a response the function itself
+            // never wrote (a cold-start timeout, an infra-level gateway error page) isn't
+            // valid JSON, and .json() throwing there fell into this catch and left `why`
+            // at the generic supabase-js message with nothing to diagnose. Reading text
+            // works either way; only the interpretation of it branches.
+            const raw = se.context && typeof se.context.text==='function' ? await se.context.text() : null;
+            if(raw){
+              let body = null;
+              try{ body = JSON.parse(raw); }catch(_){}
+              why = (body && (body.message || body.error)) || raw.slice(0, 300);
+            }
           }catch(_){}
         }
         else if(r && r.ok) sent=true;
