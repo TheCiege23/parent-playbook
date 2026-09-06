@@ -262,29 +262,43 @@
     </section>
 
     <!-- 4b. progress & body scan -->
-    <section id="progress" class="lp-growth">
+    <section id="progress" class="lp-scanshow">
+      <div class="glow" aria-hidden="true"></div>
       <div class="in">
-        <div class="lp-panel" data-reveal>
-          <div class="copy">
-            <div class="lp-k">Numbers that mean something</div>
-            <h2>See the trend, not just today's number.</h2>
-            <p class="sub">Log a 40 time, a broad jump, a height — whatever the goal calls for — and Parent Playbook lines up the last five readings so one off day doesn't rewrite the story. Height comes with a growth percentile in plain English, the same way a pediatrician would say it. No colors, no scores, nothing marked red — a kid's body is not a report card.</p>
-            <ol class="lp-steps">
-              <li><span class="n" style="background:#0E3B31">1</span>Record a number right after practice, on the field</li>
-              <li><span class="n" style="background:#17936F;color:#04120E">2</span>Watch it as a trend — five readings, oldest to newest</li>
-            </ol>
-            <p class="sub">There's also an optional body scan, off by default. Nothing is ever uploaded or saved — four photos are measured right on your phone and discarded immediately, and it only runs after you sign a plain-English release. It measures lengths only — wingspan, reach, shoulder width, leg length — never chest or waist.</p>
-            <p class="lp-fine">Withdraw that release anytime from Account — it takes effect immediately.</p>
+        <div>
+          <div class="lp-k lp-pill">The tech other apps don't have</div>
+          <h2>Measured with a phone. Not a guess.</h2>
+          <p class="sub">Four photos, on this phone — never a cloud, never a vendor's server. Parent Playbook works out wingspan, reach, shoulder width and leg length from a scan you take at home, and lines every number up against CDC growth data so a height means something. Length only, by design — chest and waist are refused outright, not filtered after the fact.</p>
+          <div class="lp-stats">
+            <div><b>0</b><span>photos ever uploaded</span></div>
+            <div><b>4</b><span>photos, about a minute</span></div>
+            <div><b>12 mo</b><span>retention, published upfront</span></div>
           </div>
-          <div class="dark">
-            <div class="lp-stripe" aria-hidden="true"></div>
-            <div class="lp-mini" aria-hidden="true">
-              <div class="scr">
-                <div class="lp-tile">📈</div>
-                <b>62nd percentile</b>
-                <span>Height for age · trending up</span>
-              </div>
+          <p class="lp-fine" style="margin-top:22px;color:rgba(246,242,233,.6)">Built for BIPA, Texas CUBI and Washington's My Health My Data Act from day one — a signed release before every scan, one tap to withdraw it. The same phone also tracks a 40 time, a broad jump, a height — as a trend across five readings, never just today's number.</p>
+        </div>
+        <div class="lp-phone" aria-hidden="true">
+          <div class="scr">
+            <div class="mk-bar"><span>9:41</span><span>▮▮▮</span></div>
+            <div class="mk-lab">Body scan · 2 of 4</div>
+            <div style="flex:1;border:1.5px dashed var(--pp-line);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center">
+              <svg width="54" height="110" viewBox="0 0 120 260" aria-hidden="true" style="opacity:.55">
+                <circle cx="60" cy="30" r="19" fill="none" stroke="var(--pp-ink)" stroke-width="4"/>
+                <path d="M60 49 L60 150" stroke="var(--pp-ink)" stroke-width="4" fill="none"/>
+                <path d="M26 76 Q60 62 94 76" stroke="var(--pp-ink)" stroke-width="4" fill="none"/>
+                <path d="M36 150 Q60 142 84 150" stroke="var(--pp-ink)" stroke-width="4" fill="none"/>
+                <path d="M46 152 Q40 200 42 246" stroke="var(--pp-ink)" stroke-width="4" fill="none"/>
+                <path d="M74 152 Q80 200 78 246" stroke="var(--pp-ink)" stroke-width="4" fill="none"/>
+              </svg>
+              <b style="font-family:'Archivo';font-size:13px">Right side</b>
+              <span style="font-size:11.5px;color:var(--pp-muted)">Turn a quarter to your right. Arms hanging naturally.</span>
             </div>
+            <div style="display:flex;justify-content:center;gap:8px;margin-top:14px">
+              <i style="width:7px;height:7px;border-radius:50%;background:var(--pp-green);display:block"></i>
+              <i style="width:7px;height:7px;border-radius:50%;background:var(--pp-amber);display:block"></i>
+              <i style="width:7px;height:7px;border-radius:50%;background:var(--pp-line);display:block"></i>
+              <i style="width:7px;height:7px;border-radius:50%;background:var(--pp-line);display:block"></i>
+            </div>
+            <p style="text-align:center;font-size:10.5px;color:var(--pp-muted);margin-top:10px">Stays on this device</p>
           </div>
         </div>
       </div>

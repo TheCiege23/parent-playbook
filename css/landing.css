@@ -165,7 +165,15 @@ body.in-app #landing{display:none}
 .lp-d.rest .lp-k{color:rgba(239,163,59,.8)}
 
 /* ---------- growth & scan ---------- */
-.lp-growth{padding:88px 0 96px;background:var(--pp-bone)}
+.lp-scanshow{position:relative;background:var(--pp-pine-900);color:var(--pp-bone);padding:96px 0 100px;overflow:hidden}
+.lp-scanshow .glow{position:absolute;width:480px;height:480px;bottom:-200px;right:-140px;border-radius:50%;
+  background:radial-gradient(circle,rgba(23,147,111,.35),transparent 70%);pointer-events:none}
+.lp-scanshow .in{position:relative;display:grid;grid-template-columns:minmax(420px,1.08fr) minmax(0,.92fr);
+  gap:60px;align-items:center}
+.lp-scanshow h2{font-size:clamp(34px,4.4vw,50px);font-weight:900;line-height:1.03;letter-spacing:-.03em;
+  max-width:12ch;margin:14px 0 16px}
+.lp-scanshow .sub{font-size:18px;line-height:1.55;color:rgba(246,242,233,.76);max-width:520px;margin:0 0 30px}
+.lp-scanshow .lp-fine{max-width:480px}
 
 /* ---------- install ---------- */
 .lp-install{padding:88px 0 96px;background:var(--pp-bone)}
@@ -290,6 +298,7 @@ body.in-app #landing{display:none}
 /* ===================== tablet ===================== */
 @media (max-width:900px){
   .lp-hero .in{grid-template-columns:1fr;gap:0}
+  .lp-scanshow .in{grid-template-columns:1fr;gap:0}
   .lp-phone{margin:44px auto 0}
   .lp-cards{grid-template-columns:1fr;gap:12px}
   .lp-grid7{display:flex;overflow-x:auto;gap:11px;scroll-snap-type:x mandatory;padding:0 24px 6px;margin:0 -24px}
