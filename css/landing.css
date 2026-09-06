@@ -73,10 +73,12 @@ body.in-app #landing{display:none}
   padding:17px 30px;border-radius:14px;border:1.5px solid rgba(246,242,233,.24);transition:border-color .15s}
 .lp-b2:hover{border-color:rgba(246,242,233,.5)}
 .lp-stats{display:flex;gap:26px;margin-top:38px}
-.lp-stats>div{padding-left:26px;border-left:1px solid rgba(246,242,233,.16)}
-.lp-stats>div:first-child{padding-left:0;border-left:none}
+.lp-stats>div,.lp-stats>a{padding-left:26px;border-left:1px solid rgba(246,242,233,.16)}
+.lp-stats>div:first-child,.lp-stats>a:first-child{padding-left:0;border-left:none}
 .lp-stats b{display:block;font-family:'Archivo';font-weight:800;font-size:24px;color:var(--pp-bone)}
 .lp-stats span{font-size:13px;color:rgba(246,242,233,.55)}
+.lp-stats>a{color:inherit;text-decoration:none;transition:.15s}
+.lp-stats>a:hover span{color:var(--pp-amber)}
 
 /* ---------- phone mockups ---------- */
 .lp-phone{width:330px;background:var(--pp-ink-deep);padding:11px;border-radius:44px;margin-left:auto;
@@ -333,8 +335,8 @@ body.in-app #landing{display:none}
   .lp-btns{flex-direction:column;gap:11px}
   .lp-b1{width:100%;font-size:16.5px;padding:17px 22px;text-align:center}
   .lp-b2{width:100%;font-size:15.5px;font-weight:600;padding:15px 22px;text-align:center}
-  .lp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:30px}
-  .lp-stats>div{padding-left:0;border-left:none}
+  .lp-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 10px;margin-top:30px}
+  .lp-stats>div,.lp-stats>a{padding-left:0;border-left:none}
   .lp-stats b{font-size:20px}
   .lp-stats span{font-size:11.5px;line-height:1.35}
   .lp-phone{width:268px;border-radius:38px;margin:36px auto 0;transform:translateY(1px)}
