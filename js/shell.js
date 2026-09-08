@@ -45,6 +45,12 @@ function ownerFirstName(){ return (state && state.ownerName) || 'Their parent'; 
 async function renderApp(tab, fromPop){
   document.body.classList.remove('auth'); setAppBg();
   await loadRole();
+  // A coach sees a narrower slice of ONE athlete's data than even family_view — no
+  // games, journey, photos, or weekly plan (enforced at the RLS layer, not just here).
+  // Reusing the normal 7-tab shell for that role would render tabs that quietly come
+  // back empty rather than explain why, so this bypasses renderApp()'s shell entirely
+  // rather than trying to retrofit every screen to hide itself from a coach.
+  if(state.role==='coach') return renderCoachView();
   // Family view has no Growth or Scan tab: goals, measurements and starting a scan are
   // things a parent DOES, and an empty read-only version of them is just a locked door.
   if(!state.canEdit && (tab==='growth' || tab==='scan')) tab='week';

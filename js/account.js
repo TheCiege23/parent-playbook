@@ -82,7 +82,17 @@ async function screenAccount(){
           <div class="gt"><b>Trainer review queue</b><span>Review and approve Pro Trainer applications</span></div><i>›</i></div>
         <div class="navrow" id="adminDrills" role="button" tabindex="0"><div class="gi">📚</div>
           <div class="gt"><b>Drill library</b><span>Add and edit training content with its source</span></div><i>›</i></div>
+        <div class="navrow" id="adminCamps" role="button" tabindex="0"><div class="gi">🏕️</div>
+          <div class="gt"><b>Camps &amp; programs review</b><span>Approve or reject submitted listings</span></div><i>›</i></div>
       </div>`:''}
+
+      <div class="sec-title">Camps &amp; programs</div>
+      <div class="card app-pad">
+        <div class="navrow" id="browseCamps" role="button" tabindex="0"><div class="gi">🏕️</div>
+          <div class="gt"><b>Find a camp or program</b><span>Sign up happens with them directly, not in this app</span></div><i>›</i></div>
+        <div class="navrow" id="submitCamp" role="button" tabindex="0"><div class="gi">＋</div>
+          <div class="gt"><b>List a camp or program</b><span>Reviewed before it's shown to other families</span></div><i>›</i></div>
+      </div>
 
       ${MARKETPLACE_ENABLED?H`<div class="sec-title">Coaching</div>
       <div class="card app-pad">
@@ -117,6 +127,9 @@ async function screenAccount(){
   go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });
   go('adminQueue', openAdminQueue);
   go('adminDrills', openAdminDrills);
+  go('adminCamps', openCampsAdminQueue);
+  go('browseCamps', openCamps);
+  go('submitCamp', openSubmitCamp);
   go('beTrainer', startTrainerOnboarding);
   go('delAthlete', confirmDelete);
   go('delAccount', confirmDeleteAccount);

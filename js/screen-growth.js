@@ -65,7 +65,7 @@ function trendBars(list, lowerIsBetter){
 
 async function screenGrowth(){
   const a=state.active; const age=ageFrom(a.birthdate); const band=ageBand(age);
-  const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow}] = await Promise.all([
+  const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow},{data:coachUp}] = await Promise.all([
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),
     sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(60),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(60),
@@ -74,7 +74,10 @@ async function screenGrowth(){
     // state.active, which is cached from a login that predates these columns.
     sb.from('athletes').select('sex_at_birth,mother_height_in,father_height_in,birthdate')
       .eq('id',a.id).maybeSingle(),
+    sb.from('coach_updates').select('kind,body,created_at').eq('athlete_id',a.id)
+      .order('created_at',{ascending:false}).limit(1),
   ]);
+  const latestCoachUp = (coachUp||[])[0] || null;
   const primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=primary?.sport_key||state.activeSportKey||'general'; setAppBg();
 
@@ -214,6 +217,16 @@ async function screenGrowth(){
             </div><i>›</i></div>
       </div>`:''}
 
+      ${state.canEdit?H`<div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="growToCoach" role="button" tabindex="0">
+          <div class="gi">🎓</div>
+          <div class="gt"><b>Team Connect</b>
+            <span>${latestCoachUp
+              ? esc(latestCoachUp.body.length>72 ? latestCoachUp.body.slice(0,72)+'…' : latestCoachUp.body)
+              : 'Invite a coach or trainer you already work with — stats only, plus updates from them.'}</span>
+            </div><i>›</i></div>
+      </div>`:''}
+
       ${primary?.sport_key==='football'?H`<div class="sec-title" style="margin-top:18px">Pop Warner divisions</div>
       <div class="card app-pad">
         ${pwWeight==null
@@ -242,6 +255,9 @@ async function screenGrowth(){
   // measurements will be written against.
   { const s=$("#growToScan");
     if(s){ const open=()=>renderApp('scan');
+      s.onclick=open; s.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
+  { const s=$("#growToCoach");
+    if(s){ const open=()=>openTeamConnect(a);
       s.onclick=open; s.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   // Predicted height stays folded until asked for — same idiom as the other collapsers.
   { const t=$("#phToggle"), l=$("#phBody");

@@ -194,7 +194,7 @@ function openInvite(){
   const bg=sheet(H`<h3>Invite someone to help</h3>
     <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${multi?H`whoever you pick below`:H`${nm} only`}.</p>
     <div class="teach" style="margin-top:12px"><div class="ic">🎓</div><div><h4>You stay in control</h4>
-      <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit. You can revoke any invite anytime.</p></div></div>
+      <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit; Team Connect is for a coach or trainer you already work with — stats only, no games, journey or photos. You can revoke any invite anytime.</p></div></div>
 
     ${multi?H`<div class="field"><label>Who is this for?</label>
       <div id="kidPick" style="display:flex;flex-direction:column;gap:8px">
@@ -212,6 +212,7 @@ function openInvite(){
       <div class="chipgrid" id="role" style="grid-template-columns:1fr 1fr">
         <div class="chip on" data-r="family_view">Family view</div>
         <div class="chip" data-r="co_parent">Co-parent (edit)</div>
+        <div class="chip" data-r="coach">Team Connect (coach)</div>
       </div></div>
 
     <div class="field"><label>How should it reach them?</label>
