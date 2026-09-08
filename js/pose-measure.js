@@ -332,6 +332,23 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   if(armIn != null)
     m.standing_reach = shoulderHeightIn + armIn + handIn;
 
+  // ---- say what never got computed, and why -------------------------------------
+  // Distinct from `rejected` below: rejected covers a number that WAS computed and then
+  // thrown out for being implausible. This covers a number that was never computed at
+  // all because a prerequisite landmark never came through clearly in any frame — the
+  // consent screen promises five things, and a parent who gets three of them with no
+  // explanation reads it as the app being unreliable rather than the sleeve it actually
+  // was.
+  const skipped = [];
+  if(biacromial == null)
+    skipped.push({ key:'shoulder_width', reason:"shoulders weren't clearly visible in the front or back photo" });
+  if(armIn == null){
+    skipped.push({ key:'standing_reach', reason:"an arm wasn't clearly visible in any photo" });
+    skipped.push({ key:'wingspan', reason:"an arm wasn't clearly visible in any photo" });
+  } else if(biacromial == null){
+    skipped.push({ key:'wingspan', reason:"shoulders weren't clearly visible, which wingspan also needs" });
+  }
+
   // ---- reject rather than round ------------------------------------------------
   const rejected = [];
   for(const [key, val] of Object.entries({ ...m })){
@@ -369,7 +386,7 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
     // Everything the result screen needs to explain itself, and everything a future
     // debugging session needs to understand a number someone disputes.
     detail: {
-      framesUsed: seen, framesMissed: missed, rejected,
+      framesUsed: seen, framesMissed: missed, rejected, skipped,
       disagreement: Math.round(disagreement * 1000) / 1000,
       crownFrom: headBreadth != null ? 'head_breadth' : 'neck_fallback',
     },
@@ -401,6 +418,12 @@ if(typeof registerBodyProvider === 'function'){
     // What this engine can and cannot produce, so the consent screen can be specific
     // instead of promising a body scan and delivering five lengths.
     produces: ['Wingspan', 'Standing reach', 'Shoulder width', 'Torso length', 'Leg length'],
+    // Leg and torso length only need the hip-to-ankle and hip-to-shoulder chain, which
+    // every one of the four poses provides — they come back from every scan. The other
+    // three additionally need a clearly visible arm or both shoulders, which a sleeve or
+    // a tight crop can lose (see the `skipped` detail above), so they can't be promised
+    // the same way.
+    guaranteed: ['Torso length', 'Leg length'],
     excludes: 'No chest, waist or hip measurement, and nothing about body composition.',
     async measure({ frames, heightIn, onProgress }){
       return measureFromFrames({ frames, heightIn, onProgress });

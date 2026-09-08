@@ -323,7 +323,7 @@ async function openBodyScan(subject){
   if(!height) return bsNeedsHeight();
   BS.heightIn = height.value;
 
-  if(consent){ BS.consent = true; BS.consentId = consent.id; return bsSetup(); }
+  if(consent){ BS.consent = true; BS.consentId = consent.id; return bsPrepareEngine(); }
   bsConsent(gate.age, p, height);
 }
 
@@ -427,7 +427,12 @@ function bsConsent(age, p, height){
 
     <div class="bs-promise"><div class="tick">✓</div><div>
       <b>What gets measured</b>
-      <span>${esc((p.produces || []).join(', ') || 'Lengths between joints')}. ${esc(p.excludes || '')}</span></div></div>
+      <span>${esc((p.produces || []).join(', ') || 'Lengths between joints')}. ${esc(p.excludes || '')}
+        ${p.guaranteed && p.guaranteed.length && p.guaranteed.length < (p.produces||[]).length
+          ? ` ${esc(p.guaranteed.join(' and '))} come back from every scan; the rest need a clear, unoccluded
+            view of an arm or both shoulders, and can be missing from a scan where a sleeve or angle hid them —
+            the result screen says which, if so.`
+          : ''}</span></div></div>
 
     <div class="bs-promise"><div class="tick">✓</div><div>
       <b>The photos are never saved</b>
@@ -503,8 +508,47 @@ function bsConsent(age, p, height){
     BS.consent = true;
     BS.consentId = data ? data.id : null;
     bg.remove();
-    bsSetup();
+    bsPrepareEngine();
   };
+}
+
+// ---------------------------------------------------------------------------
+//  ENGINE PRELOAD — surfaces a device or network problem before four photos are
+//  taken, not after. loadPoseLandmarker() downloads a ~9MB model; running it here,
+//  behind a spinner a parent expects anyway between agreeing and shooting, means a
+//  phone that can't run it (no WebGL2, a blocked CDN, an ad-blocker) says so before
+//  anyone poses a child four times for a scan that was never going to finish.
+// ---------------------------------------------------------------------------
+async function bsPrepareEngine(){
+  const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
+    <span class="spinner"></span><div>Getting the camera ready…</div></div>`);
+  try{
+    await loadPoseLandmarker();
+    bg.remove();
+    bsSetup();
+  }catch(e){
+    console.error('pose model failed to load', e);
+    bg.remove();
+    bsEngineUnavailable();
+  }
+}
+
+function bsEngineUnavailable(){
+  const nm = esc(BS.subject && BS.subject.first_name || 'this athlete');
+  const bg = sheet(H`<h3>Can't load the on-device scan</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">This is about the model that reads the photos, not
+      about ${nm} or anything you did — usually a dropped connection while it downloads (about 9MB, once), or a
+      browser this phone doesn't support yet.</p>
+    <div class="teach" style="margin-top:14px"><div class="ic">📶</div><div>
+      <h4>Try Wi-Fi, and the newest browser update</h4>
+      <p>It only has to succeed once — after that it's cached on this phone for every future scan, so this is
+      the only time it's slow.</p></div></div>
+    <button class="btn amber" id="bsEngRetry" style="margin-top:16px">Try again</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="bsEngLater" style="background:transparent;color:var(--muted)">Not now</button>
+    </div>`);
+  bg.querySelector('#bsEngLater').onclick = () => { bg.remove(); bsDiscard(); };
+  bg.querySelector('#bsEngRetry').onclick = () => { bg.remove(); bsPrepareEngine(); };
 }
 
 // One diagram replaces four bullet points. The rules that survive as words become
@@ -673,9 +717,15 @@ function bsFailed(err){
   bsMarkActive(false);
   if(err) console.error('body scan measurement failed', err);
   const code = err && err.message && BS_FAIL[err.message] ? err.message : null;
-  const f = code ? BS_FAIL[code] : { h:'Try better light and re-centre in the guide',
-    p:'Whole body inside the brackets, a plain wall behind, and close-fitting clothes. Loose fabric is what '
-    + 'these get wrong most often.' };
+  // measureFromFrames throws only the four keys above for any capture-quality reason —
+  // a body out of frame, cropped feet, an implausible result. Anything else landing here
+  // is by construction NOT about the photos: the model dropped mid-run, a network blip,
+  // a GPU context lost. Telling a parent to fix their lighting for a network error is
+  // actively wrong, so this fallback says what it actually is instead.
+  const f = code ? BS_FAIL[code] : { h:"That didn't go through — not about your photos",
+    p:'Something interrupted the measuring model rather than the pictures themselves, usually a dropped '
+    + 'connection partway through. The photos have been discarded either way; trying again on Wi-Fi usually '
+    + 'clears it.' };
 
   const bg = sheet(H`<h3>That didn't measure</h3>
     <div class="teach" style="background:#FBE9DC;border-color:#E6C9BC;margin-top:12px">
@@ -759,7 +809,10 @@ function bsResult(result){
            ${esc(String((d.framesUsed || []).length))}.` : ''}
       ${d.rejected && d.rejected.length
         ? `One reading (${esc(d.rejected.map(nameOf).join(', '))}) did not fit the height on file and was
-           dropped rather than saved.` : ''}</p></div></div>
+           dropped rather than saved.` : ''}
+      ${d.skipped && d.skipped.length
+        ? ' ' + d.skipped.map(s => `${esc(nameOf(s.key))} isn't in this scan — ${esc(s.reason)}.`).join(' ')
+        : ''}</p></div></div>
 
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
