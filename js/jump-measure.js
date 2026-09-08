@@ -105,7 +105,13 @@ function jointAngleDeg(a, b, c){
 // `video.currentTime = t` followed by waiting for the `seeked` event is the standard,
 // reliable way to pull a specific instant out of a video file in a browser — no
 // server, no transcoding, the same file the camera produced.
-async function extractJumpFrames(videoBlob, onProgress){
+// `opts` lets a caller sample at a different rate/cap than the jump default without
+// forking this function — speed-measure.js needs both, for reasons specific to what
+// it's timing (see the "why these need finer sampling than a jump" note there). Every
+// existing caller passes nothing and gets the exact behaviour this always had.
+async function extractJumpFrames(videoBlob, onProgress, opts){
+  const sampleMs = (opts && opts.sampleMs) || JUMP_SAMPLE_MS;
+  const maxSeconds = (opts && opts.maxSeconds) || JUMP_MAX_SECONDS;
   const url = URL.createObjectURL(videoBlob);
   const video = document.createElement('video');
   video.muted = true; video.playsInline = true; video.src = url;
@@ -114,12 +120,12 @@ async function extractJumpFrames(videoBlob, onProgress){
       video.onloadedmetadata = res;
       video.onerror = () => rej(new Error('video_unreadable'));
     });
-    const duration = Math.min(video.duration || 0, JUMP_MAX_SECONDS);
+    const duration = Math.min(video.duration || 0, maxSeconds);
     if(!(duration > 0.3)) throw new Error('video_unreadable');
 
     const landmarker = await loadVideoPoseLandmarker(onProgress);
     const frames = [];
-    const stepS = JUMP_SAMPLE_MS / 1000;
+    const stepS = sampleMs / 1000;
     for(let t = 0; t <= duration; t += stepS){
       await new Promise(res => {
         video.onseeked = res;

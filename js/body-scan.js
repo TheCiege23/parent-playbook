@@ -1049,8 +1049,8 @@ async function fillScanConsents(){
   }
 
   if(!rows.length){
-    return set(H`<div class="rail-empty" style="padding:4px 0">No scan or jump-measurement permission has been
-      given. Both ask for one, from an athlete's Growth screen, before they open the camera.</div>`);
+    return set(H`<div class="rail-empty" style="padding:4px 0">No scan or measurement permission has been
+      given. Each asks for one, from an athlete's Scan screen, before they open the camera.</div>`);
   }
 
   // One row per (athlete, engine) — a body-scan release and a jump-measurement release
@@ -1069,7 +1069,16 @@ async function fillScanConsents(){
     const a = (state.athletes || []).find(x => x.id === id);
     return a ? a.first_name : 'An athlete';
   };
-  const engineLabel = eng => eng === 'ondevice-jump' ? 'Jump measurement' : 'Body scan';
+  // A per-engine lookup, not a two-way fallback — the fallback used to quietly label
+  // every engine that WASN'T 'ondevice-jump' as "Body scan," which was harmless with
+  // two engines and would have mislabelled this new third one the same way the
+  // athlete_id-only revocation bug once cross-affected engines it had never heard of.
+  const ENGINE_LABELS = {
+    'ondevice-pose': 'Body scan',
+    'ondevice-jump': 'Jump measurement',
+    'ondevice-speed': 'Speed & footwork measurement',
+  };
+  const engineLabel = eng => ENGINE_LABELS[eng] || eng;
 
   set(latest.map(r => H`<div class="tgl">
       <div class="gt"><b>${esc(nameOf(r.athlete_id))} · ${esc(engineLabel(r.scan_engine))}</b>

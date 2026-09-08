@@ -37,8 +37,24 @@ async function screenScan(){
               uploaded and never saved.</span></div><i>›</i></div>
       </div>
 
+      <div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="scanReaction" role="button" tabindex="0">
+          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+          <div class="gt"><b>Measure ${esc(a.first_name)}'s reaction time</b>
+            <span>A clap or "go," then their first move. Measured on this phone — the video is never uploaded
+              and never saved.</span></div><i>›</i></div>
+      </div>
+
+      <div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="scanFootwork" role="button" tabindex="0">
+          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 20c0-4 2-6 2-9a2 2 0 10-4 0"/><path d="M18 20c0-4-2-6-2-9a2 2 0 114 0"/></svg></div>
+          <div class="gt"><b>Measure ${esc(a.first_name)}'s footwork</b>
+            <span>About five seconds of quick feet. Measured on this phone — the video is never uploaded and
+              never saved.</span></div><i>›</i></div>
+      </div>
+
       <p class="muted-note" style="margin-top:10px">Each asks your permission first — a signed, revocable
-        release — before the camera opens. Manage or withdraw either from Account.</p>
+        release — before the camera opens. Manage or withdraw any of them from Account.</p>
 
       <div class="sec-title" style="margin-top:22px">Recent scans</div>
       ${recent && recent.length ? H`
@@ -61,6 +77,12 @@ async function screenScan(){
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   { const b=$("#scanJump");
     if(b){ const open=()=>openJumpScan(a);
+      b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
+  { const b=$("#scanReaction");
+    if(b){ const open=()=>openReactionScan(a);
+      b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
+  { const b=$("#scanFootwork");
+    if(b){ const open=()=>openFootworkScan(a);
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   { const b=$("#scanToGrowth"); if(b) b.onclick=()=>renderApp('growth'); }
 }

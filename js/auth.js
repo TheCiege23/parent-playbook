@@ -41,6 +41,9 @@ async function afterLogin(){
   if(typeof jumpScanWasInterrupted === 'function' && jumpScanWasInterrupted()){
     setTimeout(jmpInterruptedNotice, 400);
   }
+  if(typeof speedScanWasInterrupted === 'function' && speedScanWasInterrupted()){
+    setTimeout(spdInterruptedNotice, 400);
+  }
 }
 
 // The household this user already belongs to, if any. `fm_select` exposes every member

@@ -627,6 +627,11 @@
      starts a jump capture. -->
 <script src="/js/jump-measure.js"></script>
 <script src="/js/jump-scan.js"></script>
+<!-- speed-measure.js reuses jump-measure.js's extractJumpFrames() and pose-measure.js's
+     P/dist/mid/median directly, so it loads after both; speed-scan.js's UI flow calls
+     into it the same way jump-scan.js calls into jump-measure.js. -->
+<script src="/js/speed-measure.js"></script>
+<script src="/js/speed-scan.js"></script>
 <script src="/js/invites.js"></script>
 <script src="/js/pwa.js"></script>
 <script src="/js/init.js"></script>
