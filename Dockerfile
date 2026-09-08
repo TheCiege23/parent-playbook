@@ -18,7 +18,7 @@ FROM caddy:2-alpine
 WORKDIR /srv
 
 # Pages
-COPY index.html 404.html privacy.html terms.html ./
+COPY index.html 404.html privacy.html terms.html datadeletion.html ./
 
 # Root assets and PWA plumbing
 COPY icon.svg og.png manifest.webmanifest sw.js sitemap.xml llms.txt ./

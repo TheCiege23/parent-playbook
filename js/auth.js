@@ -121,6 +121,13 @@ function renderAuth(mode='login', prefill=''){
       <form id="authform" novalidate>
         <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
         <div class="field"><label>Password</label><input id="pw" type="password" autocomplete="${mode==='signup'?'new-password':'current-password'}" placeholder="At least 8 characters"/></div>
+        ${mode==='signup' ? H`<label class="agree-row" for="agree" style="display:flex;align-items:flex-start;gap:9px;margin:14px 0 4px;font-size:13.5px;color:var(--muted);line-height:1.45;cursor:pointer">
+          <input id="agree" type="checkbox" style="margin-top:3px;flex:none"/>
+          <span>I am the parent or legal guardian, and I agree to the
+            <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>,
+            <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>, and
+            <a href="/datadeletion" target="_blank" rel="noopener">Data Deletion</a> policy.</span>
+        </label>` : ''}
         <div class="err" id="autherr"></div>
         <button class="btn" id="go" type="submit">${mode==='signup'?'Create account':'Log in'}</button>
       </form>
@@ -131,9 +138,9 @@ function renderAuth(mode='login', prefill=''){
       </p>
       ${mode==='login' ? `<p class="muted-note" style="margin-top:2px"><a href="#" id="forgot">Forgot password?</a></p>` : ''}
     </div>
-    <p class="authlegal">By continuing you agree that you are the parent or legal guardian and consent to creating a profile for your child, and you accept our
+    ${mode==='login' ? `<p class="authlegal">By continuing you accept our
       <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> and
-      <a href="/terms" target="_blank" rel="noopener">Terms</a>.</p>
+      <a href="/terms" target="_blank" rel="noopener">Terms</a>.</p>` : ''}
   </div>`;
 
   // From login, "new here" goes to ONBOARDING, not a signup form — the account comes
@@ -150,6 +157,10 @@ function renderAuth(mode='login', prefill=''){
     if(!email||!pw){ errEl.textContent="Enter your email and password."; return; }
     if(!validEmail(email)){ errEl.textContent="That email doesn't look right — check it for typos."; return; }
     if(mode==='signup'&&pw.length<8){ errEl.textContent="Password must be at least 8 characters."; return; }
+    if(mode==='signup'){
+      const agree=$("#agree");
+      if(agree && !agree.checked){ errEl.textContent="Please confirm you're the parent or legal guardian and agree to the Privacy Policy and Terms."; return; }
+    }
     const btn=$("#go"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
     try{
       let res;
