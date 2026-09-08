@@ -45,6 +45,9 @@ body.in-app #landing{display:none}
 .lp-nav{display:flex;gap:28px}
 .lp-nav a{font-size:14.5px;font-weight:500;color:rgba(246,242,233,.72);transition:color .15s}
 .lp-nav a:hover{color:#fff}
+.lp-signin{font-family:'Archivo';font-size:14.5px;font-weight:700;color:rgba(246,242,233,.85);
+  transition:color .15s}
+.lp-signin:hover{color:#fff}
 .lp-cta{display:inline-flex;align-items:center;min-height:44px;background:var(--pp-green);color:var(--pp-ink-deep);
   font-family:'Archivo';font-weight:700;font-size:14.5px;line-height:1;padding:0 20px;border-radius:11px;transition:background .15s}
 .lp-cta:hover{background:var(--pp-green-lift)}
@@ -332,6 +335,7 @@ body.in-app #landing{display:none}
   .lp-mark{width:32px;height:32px;border-radius:9px;font-size:15px}
   .lp-word{font-size:15px}
   .lp-nav{display:none}
+  .lp-signin{font-size:13.5px}
   .lp-cta{font-size:13.5px;padding:0 15px}
   .lp-hero{margin-top:57px;padding:44px 0 40px;
     background:linear-gradient(160deg,#0E3B31 0%,#0B1F1A 52%,#04120E 100%)}
