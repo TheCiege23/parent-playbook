@@ -53,7 +53,11 @@
         || h.indexOf('access_token=') !== -1     // Supabase drops its auth hash here
         || s.indexOf('invite=') !== -1
         || s.indexOf('source=pwa') !== -1        // the manifest's start_url
-        || s.indexOf('paid=') !== -1 || s.indexOf('paycancel=') !== -1 || s.indexOf('stripe=') !== -1;
+        || s.indexOf('paid=') !== -1 || s.indexOf('paycancel=') !== -1 || s.indexOf('stripe=') !== -1
+        // A direct sign-in entry point for someone who isn't converting off THIS page's
+        // own CTAs — e.g. coaches.html's "Already connected? Log in", where the visitor
+        // already has an account and the marketing pitch below would just be in the way.
+        || s.indexOf('login=1') !== -1;
   }
   // A synchronous guess at "is there a session" so a returning parent never sees a
   // flash of marketing. Supabase keeps its session under sb-<ref>-auth-token; the

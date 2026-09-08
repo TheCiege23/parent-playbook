@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Parent Playbook for Organizations</title>
+<meta name="theme-color" content="#12695A" />
+<meta name="description" content="One roster view for a league, club, or school — coming to Parent Playbook. See what's planned and tell us what you'd need." />
+<link rel="icon" href="/icon.svg" />
+<style>
+  :root{ --ink:#16221F; --muted:#5C6B66; --green:#12695A; --green-d:#0A2E28; --line:#E4EAE7; --bg:#FBFAF7;
+    --amber:#EFA33B; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+       -webkit-text-size-adjust:100%}
+  .wrap{max-width:680px;margin:0 auto;padding:0 20px 90px}
+  a{color:var(--green)}
+  header.top{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
+  .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
+  .brand .mk{width:28px;height:28px;border-radius:8px;background:var(--green);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .brand b{font-size:15px}
+
+  .hero{background:var(--green-d);color:#F3F7F4;border-radius:22px;padding:44px 30px;margin:8px 0 34px}
+  .hero .eyebrow{font:600 11px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:#8FD9C4;margin:0 0 14px}
+  .hero h1{font-size:clamp(26px,5vw,34px);line-height:1.15;margin:0;color:#fff}
+  .hero p{color:#CFE7DD;font-size:15.5px;line-height:1.6;margin:14px 0 0;max-width:48ch}
+
+  .badge{display:inline-block;background:rgba(239,163,59,.18);color:#F2C177;border:1px solid rgba(239,163,59,.4);
+    font:600 11px ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;
+    border-radius:8px;margin-top:18px}
+
+  h2{font-size:21px;margin:0 0 12px}
+  p.lede{font-size:15.5px;color:var(--muted);line-height:1.6}
+
+  .stack{display:flex;flex-direction:column;gap:12px;margin:18px 0 30px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;display:flex;gap:14px}
+  .card .ic{width:36px;height:36px;border-radius:10px;background:#E7F0EC;color:var(--green);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:17px}
+  .card b{display:block;font-size:15px;margin-bottom:4px}
+  .card span{font-size:13.5px;color:var(--muted);line-height:1.55}
+
+  .cta-box{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;margin-top:24px}
+  .cta-box h3{margin:0 0 8px;font-size:18px}
+  .cta-box p{color:var(--muted);font-size:14px;margin:0 0 18px;line-height:1.6}
+  .btn{display:inline-block;padding:12px 20px;border-radius:12px;font-weight:600;font-size:14.5px;
+    text-decoration:none;background:var(--amber);color:#3A2409}
+
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#EAF1EE; --muted:#9FB0AA; --line:#26332F; --bg:#0F1614; }
+    body{background:var(--bg);color:var(--ink)}
+    .card,.cta-box{background:#141D1A;border-color:var(--line)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><div class="mk">P</div><b>Parent Playbook</b></a>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">For leagues, clubs &amp; schools</div>
+    <h1>One roster. Every family already using the app.</h1>
+    <p>An organization account is being designed for the person running a league, a club, or a school program —
+      not one athlete at a time, but the whole roster, and the coaches connected to it.</p>
+    <span class="badge">In design — not live yet</span>
+  </div>
+
+  <h2>What's planned</h2>
+  <p class="lede">Confirmed direction, not a finished feature — this page will update as it's actually built.</p>
+  <div class="stack">
+    <div class="card"><div class="ic">👥</div>
+      <div><b>Manage the whole roster</b>
+        <span>See the athletes and families connected to your organization in one place, instead of one Team Connect invite at a time.</span></div></div>
+    <div class="card"><div class="ic">🎓</div>
+      <div><b>Oversee your coaches</b>
+        <span>Know which coaches are connected to which athletes under your organization — an admin layer above individual Team Connect access, not a replacement for it.</span></div></div>
+    <div class="card"><div class="ic">🏕️</div>
+      <div><b>List your own camps &amp; programs</b>
+        <span>Manage your organization's listings in the camps directory directly, rather than a single parent submitting one on your behalf.</span></div></div>
+  </div>
+
+  <p class="lede">Same rule as everywhere else in Parent Playbook: an organization sees what it needs to run
+    training and communication, never more. Whatever an organization can see about an athlete will be at most
+    what an individual coach can see today — stats and measurements, never games, journey, or photos — that
+    scope won't loosen as this gets built.</p>
+
+  <div class="cta-box">
+    <h3>Tell us what you'd actually need</h3>
+    <p>This is being designed now. If you run a league, club, or school and want to help shape it — how many
+      athletes, how many coaches, what a roster view should actually show — we want to hear it before it's built,
+      not after.</p>
+    <a class="btn" href="mailto:support@chimaura.com?subject=Organization%20account%20interest">Get in touch →</a>
+  </div>
+
+  <footer>
+    <div><a href="/">Parent Playbook</a> · <a href="/coaches">For coaches</a> · <a href="/privacy">Privacy</a></div>
+    <div>Questions — <a href="mailto:support@chimaura.com">support@chimaura.com</a></div>
+  </footer>
+</div>
+</body>
+</html>

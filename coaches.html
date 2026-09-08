@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Team Connect for Coaches &amp; Trainers — Parent Playbook</title>
+<meta name="theme-color" content="#12695A" />
+<meta name="description" content="See the stats that matter for a young athlete you coach or train, and send updates straight to their family — nothing else, nothing extra." />
+<link rel="icon" href="/icon.svg" />
+<style>
+  :root{ --ink:#16221F; --muted:#5C6B66; --green:#12695A; --green-d:#0A2E28; --line:#E4EAE7; --bg:#FBFAF7;
+    --amber:#EFA33B; --amber-pale:#FCEEDA; --amber-ink:#8A5A16; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+       -webkit-text-size-adjust:100%}
+  .wrap{max-width:680px;margin:0 auto;padding:0 20px 90px}
+  a{color:var(--green)}
+  header.top{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
+  .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
+  .brand .mk{width:28px;height:28px;border-radius:8px;background:var(--green);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .brand b{font-size:15px}
+  .signin{font-size:13.5px;color:var(--green);text-decoration:none;font-weight:600}
+
+  .hero{background:var(--green-d);color:#F3F7F4;border-radius:22px;padding:44px 30px;margin:8px 0 34px}
+  .hero .eyebrow{font:600 11px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:#8FD9C4;margin:0 0 14px}
+  .hero h1{font-size:clamp(26px,5vw,34px);line-height:1.15;margin:0;color:#fff}
+  .hero p{color:#CFE7DD;font-size:15.5px;line-height:1.6;margin:14px 0 0;max-width:46ch}
+  .hero .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+  .btn{display:inline-block;padding:12px 20px;border-radius:12px;font-weight:600;font-size:14.5px;
+    text-decoration:none;border:1.5px solid transparent}
+  .btn.pri{background:var(--amber);color:#3A2409}
+  .btn.sec{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+
+  h2{font-size:21px;margin:0 0 12px}
+  p.lede{font-size:15.5px;color:var(--muted);line-height:1.6}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 30px}
+  @media (max-width:520px){ .grid{grid-template-columns:1fr} }
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+  .card .ic{width:32px;height:32px;border-radius:10px;background:#E7F0EC;color:var(--green);
+    display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
+  .card b{display:block;font-size:14.5px;margin-bottom:4px}
+  .card span{font-size:13px;color:var(--muted);line-height:1.5}
+
+  .promise{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:15px 17px;margin:12px 0}
+  .promise .tick{width:22px;height:22px;border-radius:7px;background:#E7F0EC;color:var(--green);
+    display:flex;align-items:center;justify-content:center;font-size:12px;flex:none;margin-top:1px}
+  .promise b{display:block;font-size:14.5px;margin-bottom:3px}
+  .promise span{font-size:14px;line-height:1.55;color:var(--muted)}
+  .promise.no{background:#FBEAE3;border-color:#EBC8B8}
+  .promise.no .tick{background:rgba(180,69,31,.14);color:#B4451F}
+
+  .cta-box{background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;text-align:center;margin-top:30px}
+  .cta-box h3{margin:0 0 8px;font-size:18px}
+  .cta-box p{color:var(--muted);font-size:14px;margin:0 0 18px}
+
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#EAF1EE; --muted:#9FB0AA; --line:#26332F; --bg:#0F1614; }
+    body{background:var(--bg);color:var(--ink)}
+    .card,.promise,.cta-box{background:#141D1A;border-color:var(--line)}
+    .promise.no{background:#231A13;border-color:#3A2C1F}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><div class="mk">P</div><b>Parent Playbook</b></a>
+    <a class="signin" href="/?login=1">Already connected? Log in →</a>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">Team Connect</div>
+    <h1>The stats you need. Nothing else.</h1>
+    <p>A family invites you in — you get age, sport, and their current measurements, plus a way to send them
+      workout notes, nutrition guidance, or a quick announcement. No games, journey, or photos, because that's
+      not what a coach's relationship with the app needs to be.</p>
+    <div class="ctas">
+      <a class="btn pri" href="mailto:support@chimaura.com?subject=Team%20Connect%20for%20coaches">Ask a family to invite you</a>
+      <a class="btn sec" href="/?login=1">Log in</a>
+    </div>
+  </div>
+
+  <h2>What you get</h2>
+  <p class="lede">One screen, built around what actually changes your session plan.</p>
+  <div class="grid">
+    <div class="card"><div class="ic">📏</div><b>Current stats</b><span>Height, weight, sport, position — and every scan or timed measurement the family has recorded, kept current.</span></div>
+    <div class="card"><div class="ic">⏱</div><b>Jump, sprint, reaction, footwork</b><span>The same combine-style measurements the family sees, so you're both looking at the same numbers.</span></div>
+    <div class="card"><div class="ic">💬</div><b>Send updates</b><span>Workout notes, nutrition guidance, or an announcement — one thread, visible to every guardian on the account.</span></div>
+    <div class="card"><div class="ic">🔒</div><b>Revocable anytime</b><span>The family stays in control. Access can be turned off from their side at any time, no notice needed.</span></div>
+  </div>
+
+  <h2>What you don't get</h2>
+  <p class="lede">Just as important. This isn't a lighter version of the parent app — it's a different, narrower thing on purpose.</p>
+  <div class="promise"><div class="tick">✓</div><div><b>Invited by the family, always</b>
+    <span>There's no directory, no discovery, and no way to request access to an athlete you weren't invited to. The relationship exists in real life first — this just gives it a channel.</span></div></div>
+  <div class="promise no"><div class="tick">✕</div><div><b>No games, journey, or photos</b>
+    <span>Those stay family-only. A coach's access is scoped at the database level, not just hidden in the interface.</span></div></div>
+  <div class="promise no"><div class="tick">✕</div><div><b>No messaging the athlete directly</b>
+    <span>Every update goes to the family. There is no path in this app from a coach to a child.</span></div></div>
+
+  <div class="cta-box">
+    <h3>Coaching or training somewhere with lots of families?</h3>
+    <p>Organization accounts — for a league, club, or school managing many athletes and coaches at once — are on the way.</p>
+    <a class="btn pri" href="/organizations">See what's planned →</a>
+  </div>
+
+  <footer>
+    <div><a href="/">Parent Playbook</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></div>
+    <div>Questions — <a href="mailto:support@chimaura.com">support@chimaura.com</a></div>
+  </footer>
+</div>
+</body>
+</html>

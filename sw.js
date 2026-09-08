@@ -1,8 +1,9 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v47';
-// /privacy, /terms and /datadeletion are standalone pages, not part of the SPA. Precached
-// so an offline navigation to them serves the real page instead of the index.html fallback.
-const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
+const CACHE = 'pp-v48';
+// /privacy, /terms, /datadeletion, /coaches and /organizations are standalone pages, not
+// part of the SPA. Precached so an offline navigation to them serves the real page
+// instead of the index.html fallback.
+const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coaches', '/organizations', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
   '/img/brownpig-logo-ondark.png','/js/landing.js',
   '/js/monitoring.js','/js/core.js','/js/offline.js','/js/background.js','/js/reference.js','/js/auth.js','/js/onboarding.js',
   '/js/program.js','/js/shell.js','/js/screen-week.js','/js/week-rail.js','/js/cdc-stature.js','/js/maturity.js','/js/pop-warner.js','/js/screen-growth.js','/js/screen-scan.js','/js/screen-coach.js','/js/screen-profile.js','/js/screen-edit.js','/js/screen-activity.js',

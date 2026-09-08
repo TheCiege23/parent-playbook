@@ -148,10 +148,83 @@ it into two features entirely.
 
 ---
 
+## Part D — Organization accounts: scoped, not built
+
+**Confirmed direction (2026-09-08):** an organization account is a real third tier above `coach` —
+not a bigger coach, a different shape of access spanning three things: a roster view across *many*
+athletes at once, oversight of which coaches connect to which of those athletes, and the ability to
+manage the org's own listings in the camps directory (Part A). **Signup stays invite-only**, same as
+coach — no self-serve org discovery, matching the decision already made for coaches/trainers.
+
+**Why this is genuinely bigger than Part B, not just "coach with more rows":** `coach` reads one
+athlete at a time, gated by one `athlete_access` row per relationship — the RLS model is a single
+per-athlete boolean check. An organization needs to read *across* a whole roster, which is a
+one-to-many relationship the current schema has no shape for, plus a second one-to-many for which
+coaches belong to the org. Both need their own junction tables and their own RLS functions — reusing
+`can_view_athlete()` or even `can_coach_view_athlete()` here would repeat the exact mistake Part B's
+migration caught and fixed: a shared, blanket-access function is how a new role accidentally inherits
+scope nobody meant to give it.
+
+### Proposed data model
+
+```
+organizations
+  id, name, contact_name, contact_email, created_by, created_at
+
+org_admins
+  id, org_id, guardian_id, granted_at, revoked_at        -- who can administer this org
+
+org_athletes
+  id, org_id, athlete_id, granted_by, granted_at, revoked_at   -- the roster, invite-only
+```
+
+`athlete_access` gains a nullable `org_id` on `coach`-role rows only — set when a parent's invite to
+a coach was issued *through* an org relationship (e.g. "the team's trainer"), null for a coach
+invited independently. This is what lets an org admin see "which coaches connect to which of our
+athletes" without granting the org anything a plain `coach` row doesn't already have.
+
+`camps` already has `created_by` (Part A) — this adds a nullable `org_id`, and an org-admin RLS
+policy alongside the existing creator-based one, so an org can manage its own listings as a group
+rather than one parent owning each row alone.
+
+### The access ceiling, stated as a hard constraint
+
+An organization sees **exactly what a coach sees today, across more athletes** — age, sport,
+measurements. Never games, journey, or photos, for any athlete on the roster. This isn't a starting
+point to loosen later; it's the same boundary Part B already drew, just applied per-roster instead
+of per-athlete. `organizations.html` states this publicly on purpose, so it's a public commitment,
+not an internal note that quietly slips.
+
+### What's not decided yet, and needs a real answer before this is built
+
+1. **How does an athlete get onto an org's roster?** A parent inviting the org directly (same
+   mechanism as inviting a coach, new `role` value or a distinct invite type)? An org admin sending a
+   roster-join invite to a family? Both are invite-gated either way — this is about which side
+   initiates, which changes the onboarding flow more than the security model.
+2. **Can an org admin see individual measurement values across the whole roster at once**, or only
+   drill into one athlete at a time (same view as `screen-coach.js`, just reachable for more
+   athletes)? A roster-wide stats table is a materially bigger information display than reusing the
+   existing coach screen per-athlete, worth deciding deliberately rather than defaulting to whichever
+   is easier to build.
+3. **Does an org admin's oversight of "which coaches connect to which athletes" include seeing that
+   coach's sent updates**, or only the connection itself (coach X ↔ athlete Y) without the message
+   content? Defaulting to connection-only, not content, unless told otherwise — an org admin isn't a
+   party to the coach-to-family conversation just by administering the org.
+
+### Recommended next step
+
+Not a build yet. `coaches.html` and `organizations.html` are live as of this pass — the latter
+explicitly marked "in design, not live" with a feedback path (`support@chimaura.com`) rather than a
+working signup, so real prospective organizations can shape questions 1–3 above before the schema is
+written, the same way the three Part C questions got answered before that table was built.
+
+---
+
 ## Recommended build order
 
-1. **Part A (camps)** and **Part B (Team Connect access)** — start now, both are scoped, both reuse
-   proven patterns, neither has an open judgment call.
-2. **Part C (messaging)** — as soon as the three questions above are answered. The schema doesn't
-   change based on the answers; the UI copy and any disclaimer/gating logic does, so building the
-   table now and the UI after your answer is safe either way.
+1. **Part A (camps)** and **Part B (Team Connect access)** — done, shipped 2026-09-08.
+2. **Part C (messaging)** — done, shipped 2026-09-08, per the confirmed answers to all three
+   questions (nutrition disclaimer always shown, every guardian always sees every update,
+   announcements share the thread with a visual tag).
+3. **Part D (organizations)** — scoped above, landing pages live, schema/RLS work gated on answers
+   to the three open questions.
