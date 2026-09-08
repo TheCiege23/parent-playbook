@@ -641,9 +641,11 @@
      into it the same way jump-scan.js calls into jump-measure.js. -->
 <script src="/js/speed-measure.js"></script>
 <script src="/js/speed-scan.js"></script>
-<!-- sprint-scan.js has no measurement engine of its own — it's a stopwatch, not a scan —
-     so it doesn't depend on pose-measure.js/jump-measure.js and could load anywhere
-     after core.js. It sits here for locality with the rest of the Scan tab's files. -->
+<!-- sprint-measure.js is the calibrated-video engine behind sprint-scan.js's Phase 2
+     option — it reuses extractJumpFrames()/P/loadVideoPoseLandmarker from
+     jump-measure.js/pose-measure.js directly, so it loads after both. The stopwatch
+     path in sprint-scan.js still needs neither. -->
+<script src="/js/sprint-measure.js"></script>
 <script src="/js/sprint-scan.js"></script>
 <script src="/js/invites.js"></script>
 <script src="/js/pwa.js"></script>

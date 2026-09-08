@@ -80,9 +80,29 @@ function sptPickDistance(){
     row.onclick = () => {
       SPT.distance = SPRINT_DISTANCES.find(d => d.key === row.getAttribute('data-dist'));
       bg.remove();
-      sptSetup();
+      sptPickMethod();
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+//  METHOD CHOICE — the stopwatch above, or the calibrated-video engine below
+// ---------------------------------------------------------------------------
+function sptPickMethod(){
+  const bg = sheet(H`<h3>How do you want to time it?</h3>
+    <div class="bs-release" style="margin-top:10px">
+      <label class="navrow" style="cursor:pointer" data-method="stopwatch">
+        <div class="gt"><b>Stopwatch</b><span>Tap to start, tap to stop. Simple, no camera, ready in seconds.</span></div><i>›</i></label>
+      <label class="navrow" style="cursor:pointer" data-method="video">
+        <div class="gt"><b>Record &amp; measure automatically</b>
+          <span>A real speed number from video — needs a stationary camera and marking the start/finish line once. More setup, and asks for a permission first.</span></div><i>›</i></label>
+    </div>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="sptmCancel" style="background:transparent;color:var(--muted)">Cancel</button>
+    </div>`);
+  bg.querySelector('#sptmCancel').onclick = () => bg.remove();
+  bg.querySelector('[data-method="stopwatch"]').onclick = () => { bg.remove(); sptSetup(); };
+  bg.querySelector('[data-method="video"]').onclick = () => { bg.remove(); sptvOpen(); };
 }
 
 function sptSetup(){
@@ -262,5 +282,358 @@ function sptResult(elapsedS, videoFile){
     }
     logUsageEvent('scan_sprint_saved');
     cleanup(); bg.remove(); toast('Saved'); renderApp('growth');
+  };
+}
+
+// ===================================================================
+//  CALIBRATED VIDEO — Phase 2, real speed from a measured, marked course
+// ===================================================================
+// A separate biometric consent from body-scan/jump/speed, on purpose — this is a
+// genuinely different setup (a stationary camera and a one-time calibration tap)
+// from any of those, and body-scan/jump each already have their own separate consent
+// rather than being bundled, so a fourth distinct one here is consistent, not new.
+const SPRINT_POLICY_VERSION = '2026-09-08.sprint.v1';
+const SPRINT_RETENTION_MONTHS = 12;
+const SPRINT_ENGINE_ID = 'ondevice-sprint';
+
+const SPTV = { subject:null, consent:false, consentId:null, videoBlob:null, startPoint:null, finishPoint:null };
+
+async function sptvOpen(){
+  SPTV.subject = SPT.subject; SPTV.consent = false; SPTV.consentId = null;
+  SPTV.videoBlob = null; SPTV.startPoint = null; SPTV.finishPoint = null;
+
+  const age = SPTV.subject.birthdate ? ageFrom(SPTV.subject.birthdate) : null;
+  if(age == null) return sptBlocked('We need a date of birth first.',
+    `Add ${esc(SPTV.subject.first_name || 'their')} date of birth in Edit, then come back — it decides which
+     release applies.`);
+
+  const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
+    <span class="spinner"></span><div>Checking…</div></div>`);
+  const consent = await loadScanConsent(SPTV.subject.id, SPRINT_ENGINE_ID);
+  bg.remove();
+
+  if(consent){ SPTV.consent = true; SPTV.consentId = consent.id; return sptvSetup(); }
+  sptvConsent(age);
+}
+
+function sptvConsent(age){
+  const minor = age < ADULT_AGE;
+  const nm = esc(SPTV.subject.first_name || 'this athlete');
+  const d = SPT.distance;
+  const until = (() => { const dt = new Date(); dt.setMonth(dt.getMonth() + SPRINT_RETENTION_MONTHS); return dt.toISOString().slice(0,10); })();
+  const untilHuman = new Date(until + 'T00:00:00').toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+
+  const bg = sheet(H`<h3>Measure ${nm}'s sprint speed</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">A short video of the ${esc(d.label)} run. This
+      part is the agreement — it is short, and it is the whole of it.</p>
+
+    <div class="bs-promise"><div class="tick">✓</div><div>
+      <b>What gets measured</b>
+      <span>Sprint time and speed over ${esc(d.label)}, from where ${nm}'s body crosses two points you mark
+        yourself after recording. Nothing about strength, technique or body composition.</span></div></div>
+
+    <div class="bs-promise"><div class="tick">✓</div><div>
+      <b>The video is never saved</b>
+      <span>Measured on this phone and discarded the moment it's read. Nothing is uploaded to your account and
+        no record points at a video.</span></div></div>
+
+    <div class="bs-promise"><div class="tick">🗓️</div><div>
+      <b>Kept until ${esc(untilHuman)}</b>
+      <span>Then deleted, unless ${nm} is measured again — which starts the ${SPRINT_RETENTION_MONTHS} months over.
+        You can delete the measurement and withdraw this permission from Account at any time, and it takes effect
+        immediately.</span></div></div>
+
+    <div class="bs-release">
+      ${minor
+        ? H`<label><input type="checkbox" id="sptvOk1"/>
+              <span>I am ${nm}'s parent or legal guardian, and I authorise this app to measure their sprint speed
+                from a video I record.</span></label>
+            <label><input type="checkbox" id="sptvOk2"/>
+              <span>I understand what is measured, that the video is not uploaded or kept, and that the
+                measurement is deleted on the date above.</span></label>`
+        : H`<label><input type="checkbox" id="sptvOk1"/>
+              <span>${nm} is ${esc(String(age))} and has agreed to be measured this way. Over 18, the release is
+                theirs to give — I am recording it, not giving it for them.</span></label>`}
+    </div>
+
+    <div class="err" id="sptvCErr"></div>
+    <button class="btn amber" id="sptvGo" disabled>Agree and start</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="sptvCancel" style="background:transparent;color:var(--muted)">Cancel</button>
+    </div>`);
+
+  const go = bg.querySelector('#sptvGo');
+  const boxes = Array.from(bg.querySelectorAll('.bs-release input[type=checkbox]'));
+  const sync = () => { go.disabled = !boxes.every(b => b.checked); };
+  boxes.forEach(b => { b.onchange = sync; });
+  bg.querySelector('#sptvCancel').onclick = () => bg.remove();
+
+  go.onclick = async e => {
+    const err = bg.querySelector('#sptvCErr'); err.textContent = '';
+    if(!boxes.every(b => b.checked)) return;
+    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+
+    const { data, error } = await sb.from('biometric_consents').insert({
+      athlete_id: SPTV.subject.id,
+      guardian_id: state.user.id,
+      subject_is_minor: minor,
+      subject_age_years: age,
+      policy_version: SPRINT_POLICY_VERSION,
+      scan_engine: SPRINT_ENGINE_ID,
+      retention_until: until,
+      method: 'in_app_written_release',
+      detail: { produces: ['Sprint time', 'Sprint speed'], engine_label: 'On-device calibrated sprint speed' },
+    }).select('id').maybeSingle();
+
+    if(error){
+      console.error(error);
+      err.textContent = 'Could not record that permission, so the capture has not started. ' + (error.message || '');
+      e.target.innerHTML = 'Agree and start'; e.target.disabled = false;
+      return;
+    }
+
+    SPTV.consent = true;
+    SPTV.consentId = data ? data.id : null;
+    bg.remove();
+    sptvSetup();
+  };
+}
+
+function sptvSetup(){
+  const nm = esc(SPTV.subject.first_name || 'them');
+  const d = SPT.distance;
+  const bg = sheet(H`<h3>Set up the course</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 0">${esc(d.label)}, measured with a tape or a
+      measuring wheel — mark both ends with a cone, a line, or anything visible on video.</p>
+    <div class="teach" style="margin-top:14px"><div class="ic">📷</div><div>
+      <h4>Brace the phone — it can't move</h4>
+      <p>Set the phone down or on a tripod, off to the side, so the whole course is in frame from start to
+      finish. Once recording starts, the phone has to stay still — any movement breaks the measurement.</p></div></div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:10px">After recording, you'll tap where the start and
+      finish marks are in the video — that's what turns the video into a real number.</p>
+    <button class="btn amber" id="sptvStart" style="margin-top:16px">Start recording</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="sptvBail" style="background:transparent;color:var(--muted)">Cancel</button>
+    </div>`);
+  bg.querySelector('#sptvBail').onclick = () => bg.remove();
+  bg.querySelector('#sptvStart').onclick = () => { bg.remove(); sptvCapture(); };
+}
+
+function sptvCapture(){
+  const bg = sheet(H`
+    <div class="lg-head">
+      <button class="iconbtn" id="sptvCapBack" aria-label="Back">✕</button>
+      <h3>Record the run</h3>
+    </div>
+    <div class="bs-view">
+      <span class="brk tl"></span><span class="brk tr"></span>
+      <span class="brk bl"></span><span class="brk br"></span>
+      <div class="bs-hint">Whole course in frame. Phone stays still.</div>
+    </div>
+    <input id="sptvFile" type="file" accept="video/*" capture="environment" hidden/>
+    <button class="bs-shutter" id="sptvShot" aria-label="Record video"></button>
+    <p class="muted-note" style="margin-top:12px">Stays on this device.</p>
+    <div class="err" id="sptvCapErr"></div>`);
+
+  const file = bg.querySelector('#sptvFile');
+  bg.querySelector('#sptvShot').onclick = () => file.click();
+  bg.querySelector('#sptvCapBack').onclick = () => { bg.remove(); sptvDiscard(); };
+  file.onchange = () => {
+    const f = file.files[0];
+    if(!f){ bg.querySelector('#sptvCapErr').textContent = 'No video was recorded.'; return; }
+    bg.remove();
+    sptvReview(f);
+  };
+}
+
+function sptvReview(file){
+  const url = URL.createObjectURL(file);
+  const bg = sheet(H`
+    <div class="lg-head"><h3>Look right?</h3></div>
+    <div class="bs-view" style="aspect-ratio:3/4">
+      <video src="${esc(url)}" controls playsinline style="width:100%;height:100%;object-fit:cover;background:#000"></video>
+    </div>
+    <p class="muted-note" style="margin-top:10px">Only measured on this phone, then discarded.</p>
+    <div class="row2" style="margin-top:12px">
+      <button class="btn ghost" id="sptvRetake">Retake</button>
+      <button class="btn amber" id="sptvUse">Use this</button>
+    </div>`);
+  const done = () => { try{ URL.revokeObjectURL(url); }catch(e){} bg.remove(); };
+  bg.querySelector('#sptvRetake').onclick = () => { done(); sptvCapture(); };
+  bg.querySelector('#sptvUse').onclick = () => {
+    SPTV.videoBlob = file;
+    done();
+    sptvCalibrate('start');
+  };
+}
+
+// The calibration tap. Runs on the ALREADY-RECORDED clip in an ordinary <video> element
+// — see sprint-measure.js's header for why this, and not a live camera overlay, is the
+// right shape for this step. `which` is 'start' or 'finish'; the same screen is used
+// for both taps in sequence.
+function sptvCalibrate(which){
+  const nm = esc(SPTV.subject.first_name || 'them');
+  const isStart = which === 'start';
+  const url = URL.createObjectURL(SPTV.videoBlob);
+  const bg = sheet(H`
+    <div class="lg-head"><h3>Tap the ${isStart?'start':'finish'} line</h3></div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px">Scrub to any clear moment — the marks stay in the
+      same spot since the camera didn't move. Tap directly on the video image to mark where ${isStart?'the start':'the finish'}
+      line is.</p>
+    <div id="sptvCalWrap" style="position:relative;background:#000;border-radius:14px;overflow:hidden">
+      <video id="sptvCalVid" src="${esc(url)}" controls playsinline style="width:100%;display:block;object-fit:contain;background:#000"></video>
+      <div id="sptvMarker" style="position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;
+        background:var(--amber);border:2px solid #fff;display:none;pointer-events:none"></div>
+    </div>
+    <div class="err" id="sptvCalErr" style="margin-top:8px"></div>
+    <button class="btn amber" id="sptvCalNext" disabled style="margin-top:12px">${isStart?'Next: mark the finish line':'Measure'}</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="sptvCalBack" style="background:transparent;color:var(--muted)">Cancel</button>
+    </div>`);
+
+  const vid = bg.querySelector('#sptvCalVid'), marker = bg.querySelector('#sptvMarker'), next = bg.querySelector('#sptvCalNext');
+  let point = null;
+
+  vid.addEventListener('click', e => {
+    // A native <video controls> fires click on the picture area too; the bottom
+    // controls strip is a separate hit target the browser handles itself, so a tap
+    // there won't reach here in practice on the platforms this app targets.
+    const rect = vid.getBoundingClientRect();
+    if(!vid.videoWidth || !vid.videoHeight) return;
+    point = tapToNormalized(e.clientX, e.clientY, rect, vid.videoWidth, vid.videoHeight);
+    const boxW = rect.width, boxH = rect.height;
+    const videoAspect = vid.videoWidth / vid.videoHeight, boxAspect = boxW / boxH;
+    let dispW, dispH, offX, offY;
+    if(videoAspect > boxAspect){ dispW = boxW; dispH = boxW / videoAspect; offX = 0; offY = (boxH - dispH) / 2; }
+    else { dispH = boxH; dispW = boxH * videoAspect; offY = 0; offX = (boxW - dispW) / 2; }
+    marker.style.left = (offX + point.x * dispW) + 'px';
+    marker.style.top = (offY + point.y * dispH) + 'px';
+    marker.style.display = 'block';
+    next.disabled = false;
+  });
+
+  const done = () => { try{ URL.revokeObjectURL(url); }catch(e){} bg.remove(); };
+  bg.querySelector('#sptvCalBack').onclick = () => { done(); sptvDiscard(); };
+  next.onclick = () => {
+    if(!point) return;
+    done();
+    if(isStart){ SPTV.startPoint = point; sptvCalibrate('finish'); }
+    else { SPTV.finishPoint = point; sptvRun(); }
+  };
+}
+
+function sptvDiscard(){
+  SPTV.videoBlob = null; SPTV.consent = false; SPTV.startPoint = null; SPTV.finishPoint = null;
+}
+
+const SPRINT_FAIL = {
+  no_pose: { h:'A body could not be tracked in that video',
+    p:'Usually the whole run wasn\'t in frame, or the light made the outline hard to track. Whole course in frame, good light, phone steady — that fixes this most often.' },
+  no_crossing_detected: { h:"Didn't see a clear crossing at one of the marks",
+    p:'The video played and a body was tracked, but it never clearly passed through one of the two spots you marked. Re-check that the marks match where the run actually happened.' },
+  crossed_out_of_order: { h:'The finish came before the start',
+    p:'That usually means the two marks got swapped, or the run happened in the opposite direction from how the marks were placed. Try marking them again in order.' },
+  implausible: { h:'That reading did not add up',
+    p:'The time between the two marks is not one a person actually runs — usually the phone moved, or someone else crossed through the frame. It has been thrown away rather than saved.' },
+};
+
+async function sptvRun(){
+  const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
+    <span class="spinner"></span><div id="sptvProg">Getting the camera ready…</div></div>`);
+  const say = t => { const el = bg.querySelector('#sptvProg'); if(el) el.textContent = t; };
+
+  try{ await loadVideoPoseLandmarker(say); }
+  catch(e){ console.error('sprint pose model failed to load', e); bg.remove(); return sptvFailed(null); }
+
+  // Second consent check, re-read from the database — same reason as every other
+  // engine: a co-parent can revoke from another device mid-capture.
+  const live = await loadScanConsent(SPTV.subject.id, SPRINT_ENGINE_ID);
+  if(!live || !SPTV.consent){ sptvDiscard(); bg.remove(); return sptvRefuse(); }
+
+  let result = null, failure = null;
+  try{
+    result = await measureSprintFromVideo({
+      videoBlob: SPTV.videoBlob, startPoint: SPTV.startPoint, finishPoint: SPTV.finishPoint,
+      distanceYards: SPT.distance.yards, onProgress: say,
+    });
+  }catch(err){ console.error(err); failure = err; }
+
+  sptvDiscard();
+  bg.remove();
+  if(failure || !result) return sptvFailed(failure);
+  sptvResult(result);
+}
+
+function sptvRefuse(){
+  const bg = sheet(H`<div class="bs-refuse">
+    <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="#EFA33B" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="2"/>
+      <path d="M6 8v3M10 8v5M14 8v3M18 8v5"/></svg></div>
+    <h3>This capture was stopped.</h3>
+    <p>The permission covering this measurement is no longer active, so nothing was measured. The video has
+      been discarded.</p>
+    <button class="btn amber" id="sptvRefGrowth">Go to Growth</button>
+  </div>`);
+  const g = bg.querySelector('#sptvRefGrowth');
+  if(g) g.onclick = () => { bg.remove(); renderApp('growth'); };
+}
+
+function sptvFailed(err){
+  if(err) console.error('calibrated sprint measurement failed', err);
+  const code = err && err.message && SPRINT_FAIL[err.message] ? err.message : null;
+  const f = code ? SPRINT_FAIL[code] : { h:"That didn't go through — not about your video",
+    p:'Something interrupted the measuring model rather than the video itself, usually a dropped connection '
+    + 'partway through. Trying again on Wi-Fi usually clears it.' };
+
+  const bg = sheet(H`<h3>That didn't measure</h3>
+    <div class="teach" style="background:#FBE9DC;border-color:#E6C9BC;margin-top:12px">
+      <div class="ic" style="background:#FBE9DC;color:#B4451F;border:1.5px solid #E6C9BC">!</div>
+      <div><h4 style="color:#B4451F">${esc(f.h)}</h4>
+        <p>${esc(f.p)} The video has been discarded and nothing was saved.</p></div></div>
+    <div class="row2" style="margin-top:16px">
+      <button class="btn ghost" id="sptvFClose">Not now</button>
+      <button class="btn amber" id="sptvFRetry">Try again</button>
+    </div>`);
+  bg.querySelector('#sptvFClose').onclick = () => bg.remove();
+  bg.querySelector('#sptvFRetry').onclick = () => { bg.remove(); sptvSetup(); };
+}
+
+function sptvResult(result){
+  const d = SPT.distance;
+  const bg = sheet(H`<h3>${esc(d.label)}</h3>
+    <div class="ghero" style="margin:14px 0">
+      <div class="k">Time</div>
+      <div class="gh-num"><b>${result.elapsedS.toFixed(2)}</b><span>s</span></div>
+    </div>
+    <div class="bs-ratios"><div class="bs-ratio">
+      <div class="k">Speed</div><b>${result.speedMph} mph</b>
+      <span>Distance ÷ time, from the marks you set — not a lab-grade radar gun, but a real, consistent
+        number to track the trend against.</span></div></div>
+
+    <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
+      <h4>Timed from where the marks were crossed</h4>
+      <p>The video is gone — this is what was kept. Treat the change between sessions as the real signal, the
+      same as everywhere else in Growth.</p></div></div>
+
+    <div class="row2" style="margin-top:16px">
+      <button class="btn ghost" id="sptvDrop">Discard</button>
+      <button class="btn amber" id="sptvSave">Save to Growth</button>
+    </div>`);
+
+  bg.querySelector('#sptvDrop').onclick = () => bg.remove();
+  bg.querySelector('#sptvSave').onclick = async e => {
+    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    const { error } = await sb.from('measurements').insert({
+      athlete_id: SPT.subject.id, metric_key: d.key, value: result.elapsedS, unit: 's',
+      measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,
+      note: `On-device calibrated sprint capture, ${d.label} — ${result.speedMph} mph`,
+    });
+    if(error){
+      console.error(error);
+      toast('Could not save that');
+      e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
+    }
+    logUsageEvent('scan_sprint_saved');
+    bg.remove(); toast('Saved'); renderApp('growth');
   };
 }

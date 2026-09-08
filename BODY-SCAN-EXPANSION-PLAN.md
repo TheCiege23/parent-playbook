@@ -181,7 +181,16 @@ Neither of these needs the athlete to cover a measured distance, so neither need
 anything beyond point the phone and record — the same "no equipment the phone can't see" bar the
 jump MVP already holds itself to.
 
-### Phase 2 — real sprint speed, bigger lift, worth naming honestly
+### Phase 2 — real sprint speed, bigger lift, worth naming honestly — **shipped 2026-09-08**
+
+> One design decision changed from the original scope below, worth flagging: calibration was
+> planned as tapping the start/finish line in a live preview *before* recording. That turned out to
+> assume a live camera preview this app has never had — every capture here hands the screen to the
+> native camera app, which owns it entirely until the recording is done. What actually shipped taps
+> the two marks on the *already-recorded* clip, played back in an ordinary `<video>` element, after
+> the fact. Same distance-measured-by-a-parent input, same crossing-time math, no live-preview
+> overlay ever needed. See `js/sprint-measure.js` and the "CALIBRATED VIDEO" section of
+> `js/sprint-scan.js`.
 
 A true speed number (yards/sec, a 10-yard-split-style time) needs **distance ÷ time**, and time-of-
 flight tricks don't apply to a body translating across the ground — there's no formula that
@@ -223,6 +232,11 @@ already shipped, and it's the same size of effort as the vertical jump build. Tr
 (calibrated sprint speed) as its own scoped decision once Phase 1 is live and you've seen how
 parents actually use it. Treat **catches/shooting/defense** as a Part-1-style vendor/capability
 evaluation, not a build, until that evaluation happens.
+
+**Status:** Phase 1 shipped 2026-09-08. Phase 2 shipped 2026-09-08, as item 5 of the "improve this
+long-term" list — offered as a second method alongside the stopwatch (sprint-scan.js), not a
+replacement for it, since both save to the same metric and the same trend line. Catches/shooting/
+defense remain unstarted, unchanged from the evaluation above.
 
 ---
 

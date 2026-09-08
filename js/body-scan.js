@@ -1079,6 +1079,7 @@ async function fillScanConsents(){
     'ondevice-pose': 'Body scan',
     'ondevice-jump': 'Jump measurement',
     'ondevice-speed': 'Speed & footwork measurement',
+    'ondevice-sprint': 'Calibrated sprint speed',
   };
   const engineLabel = eng => ENGINE_LABELS[eng] || eng;
 
