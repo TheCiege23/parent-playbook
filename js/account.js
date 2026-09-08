@@ -85,6 +85,8 @@ async function screenAccount(){
           <div class="gt"><b>Drill library</b><span>Add and edit training content with its source</span></div><i>›</i></div>
         <div class="navrow" id="adminCamps" role="button" tabindex="0"><div class="gi">🏕️</div>
           <div class="gt"><b>Camps &amp; programs review</b><span>Approve or reject submitted listings</span></div><i>›</i></div>
+        <div class="navrow" id="adminTeamConnectSafety" role="button" tabindex="0"><div class="gi">🛟</div>
+          <div class="gt"><b>Team Connect safety</b><span>Auto-flagged and parent-reported messages</span></div><i>›</i></div>
       </div>`:''}
 
       <div class="sec-title">Camps &amp; programs</div>
@@ -129,6 +131,7 @@ async function screenAccount(){
   go('adminQueue', openAdminQueue);
   go('adminDrills', openAdminDrills);
   go('adminCamps', openCampsAdminQueue);
+  go('adminTeamConnectSafety', openTeamConnectSafety);
   go('browseCamps', openCamps);
   go('submitCamp', openSubmitCamp);
   go('beTrainer', startTrainerOnboarding);

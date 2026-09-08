@@ -74,6 +74,8 @@ async function openTeamConnect(subject){
             color:var(--amber-ink,#8A5A16);margin:4px 0;display:inline-block">Announcement</span>`
             : u.kind==='nutrition' ? H`<span class="pill" style="margin:4px 0;display:inline-block">Nutrition</span>` : ''}
           <p style="font-size:14px;margin:4px 0 0;white-space:pre-wrap">${esc(u.body)}</p>
+          <button class="pill" data-report="${esc(u.id)}" style="background:transparent;color:var(--muted);
+            font-size:11.5px;padding:4px 0;margin-top:4px">Report this message</button>
         </div>`).join('')}
       </div>`
       : H`<p class="empty">No updates yet.</p>`}
@@ -93,6 +95,41 @@ async function openTeamConnect(subject){
   bg2.querySelector('#tcClose').onclick = () => bg2.remove();
   const inv = bg2.querySelector('#tcInvite');
   if(inv) inv.onclick = () => { bg2.remove(); openInvite(); };
+  bg2.querySelectorAll('[data-report]').forEach(b => {
+    b.onclick = () => openReportUpdate(b.getAttribute('data-report'));
+  });
+}
+
+// A named report on one specific message — separate from revoking a coach's access
+// entirely. A parent can flag something concerning without having to also cut off
+// future stats sharing in the same moment, and a report is visible to an admin
+// regardless of whether access ever gets revoked afterward.
+function openReportUpdate(updateId){
+  const bg = sheet(H`<h3>Report this message</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">This goes to our team for review, not to the
+      coach. If you're worried about immediate safety, contact local authorities first — this report is reviewed
+      by a person, not instantly.</p>
+    <div class="field"><label>What's concerning about it?</label>
+      <textarea id="repReason" rows="3" maxlength="1000"></textarea></div>
+    <div class="err" id="repErr"></div>
+    <button class="btn amber" id="repSend">Send report</button>`);
+  bg.querySelector('#repSend').onclick = async e => {
+    const reason = (bg.querySelector('#repReason').value||'').trim();
+    const err = bg.querySelector('#repErr'); err.textContent = '';
+    if(!reason){ err.textContent = 'Say a bit about what concerned you.'; return; }
+    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    const { error } = await sb.from('coach_update_reports').insert({
+      update_id: updateId, reported_by: state.user.id, reason,
+    });
+    if(error){
+      console.error(error);
+      err.textContent = 'Could not send that.';
+      e.target.innerHTML = 'Send report'; e.target.disabled = false;
+      return;
+    }
+    bg.remove();
+    toast('Reported — our team will review it');
+  };
 }
 
 async function screenCoach(){
@@ -203,4 +240,107 @@ async function screenCoach(){
     toast('Sent');
     screenCoach();
   };
+}
+
+// ===================================================================
+//  ADMIN — Team Connect safety review
+// ===================================================================
+// Two independent signals feed one queue: a message the server-side keyword trigger
+// flagged on its own (private.flag_coach_update(), see the migration), and a message a
+// parent named specifically via "Report this message". Neither implies the other —
+// an auto-flag with no report is still worth a human look, and a report on a message
+// the trigger didn't catch is exactly why the report path exists at all.
+async function openTeamConnectSafety(){
+  document.body.classList.remove('auth'); setAppBg();
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+
+  let flagged = [], reports = [];
+  try{
+    const [{ data: f, error: fe }, { data: r, error: re }] = await Promise.all([
+      sb.from('coach_updates').select('id,athlete_id,sender_id,kind,body,created_at,admin_reviewed')
+        .eq('auto_flagged', true).eq('admin_reviewed', false)
+        .order('created_at', { ascending:false }).limit(100),
+      sb.from('coach_update_reports').select('id,update_id,reported_by,reason,status,created_at')
+        .eq('status','open').order('created_at', { ascending:false }).limit(100),
+    ]);
+    if(fe) throw fe; if(re) throw re;
+    flagged = f||[]; reports = r||[];
+  }catch(err){ console.error(err); return adminError(openTeamConnectSafety); }
+
+  // Reports point at coach_updates by id — fetch those bodies too, so a report reads
+  // with its actual message content rather than just a reason and an opaque id.
+  const reportUpdateIds = Array.from(new Set(reports.map(r=>r.update_id)));
+  let reportUpdates = {};
+  if(reportUpdateIds.length){
+    const { data: ru } = await sb.from('coach_updates')
+      .select('id,athlete_id,sender_id,kind,body,created_at').in('id', reportUpdateIds);
+    (ru||[]).forEach(u => reportUpdates[u.id] = u);
+  }
+
+  const athleteIds = Array.from(new Set([
+    ...flagged.map(u=>u.athlete_id), ...Object.values(reportUpdates).map(u=>u.athlete_id),
+  ]));
+  const senderIds = Array.from(new Set([
+    ...flagged.map(u=>u.sender_id), ...Object.values(reportUpdates).map(u=>u.sender_id),
+  ]));
+  const [{ data: athletes }, { data: senders }] = await Promise.all([
+    athleteIds.length ? sb.from('athletes').select('id,first_name').in('id', athleteIds) : Promise.resolve({data:[]}),
+    senderIds.length ? sb.from('guardians').select('id,display_name').in('id', senderIds) : Promise.resolve({data:[]}),
+  ]);
+  const athleteName = id => (athletes||[]).find(a=>a.id===id)?.first_name || 'Unknown athlete';
+  const senderName = id => ((senders||[]).find(s=>s.id===id)?.display_name||'').trim() || 'Unknown sender';
+
+  const flaggedCards = flagged.map(u => H`<div class="card app-pad" style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">Auto-flagged</b>
+      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(u.created_at.slice(0,10)))}</span></div>
+    <p style="font-size:12.5px;color:var(--muted);margin:4px 0">${esc(athleteName(u.athlete_id))} · from ${esc(senderName(u.sender_id))}</p>
+    <p style="font-size:14px;margin:6px 0;white-space:pre-wrap">${esc(u.body)}</p>
+    <button class="btn sm ghost" data-clearflag="${esc(u.id)}">Reviewed — clear flag</button>
+  </div>`).join('');
+
+  const reportCards = reports.map(r => { const u = reportUpdates[r.update_id]; return H`<div class="card app-pad" style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">Reported by a parent</b>
+      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(r.created_at.slice(0,10)))}</span></div>
+    ${u?H`<p style="font-size:12.5px;color:var(--muted);margin:4px 0">${esc(athleteName(u.athlete_id))} · from ${esc(senderName(u.sender_id))}</p>
+      <p style="font-size:14px;margin:6px 0;white-space:pre-wrap">${esc(u.body)}</p>`
+      :H`<p style="font-size:12.5px;color:var(--muted);margin:4px 0">Original message no longer available.</p>`}
+    <p style="font-size:12.5px;margin:6px 0"><b>Reason given:</b> ${esc(r.reason)}</p>
+    <div class="row2">
+      <button class="btn sm ghost" data-dismiss="${esc(r.id)}">Dismiss</button>
+      <button class="btn sm" data-reviewed="${esc(r.id)}">Mark reviewed</button>
+    </div>
+  </div>`; }).join('');
+
+  root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h1 style="font-size:22px">Team Connect safety</h1>
+      <button class="pill" id="tcsDone">Done</button>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px">${flagged.length} auto-flagged · ${reports.length} reported</p>
+    <div class="sec-title">Reported by a parent</div>
+    ${reportCards || H`<div class="card app-pad"><div class="empty">Nothing open.</div></div>`}
+    <div class="sec-title" style="margin-top:18px">Auto-flagged, not yet reported</div>
+    ${flaggedCards || H`<div class="card app-pad"><div class="empty">Nothing pending.</div></div>`}
+  </div>`;
+
+  $("#tcsDone").onclick = () => renderApp('profile');
+  root.querySelectorAll('[data-clearflag]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('coach_updates').update({ admin_reviewed:true }).eq('id', b.getAttribute('data-clearflag'));
+    if(error){ console.error(error); toast('Could not update that'); return; }
+    openTeamConnectSafety();
+  });
+  root.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('coach_update_reports')
+      .update({ status:'dismissed', reviewed_by:state.user.id, reviewed_at:new Date().toISOString() })
+      .eq('id', b.getAttribute('data-dismiss'));
+    if(error){ console.error(error); toast('Could not update that'); return; }
+    openTeamConnectSafety();
+  });
+  root.querySelectorAll('[data-reviewed]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('coach_update_reports')
+      .update({ status:'reviewed', reviewed_by:state.user.id, reviewed_at:new Date().toISOString() })
+      .eq('id', b.getAttribute('data-reviewed'));
+    if(error){ console.error(error); toast('Could not update that'); return; }
+    openTeamConnectSafety();
+  });
 }

@@ -288,3 +288,46 @@ marketplace's screening-vendor relationship.
    to the three open questions.
 4. **Part E (league/roster integrations)** — researched, schema groundwork laid (2026-09-08), gated
    on Part D shipping and a real SportsEngine pilot organization.
+5. **Part F (moderation)** — done, shipped 2026-09-08. See below.
+
+---
+
+## Part F — Team Connect moderation: shipped
+
+**Prompted by** item 4 of the "10 ways to improve this long-term" list: Team Connect is the one
+place in this app where an adult who isn't a guardian communicates about a child, and the nutrition
+disclaimer alone isn't a safety net for anything outside nutrition content.
+
+Two independent layers, matching the two ways a concerning message could otherwise go unnoticed —
+nobody happens to be looking, or somebody notices but the only recourse was revoking access
+entirely rather than naming what was wrong:
+
+**Automatic, server-side flagging.** A `BEFORE INSERT` trigger on `coach_updates`
+(`private.flag_coach_update()`) checks the message body against two pattern sets: high-signal terms
+with no innocent reading in this channel (self-harm/crisis language, requests for explicit images),
+and phrase-combinations that are only concerning together, not as individual words (secrecy language
+— "our secret," "don't tell your parents" — combined with isolation language — "meet me alone,"
+"come alone"). Deliberately a trigger, not a client-side check: the same reasoning behind every RLS
+policy in this project — a check the client could skip isn't a real check. Verified against real
+inserts (not just the regex in isolation): an ordinary coaching message came back `auto_flagged:
+false`, a scripted concerning one came back `true`, test rows removed after. False positives are
+the accepted failure mode (an admin looks at an innocent message and dismisses it) — the pattern
+list errs toward catching more, not fewer, and single ordinary words (secret, alone, drugs, between
+us) never trigger on their own, only in the specific combined phrases that have no good-faith reading.
+
+**A named report, separate from revoking access.** Every message a guardian can read carries a
+"Report this message" action (`coach_update_reports`) — the coach who sent it cannot report or
+dismiss their own message (enforced by RLS reading from `can_view_athlete()`, not
+`can_coach_view_athlete()`). Reporting doesn't require also revoking the coach's access in the same
+moment; a parent can flag something concerning while deciding separately whether to end the
+relationship.
+
+**One admin queue, two sources.** `openTeamConnectSafety()` (Account → Admin → "Team Connect
+safety") shows both: messages the trigger flagged with no report yet, and reports a parent filed —
+neither implies the other, so both need a place to land. Reviewing an auto-flag clears it
+(`admin_reviewed`); a report can be marked reviewed or dismissed, both actions timestamped and
+attributed to the reviewing admin.
+
+**What this is not:** a substitute for human judgment, and not claimed to be. It's a coarse,
+honest, tamper-proof first pass — the same "reject rather than guess, and say so" discipline the
+scan engines use, applied to text instead of a measurement.
