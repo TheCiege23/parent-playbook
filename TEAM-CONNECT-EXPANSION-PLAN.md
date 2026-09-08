@@ -220,6 +220,64 @@ written, the same way the three Part C questions got answered before that table 
 
 ---
 
+## Part E — League/roster system integrations: researched, groundwork laid, not built
+
+**Prompted by** item 2 of the "10 ways to improve this long-term" list: reduce the actual onboarding
+friction for an organization by importing rosters/schedules from the software a league already
+runs on, instead of re-entering everything by hand into a Parent Playbook-specific roster (Part D).
+
+**This is honestly blocked on two things, in order:** the Part D schema (there's no roster to sync
+*into* until organizations exist as a real access tier), and a genuine partner relationship or OAuth
+app registration with whichever platform gets targeted first — not something buildable from inside
+this environment without live credentials, the same category of limit Stripe Connect for the trainer
+marketplace already sits behind.
+
+### What's actually true about each platform (researched, not assumed)
+
+| Platform | API reality | Verdict |
+|---|---|---|
+| **SportsEngine** | Real, public GraphQL API with OAuth2. Existing SportsEngine customers get API credentials automatically with their account — no separate partnership needed with SportsEngine itself, just the org's own key. Full developer docs and a browser-based query explorer exist. | **The credible first target.** Self-serve for any org that's already a SportsEngine customer, which a meaningful share of youth leagues (hockey, baseball, soccer especially) already are. |
+| **LeagueApps** | Has an API, but the public material reads as partner-program-gated (a "Rolls Out API to Our Partners" framing, and a structured integration-partner program built with Pandium) rather than open self-serve. | Plausible second target, but likely needs a real partnership conversation, not just an API key. |
+| **TeamSnap** | No self-serve API developer path found. Their public "Partnerships and Integrations" page describes existing integrated partners, not an open developer program. | Not pursuable without a direct partnership conversation with TeamSnap — deprioritized until one exists. |
+
+### Why nothing gets built against SportsEngine's API today, even though it's the credible option
+
+Building and shipping an integration nobody can log into isn't real progress — it's an unverified
+code path masquerading as a feature. Confirming it actually works needs a real SportsEngine
+organization's credentials to test against, which means this specific piece genuinely waits on you
+(register a developer app once a pilot org is identified) rather than being something to build ahead
+of that.
+
+### What's safe to do now, and has been
+
+A small, verifiable schema addition — not a sync, not a parser, just a place for a future sync to
+write to so it doesn't need a redesign later:
+
+```sql
+alter table athlete_sports add column external_source text;   -- e.g. 'sportsengine'
+alter table athlete_sports add column external_ref   text;    -- the platform's own event/team id
+create unique index athlete_sports_external_idx
+  on athlete_sports(external_source, external_ref) where external_source is not null;
+```
+
+The unique index is what makes a future sync **idempotent** — re-running an import against the same
+external event upserts instead of duplicating, which is the actual hard part of any roster sync to
+get right, and cheap to guarantee now while nothing depends on it yet.
+
+**Deliberately not built:** any CSV or text-paste import as a stand-in. Real league schedule exports
+are inconsistent enough in practice that a parser built without real sample files to test against
+would be a guess wearing a feature's clothes — worse than not offering one, the same reasoning that
+already keeps this app from estimating body composition or fabricating a value it can't back up.
+
+### Recommended next step
+
+Nothing to build until Part D has a schema. When you're ready to pursue this for real: identify one
+pilot organization already on SportsEngine, and the actual next action is registering a developer
+app against their org — that's a founder step, not an engineering one, the same shape as the
+marketplace's screening-vendor relationship.
+
+---
+
 ## Recommended build order
 
 1. **Part A (camps)** and **Part B (Team Connect access)** — done, shipped 2026-09-08.
@@ -228,3 +286,5 @@ written, the same way the three Part C questions got answered before that table 
    announcements share the thread with a visual tag).
 3. **Part D (organizations)** — scoped above, landing pages live, schema/RLS work gated on answers
    to the three open questions.
+4. **Part E (league/roster integrations)** — researched, schema groundwork laid (2026-09-08), gated
+   on Part D shipping and a real SportsEngine pilot organization.
