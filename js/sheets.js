@@ -188,11 +188,26 @@ function toE164(raw){
 }
 
 function openInvite(){
+  const kids = state.athletes||[];
+  const multi = kids.length>1;
   const nm=esc(state.active.first_name);
   const bg=sheet(H`<h3>Invite someone to help</h3>
-    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${nm} only.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${multi?H`whoever you pick below`:H`${nm} only`}.</p>
     <div class="teach" style="margin-top:12px"><div class="ic">🎓</div><div><h4>You stay in control</h4>
       <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit. You can revoke any invite anytime.</p></div></div>
+
+    ${multi?H`<div class="field"><label>Who is this for?</label>
+      <div id="kidPick" style="display:flex;flex-direction:column;gap:8px">
+        ${kids.map(a=>H`<label class="kidrow" style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+          border:1px solid var(--line);border-radius:12px;cursor:pointer">
+          <input type="checkbox" data-kid="${esc(a.id)}" ${a.id===state.active.id?'checked':''} style="width:18px;height:18px;flex:0 0 auto"/>
+          <span class="avatar" style="width:28px;height:28px;font-size:13px;border-radius:9px">${esc((a.first_name||'?')[0].toUpperCase())}</span>
+          <span>${esc(a.first_name)}</span>
+        </label>`).join('')}
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Check as many as you want — one invite goes
+        out for each, so accepting one never hands over a sibling's data too.</p></div>`:''}
+
     <div class="field"><label>Access level</label>
       <div class="chipgrid" id="role" style="grid-template-columns:1fr 1fr">
         <div class="chip on" data-r="family_view">Family view</div>
@@ -226,11 +241,22 @@ function openInvite(){
     bg.querySelector('#fPhone').hidden = chan!=='text';
     bg.querySelector('#fEmail').hidden = chan!=='email';
   });
+  // The row is the hit target, not just the box — same idiom as every other pick-list
+  // in this app, and a lot easier to tap accurately than an 18px checkbox on a phone.
+  bg.querySelectorAll('.kidrow').forEach(row=>{
+    const box=row.querySelector('input[type=checkbox]');
+    row.onclick=e=>{ if(e.target!==box) box.checked=!box.checked; };
+  });
 
   bg.querySelector('#gen').onclick=async(e)=>{
     const btn=e.target; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
     const errEl=bg.querySelector('#inverr'); errEl.textContent='';
     const stop=msg=>{ errEl.textContent=msg; btn.innerHTML='Create invite'; btn.disabled=false; };
+
+    const kidIds = multi
+      ? Array.from(bg.querySelectorAll('#kidPick input:checked')).map(i=>i.dataset.kid)
+      : [state.active.id];
+    if(!kidIds.length) return stop('Pick at least one child.');
 
     const email = chan==='email' ? (bg.querySelector('#invEmail').value||'').trim() : '';
     let phone = null;
@@ -244,83 +270,108 @@ function openInvite(){
       if(!/.+@.+\..+/.test(email)) return stop("That email address doesn't look right.");
     }
 
-    const { data, error } = await sb.from('athlete_invites')
-      .insert({ athlete_id:state.active.id, role,
-                invited_email:email||null, invited_phone:phone||null,
-                sent_via:chan }).select().single();
-    if(error){ console.error(error); reportError(error,'invite:create');
-      toast('Could not create link'); btn.textContent='Try again'; btn.disabled=false; return; }
-
-    // The code is issued for EVERY invite, including a link the parent copies by hand.
-    // The link on its own used to be the whole credential, which meant one forwarded
-    // message handed a stranger standing access to a child's photos. Now the link gets
-    // them to a door and the code opens it.
-    let code=null;
-    try{
-      const { data:c, error:ce } = await sb.rpc('issue_invite_code',{ p_invite_id:data.id });
-      if(ce) throw ce;
-      code=c;
-    }catch(err){
-      // Not fatal: an invite with no code still works exactly as it did last week. Say
-      // so rather than pretending there is a code the recipient will be asked for.
-      console.error(err); reportError(err,'invite:code');
-    }
-
-    const link=inviteLink(data.token);
-    const share = code
-      ? `Follow ${state.active.first_name}'s season on Parent Playbook: ${link}\n\nYour code is ${code}`
-      : `Follow ${state.active.first_name}'s season on Parent Playbook: ${link}`;
-
-    bg.querySelector('#linkout').innerHTML=H`
-      ${code?H`<div class="sec-title" style="margin-top:14px">Their code</div>
-        <div class="code-show">${esc(code)}</div>
-        <p style="font-size:11.5px;color:var(--muted);margin:0 2px 10px">Shown once. They'll be asked for it
-          after they open the link, so a forwarded message isn't enough on its own.</p>`:''}
-      <div class="linkbox"><span style="flex:1">${esc(link)}</span></div>`;
-
-    // Delivery is a convenience layered on top; the link and code exist either way, so a
-    // gateway failure must never read as a failed invite.
-    if(chan==='text' || chan==='email'){
-      btn.innerHTML='<span class="spinner"></span> Sending…';
-      const fn = chan==='text' ? 'send-invite-sms' : 'send-invite';
-      let sent=false, why='';
-      try{
-        const { data:r, error:se } = await sb.functions.invoke(fn,{ body:{ invite_id:data.id, code } });
-        if(se){
-          // supabase-js puts se.message at "Edge Function returned a non-2xx status
-          // code" for every failure — the actual reason the function wrote (missing
-          // Twilio config, its rejection message, an unregistered sender) lives in the
-          // response body, reachable only via se.context, a raw Response. Without this,
-          // every carefully-worded error the function returns is invisible here.
-          why = se.message || '';
-          try{
-            // Read as text first, not .json() directly — a response the function itself
-            // never wrote (a cold-start timeout, an infra-level gateway error page) isn't
-            // valid JSON, and .json() throwing there fell into this catch and left `why`
-            // at the generic supabase-js message with nothing to diagnose. Reading text
-            // works either way; only the interpretation of it branches.
-            const raw = se.context && typeof se.context.text==='function' ? await se.context.text() : null;
-            if(raw){
-              let body = null;
-              try{ body = JSON.parse(raw); }catch(_){}
-              why = (body && (body.message || body.error)) || raw.slice(0, 300);
-            }
-          }catch(_){}
-        }
-        else if(r && r.ok) sent=true;
-        else why=(r&&(r.message||r.error))||'';
-      }catch(err){ console.error(err); why=err.message||''; }
-      if(sent){ toast(chan==='text' ? 'Text sent' : 'Invite sent to '+email); }
-      else{
-        errEl.textContent = (chan==='text'
-          ? "We couldn't text it"
-          : "We couldn't email it")+(why?' ('+why+')':'')
-          +' — copy the message below and send it yourself instead.';
-        reportError(new Error(fn+' failed: '+why),'invite:send');
+    // One invite row per child, each with its OWN token and code — the loop is what's
+    // new here, but every invite it produces is exactly as narrow as the single-child
+    // flow always was. Accepting CJ's invite still never touches Savannah's.
+    if(chan==='text'||chan==='email') btn.innerHTML='<span class="spinner"></span> Sending…';
+    const results=[]; // { name, ok, sent, code, link, why, chan }
+    for(const kidId of kidIds){
+      const kid = kids.find(k=>k.id===kidId) || state.active;
+      const { data, error } = await sb.from('athlete_invites')
+        .insert({ athlete_id:kidId, role,
+                  invited_email:email||null, invited_phone:phone||null,
+                  sent_via:chan }).select().single();
+      if(error){
+        console.error(error); reportError(error,'invite:create');
+        results.push({ name:kid.first_name, ok:false, why:'Could not create the invite' });
+        continue;
       }
+
+      // The code is issued for EVERY invite, including a link the parent copies by hand.
+      // The link on its own used to be the whole credential, which meant one forwarded
+      // message handed a stranger standing access to a child's photos. Now the link gets
+      // them to a door and the code opens it.
+      let code=null;
+      try{
+        const { data:c, error:ce } = await sb.rpc('issue_invite_code',{ p_invite_id:data.id });
+        if(ce) throw ce;
+        code=c;
+      }catch(err){
+        // Not fatal: an invite with no code still works exactly as it did last week. Say
+        // so rather than pretending there is a code the recipient will be asked for.
+        console.error(err); reportError(err,'invite:code');
+      }
+
+      const link=inviteLink(data.token);
+      let sent=false, why='';
+      // Delivery is a convenience layered on top; the link and code exist either way, so a
+      // gateway failure must never read as a failed invite.
+      if(chan==='text' || chan==='email'){
+        const fn = chan==='text' ? 'send-invite-sms' : 'send-invite';
+        try{
+          const { data:r, error:se } = await sb.functions.invoke(fn,{ body:{ invite_id:data.id, code } });
+          if(se){
+            // supabase-js puts se.message at "Edge Function returned a non-2xx status
+            // code" for every failure — the actual reason the function wrote (missing
+            // Twilio config, its rejection message, an unregistered sender) lives in the
+            // response body, reachable only via se.context, a raw Response. Without this,
+            // every carefully-worded error the function returns is invisible here.
+            why = se.message || '';
+            try{
+              // Read as text first, not .json() directly — a response the function itself
+              // never wrote (a cold-start timeout, an infra-level gateway error page) isn't
+              // valid JSON, and .json() throwing there fell into this catch and left `why`
+              // at the generic supabase-js message with nothing to diagnose. Reading text
+              // works either way; only the interpretation of it branches.
+              const raw = se.context && typeof se.context.text==='function' ? await se.context.text() : null;
+              if(raw){
+                let body = null;
+                try{ body = JSON.parse(raw); }catch(_){}
+                why = (body && (body.message || body.error)) || raw.slice(0, 300);
+              }
+            }catch(_){}
+          }
+          else if(r && r.ok) sent=true;
+          else why=(r&&(r.message||r.error))||'';
+        }catch(err){ console.error(err); why=err.message||''; }
+        if(!sent) reportError(new Error(fn+' failed: '+why),'invite:send');
+      }
+      results.push({ name:kid.first_name, ok:true, sent, code, link, why, chan });
     }
 
-    btn.textContent='Copy the message';
+    const ok = results.filter(r=>r.ok);
+    const sentCount = ok.filter(r=>r.sent).length;
+
+    bg.querySelector('#linkout').innerHTML = results.map(r=>{
+      if(!r.ok) return H`<div class="err" style="margin-top:10px">${esc(r.name)}: ${esc(r.why)}</div>`;
+      return H`<div style="margin-top:14px">
+        ${multi?H`<div class="sec-title">${esc(r.name)}</div>`:''}
+        ${r.code?H`<div class="sec-title" style="margin-top:${multi?4:14}px">Their code</div>
+          <div class="code-show">${esc(r.code)}</div>
+          <p style="font-size:11.5px;color:var(--muted);margin:0 2px 10px">Shown once. They'll be asked for it
+            after they open the link, so a forwarded message isn't enough on its own.</p>`:''}
+        <div class="linkbox"><span style="flex:1">${esc(r.link)}</span></div>
+        ${(r.chan==='text'||r.chan==='email')&&!r.sent
+          ?H`<p style="font-size:11.5px;color:var(--danger);margin:6px 2px 0">Couldn't send automatically
+              (${esc(r.why||'gateway error')}) — copy this and send it yourself.</p>`:''}
+      </div>`;
+    }).join('');
+
+    if(!ok.length) return stop('Nothing went through — try again.');
+    if(chan==='text'||chan==='email'){
+      if(sentCount===ok.length) toast(ok.length>1 ? `Sent ${sentCount} invites`
+        : (chan==='text'?'Text sent':'Invite sent to '+email));
+      else if(sentCount>0) toast(`${sentCount} of ${ok.length} sent — copy the rest below`);
+      else errEl.textContent = "Couldn't send automatically — copy the message"+(ok.length>1?'s':'')+" below and send "+(ok.length>1?'them':'it')+" yourself.";
+    }
+
+    // Everything this run produced, in one paste — the fallback path a gateway failure
+    // (or "Just a link") always lands on, for one child or several.
+    const share = ok.map(r =>
+      `Follow ${r.name}'s season on Parent Playbook: ${r.link}` + (r.code?`\n\nYour code is ${r.code}`:'')
+    ).join('\n\n---\n\n');
+
+    btn.textContent = ok.length>1 ? 'Copy the messages' : 'Copy the message';
     btn.disabled=false;
     btn.onclick=()=>{ navigator.clipboard?.writeText(share);
       toast('Copied — paste it into a text'); };

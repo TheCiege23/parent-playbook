@@ -772,6 +772,7 @@ async function finishOnboarding(){
     state.active = state.athletes.find(a=>a.id===athleteId) || state.athletes[0];
     toast('Profile created 🎉');
     renderApp('week');
+    nudgeGrowthScan(athleteId);
   }catch(err){
     console.error(err);
     reportError(err,'onboarding:finish');
@@ -779,5 +780,29 @@ async function finishOnboarding(){
     if(btn){ btn.innerHTML=label; btn.disabled=false; }
     else { toast("Could not save the profile — try again"); obStep(); }
   }
+}
+
+// The earliest a scan can honestly be offered. Onboarding deliberately asks for no
+// height or weight at intake (see the note above the abandoned measurement seed) and
+// the scan itself refuses to run without one already on file (body-scan.js needs a
+// taped height to scale proportions into inches) — so this can't live any earlier than
+// right after the profile exists. One sheet, shown once, right behind the week that
+// just rendered; "Not now" costs nothing; Growth offers the same two things again later.
+function nudgeGrowthScan(athleteId){
+  const a = (state.athletes||[]).find(x=>x.id===athleteId);
+  const nm = esc(a && a.first_name || 'your athlete');
+  const bg = sheet(H`<h3>One more thing</h3>
+    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Add ${nm}'s height and you can try the body
+      scan — four photos, on this phone, for wingspan, reach and leg length. Both live in Growth, whenever you're
+      ready.</p>
+    <div class="teach" style="margin-top:12px"><div class="ic">📏</div><div><h4>Starts with a real height</h4>
+      <p>Against a door frame, shoes off — thirty seconds. That's the number everything else scales against.</p>
+      </div></div>
+    <button class="btn amber" id="nudgeGo" style="margin-top:16px">Go to Growth</button>
+    <div style="text-align:center;margin-top:12px">
+      <button class="pill" id="nudgeLater" style="background:transparent;color:var(--muted)">Not now</button>
+    </div>`);
+  bg.querySelector('#nudgeLater').onclick=()=>bg.remove();
+  bg.querySelector('#nudgeGo').onclick=()=>{ bg.remove(); renderApp('growth'); };
 }
 
