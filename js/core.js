@@ -34,6 +34,17 @@ function toast(msg){
   const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
   setTimeout(()=>t.remove(),2600);
 }
+// ---------- usage telemetry ----------
+// Aggregate, first-party, non-identifying: a daily count per feature, never a user, a
+// child, or a session. This is NOT the third-party analytics / session recording
+// privacy.html promises the product doesn't do — it's a separate, disclosed practice
+// (see privacy.html's "Aggregate feature usage" section). Fire-and-forget: a metrics
+// call must never be able to break, slow, or be noticed by the screen that triggered
+// it, so failures are swallowed silently rather than surfaced or retried.
+function logUsageEvent(key){
+  try{ sb.rpc('log_usage_event', { p_key: key }).then(()=>{}, ()=>{}); }catch(e){}
+}
+
 function ageFrom(bd){ if(!bd) return null;
   // Parse 'YYYY-MM-DD' as a LOCAL date (new Date('YYYY-MM-DD') is UTC midnight,
   // which reads back as the previous day in western timezones → age off by one).

@@ -98,10 +98,14 @@
 <p>We use your family's information for exactly one purpose: <b>to build and show your child's training plan, and to track the progress you choose to record.</b> That includes sending you account emails (confirmation, password reset, co-parent invitations) and notifications you have opted into.</p>
 <p>We do <b>not</b> use it for advertising, profiling, resale, or to train machine-learning models.</p>
 
+<h2>Aggregate feature usage</h2>
+<p>We keep a running daily count of which parts of the app get used — for example, "the body scan was opened 40 times today." Each count is a single number attached to a feature name and a date. Nothing else is attached to it: no account, no child, no device, no IP address, and no way to work backward from a count to a person. This is not the third-party analytics, tracking pixels, or session recording described above — it never leaves our own database, no outside company ever sees it, and it cannot show what any individual did. It exists only to tell us which parts of the app are actually useful, so we can build more of what helps and less of what doesn't.</p>
+
 <h2>Who can see your child's profile</h2>
 <ul>
   <li><b>You.</b></li>
   <li><b>Adults you explicitly invite</b> — a co-parent, a grandparent — using an invite link you generate. You can revoke their access at any time.</li>
+  <li><b>A coach or trainer you invite through Team Connect</b> sees a deliberately narrower slice — age, sport, and measurements only. Never games, journey entries, or photos, and never anyone you haven't personally invited. This access is enforced the same way as everything else on this page: at the database level, not just hidden in the app, and revocable by you at any time.</li>
   <li><b>Nobody else.</b> Profiles are not public, not searchable, and not shared between families.</li>
 </ul>
 <p>Access is enforced in our database itself, not merely hidden in the app: every table carries row-level security rules, so a request for another family's data is refused by the database regardless of what the app asks for.</p>

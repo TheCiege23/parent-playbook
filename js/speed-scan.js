@@ -76,6 +76,7 @@ async function openReactionScan(subject){ return spdOpen('reaction', subject); }
 async function openFootworkScan(subject){ return spdOpen('footwork', subject); }
 
 async function spdOpen(mode, subject){
+  logUsageEvent(mode === 'reaction' ? 'scan_reaction_started' : 'scan_footwork_started');
   SPD.videoBlob = null; SPD.consent = false; SPD.consentId = null; SPD.mode = mode;
   SPD.subject = subject || state.active;
   if(!SPD.subject || !SPD.subject.id) return;
@@ -436,6 +437,7 @@ function spdResult(result){
       toast('Could not save that');
       e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
     }
+    logUsageEvent(isReaction ? 'scan_reaction_saved' : 'scan_footwork_saved');
     bg.remove(); toast('Saved'); renderApp('growth');
   };
 }

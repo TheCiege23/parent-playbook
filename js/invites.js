@@ -229,6 +229,7 @@ async function acceptAndEnter(token, code){
     history.replaceState({},'',location.pathname);
     return renderInviteDead('Could not accept this invite', friendlyAcceptErr(m), token);
   }
+  logUsageEvent('invite_accepted');
   history.replaceState({},'',location.pathname);
   // Screen 2 — who this child is, what's next, and the install prompt. A grandparent
   // needs "Add to Home Screen" most and will find it least, so it goes here rather

@@ -6,6 +6,7 @@
 // household, password, notifications, export, legal, deletion, log out — moved one
 // level down into Account & settings, reachable but never in the way.
 async function screenProfile(){
+  logUsageEvent('view_profile');
   const a=state.active; const age=ageFrom(a.birthdate);
   const [{data:sports},{data:access},{data:invites},{data:doneRows}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),

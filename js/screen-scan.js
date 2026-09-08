@@ -10,6 +10,7 @@
 // — it's how some of Growth's numbers get filled in, and this screen says so rather than
 // pretending otherwise.
 async function screenScan(){
+  logUsageEvent('view_scan_hub');
   const a = state.active;
 
   const { data: recent } = await sb.from('measurements')

@@ -177,6 +177,7 @@ function renderAuth(mode='login', prefill=''){
           toast('You already have an account — please log in');
           return renderAuth('login', email);
         }
+        logUsageEvent('signup_completed');
         if(!res.data.session){ renderConfirmNotice(email); return; }
       } else {
         try{ localStorage.setItem('pp_last_email',email); }catch(e){}

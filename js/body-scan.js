@@ -295,6 +295,7 @@ const BS = { frames:{}, consent:false, subject:null, heightIn:null, consentId:nu
 // user id is not an athlete id. Nothing ever hit it, because no provider existed to
 // produce a result worth saving. Now one does.
 async function openBodyScan(subject){
+  logUsageEvent('scan_body_started');
   BS.frames = {}; BS.consent = false; BS.consentId = null; BS.heightIn = null;
   BS.subject = subject || state.active;
   if(!BS.subject || !BS.subject.id) return;
@@ -854,6 +855,7 @@ function bsResult(result){
       toast('Could not save that');
       e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
     }
+    logUsageEvent('scan_body_saved');
     close(); toast('Saved'); renderApp('growth');
   };
 }

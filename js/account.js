@@ -5,6 +5,7 @@
 // password, notifications, export, legal, deletion and log out all moved one level
 // down into this route. Reachable, never in the way.
 async function screenAccount(){
+  logUsageEvent('view_account');
   const a=state.active;
   const [{data:fam},{data:adminRows},{data:prefRows}] = await Promise.all([
     sb.from('families').select('id,name').limit(1),

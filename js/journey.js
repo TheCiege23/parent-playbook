@@ -73,6 +73,7 @@ function jrnTimeline(games, miles){
 }
 
 async function screenJourney(){
+  logUsageEvent('view_journey');
   const a=state.active;
   const [{data:sports},{data:games},{data:miles},{data:media},{data:access}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),

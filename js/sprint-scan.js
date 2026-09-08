@@ -44,6 +44,7 @@ const SPRINT_DISTANCES = [
 const SPT = { subject:null, distance:null, videoBlob:null };
 
 async function openSprintScan(subject){
+  logUsageEvent('scan_sprint_started');
   SPT.subject = subject || state.active;
   SPT.distance = null; SPT.videoBlob = null;
   if(!SPT.subject || !SPT.subject.id) return;
@@ -259,6 +260,7 @@ function sptResult(elapsedS, videoFile){
       toast('Could not save that');
       e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
     }
+    logUsageEvent('scan_sprint_saved');
     cleanup(); bg.remove(); toast('Saved'); renderApp('growth');
   };
 }

@@ -64,6 +64,7 @@ function trendBars(list, lowerIsBetter){
 }
 
 async function screenGrowth(){
+  logUsageEvent('view_growth');
   const a=state.active; const age=ageFrom(a.birthdate); const band=ageBand(age);
   const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow},{data:coachUp}] = await Promise.all([
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),

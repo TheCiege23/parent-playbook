@@ -8,6 +8,7 @@
 // weeks, never days — a day-level streak makes a rest day read as a loss, which is the
 // opposite of everything else this app says.
 async function screenWeek(){
+  logUsageEvent('view_week');
   const a=state.active; const age=ageFrom(a.birthdate);
   const weekStart=isoDay(mondayOfThisWeek()), weekEnd=dateForDayIndex(6);
   // far enough back for the streak counter; see weekStreak()

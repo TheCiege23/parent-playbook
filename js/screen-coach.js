@@ -40,6 +40,7 @@ async function renderCoachView(){
 //  Same table, same RLS, the other direction: a coach writes here, a guardian reads.
 // ---------------------------------------------------------------------------
 async function openTeamConnect(subject){
+  logUsageEvent('team_connect_viewed');
   const a = subject || state.active;
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
     <span class="spinner"></span><div>Loading…</div></div>`);
@@ -198,6 +199,7 @@ async function screenCoach(){
       e.target.innerHTML = 'Send to the family'; e.target.disabled = false;
       return;
     }
+    logUsageEvent('team_connect_update_sent');
     toast('Sent');
     screenCoach();
   };

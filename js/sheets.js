@@ -287,6 +287,7 @@ function openInvite(){
         results.push({ name:kid.first_name, ok:false, why:'Could not create the invite' });
         continue;
       }
+      if(role==='coach') logUsageEvent('team_connect_invite_sent');
 
       // The code is issued for EVERY invite, including a link the parent copies by hand.
       // The link on its own used to be the whole credential, which meant one forwarded

@@ -23,6 +23,7 @@ function campAges(c){
 let campSport = '';
 
 async function openCamps(){
+  logUsageEvent('camps_viewed');
   document.body.classList.remove('auth'); setAppBg();
   root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Finding camps…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
@@ -130,6 +131,7 @@ function openSubmitCamp(){
       e.target.innerHTML='Submit for review'; e.target.disabled=false;
       return;
     }
+    logUsageEvent('camp_submitted');
     bg.remove();
     toast('Submitted — we\'ll review it soon');
   };

@@ -56,6 +56,7 @@ function jmpInterruptedNotice(){
 // check, then either straight to setup or the release screen. No height requirement —
 // see js/jump-measure.js for why flight time needs none.
 async function openJumpScan(subject){
+  logUsageEvent('scan_jump_started');
   JMP.videoBlob = null; JMP.consent = false; JMP.consentId = null;
   JMP.subject = subject || state.active;
   if(!JMP.subject || !JMP.subject.id) return;
@@ -418,6 +419,7 @@ function jmpResult(result){
       toast('Could not save that');
       e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
     }
+    logUsageEvent('scan_jump_saved');
     bg.remove(); toast('Saved'); renderApp('growth');
   };
 }
