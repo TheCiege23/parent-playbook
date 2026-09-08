@@ -148,75 +148,77 @@ it into two features entirely.
 
 ---
 
-## Part D — Organization accounts: scoped, not built
+## Part D — Organization accounts: shipped 2026-09-08
 
 **Confirmed direction (2026-09-08):** an organization account is a real third tier above `coach` —
-not a bigger coach, a different shape of access spanning three things: a roster view across *many*
-athletes at once, oversight of which coaches connect to which of those athletes, and the ability to
-manage the org's own listings in the camps directory (Part A). **Signup stays invite-only**, same as
-coach — no self-serve org discovery, matching the decision already made for coaches/trainers.
+not a bigger coach, a different shape of access spanning two things: a roster view across *many*
+athletes at once, and oversight of which coaches connect to which of those athletes. (The third
+piece originally scoped — managing camps-directory listings as an org — was **not** built in this
+pass; it's a Part A extension, not answered by the three questions below, and would meaningfully
+grow the surface. Left as a future add, not silently dropped.)
 
-**Why this is genuinely bigger than Part B, not just "coach with more rows":** `coach` reads one
-athlete at a time, gated by one `athlete_access` row per relationship — the RLS model is a single
-per-athlete boolean check. An organization needs to read *across* a whole roster, which is a
-one-to-many relationship the current schema has no shape for, plus a second one-to-many for which
-coaches belong to the org. Both need their own junction tables and their own RLS functions — reusing
-`can_view_athlete()` or even `can_coach_view_athlete()` here would repeat the exact mistake Part B's
-migration caught and fixed: a shared, blanket-access function is how a new role accidentally inherits
-scope nobody meant to give it.
+**Answers to the three open questions (2026-09-08):**
+1. **Parent invites the org** — a parent adds their own athlete to a roster by entering a code, the
+   same shape as the existing coach-invite flow. Nobody lands on a roster without one; an org can
+   never discover or browse athletes.
+2. **Roster-wide table** — one screen shows every athlete on the roster and their latest stats at
+   once, not the per-athlete coach screen reused N times.
+3. **Connection only, not content** — an org admin sees *which* coaches are connected to which
+   roster athletes, never a coach's sent updates.
 
-### Proposed data model
+**What actually got built, and why it's smaller than the original proposal:** mid-build, a pre-existing
+`teams` / `team_memberships` schema turned up — already shipped, already used to prefill a team's
+sport/schedule during onboarding via a `join_code` (`team_by_code` / `team_code_used` RPCs), but the
+roster link itself (`team_memberships`) was never actually written to; onboarding only ever
+pre-filled fields from it. That scaffold already has exactly the shape question 1 needed (a
+parent-entered code, a roster join table), and `teams_ins` already let any guardian create their own
+team (`created_by = auth.uid()`) — the DB-level capability existed, only the UI didn't. Building a
+parallel `organizations` / `org_admins` / `org_athletes` schema on top of that would have duplicated
+it. So: **`teams.created_by` is the org admin — no separate `organizations` table, no `org_admins`
+table.** This mirrors how `coach` already works: a grant, not a distinct account type or signup path.
+No multi-admin support in v1 (YAGNI — nothing in the three answers asked for it; a `team_admins`
+table is a straightforward add later if a real org needs shared staff access).
 
-```
-organizations
-  id, name, contact_name, contact_email, created_by, created_at
+### What shipped
 
-org_admins
-  id, org_id, guardian_id, granted_at, revoked_at        -- who can administer this org
+- `private.can_org_view_athlete(ath)` — SECURITY DEFINER, mirrors `can_coach_view_athlete`'s shape:
+  true if `can_edit_athlete`, or the athlete has a `team_memberships` row on a team where
+  `teams.created_by = auth.uid()`.
+- New SELECT policies using it on `athletes`, `athlete_sports`, `measurements` — same three tables
+  `coach` reads, nothing more. Never `games`, journey, or photos.
+- `aa_select_org` on `athlete_access`: visible to a roster's org admin only where `role='coach'` —
+  the connection, never `coach_updates` (no org policy exists on that table at all, so RLS can't
+  leak it even by mistake).
+- `teams_read` tightened from `qual=true` (any authenticated user could read every team, including
+  every `join_code`, directly) to creator-or-roster-member only. Verified this breaks nothing live:
+  `team_by_code` / `team_code_used` are SECURITY DEFINER and already bypassed RLS.
+- `team_by_code` now also returns the team's `id` (it didn't before — no way to write a
+  `team_memberships` row without it).
+- Unique index on `teams.join_code` (case-insensitive) — didn't exist before; `team_by_code`'s
+  `limit 1` lookup would have silently resolved to the wrong team on a collision.
+- Onboarding now actually inserts a `team_memberships` row when a team code was applied (previously
+  it only pre-filled sport/schedule fields and never linked the child — see the removed comment in
+  `js/onboarding.js`).
+- `js/org.js` (new): join-with-code for any existing athlete (not just at onboarding), roster
+  creation, the roster-wide table, and per-athlete stat + connected-coach detail. Reached from
+  Account → "Team & organization" → "Join with a code" / "Your rosters" — visible to every guardian,
+  not admin-gated, matching that team/roster creation was already ungated at the DB layer.
+- `organizations.html` updated from "in design" to reflect that it's live.
 
-org_athletes
-  id, org_id, athlete_id, granted_by, granted_at, revoked_at   -- the roster, invite-only
-```
+Migration verified on a disposable Supabase branch before shipping (real fixtures, RLS checked by
+impersonating both an org-admin uid and an unrelated uid) — caught and fixed one real bug in the
+process: `aa_select_org`'s first draft queried `team_memberships` directly inside its own USING
+clause, which put it back under `team_memberships`'s *own* RLS (`can_view_athlete` only), so an org
+admin's check could never see the very membership row it needed. Fixed by routing through a second
+SECURITY DEFINER helper, `private.is_team_admin_for_athlete()`, same fix already proven correct for
+the other three policies.
 
-`athlete_access` gains a nullable `org_id` on `coach`-role rows only — set when a parent's invite to
-a coach was issued *through* an org relationship (e.g. "the team's trainer"), null for a coach
-invited independently. This is what lets an org admin see "which coaches connect to which of our
-athletes" without granting the org anything a plain `coach` row doesn't already have.
+### Not built in this pass
 
-`camps` already has `created_by` (Part A) — this adds a nullable `org_id`, and an org-admin RLS
-policy alongside the existing creator-based one, so an org can manage its own listings as a group
-rather than one parent owning each row alone.
-
-### The access ceiling, stated as a hard constraint
-
-An organization sees **exactly what a coach sees today, across more athletes** — age, sport,
-measurements. Never games, journey, or photos, for any athlete on the roster. This isn't a starting
-point to loosen later; it's the same boundary Part B already drew, just applied per-roster instead
-of per-athlete. `organizations.html` states this publicly on purpose, so it's a public commitment,
-not an internal note that quietly slips.
-
-### What's not decided yet, and needs a real answer before this is built
-
-1. **How does an athlete get onto an org's roster?** A parent inviting the org directly (same
-   mechanism as inviting a coach, new `role` value or a distinct invite type)? An org admin sending a
-   roster-join invite to a family? Both are invite-gated either way — this is about which side
-   initiates, which changes the onboarding flow more than the security model.
-2. **Can an org admin see individual measurement values across the whole roster at once**, or only
-   drill into one athlete at a time (same view as `screen-coach.js`, just reachable for more
-   athletes)? A roster-wide stats table is a materially bigger information display than reusing the
-   existing coach screen per-athlete, worth deciding deliberately rather than defaulting to whichever
-   is easier to build.
-3. **Does an org admin's oversight of "which coaches connect to which athletes" include seeing that
-   coach's sent updates**, or only the connection itself (coach X ↔ athlete Y) without the message
-   content? Defaulting to connection-only, not content, unless told otherwise — an org admin isn't a
-   party to the coach-to-family conversation just by administering the org.
-
-### Recommended next step
-
-Not a build yet. `coaches.html` and `organizations.html` are live as of this pass — the latter
-explicitly marked "in design, not live" with a feedback path (`support@chimaura.com`) rather than a
-working signup, so real prospective organizations can shape questions 1–3 above before the schema is
-written, the same way the three Part C questions got answered before that table was built.
+- Multi-admin per team/org (`team_admins` table) — add if a real org asks.
+- Org-managed camps listings (the third original scope item) — Part A extension, separate work.
+- A way for an org to remove an athlete from its own roster, or for a parent to leave one, from the
+  UI (the DB allows both `athlete_access`-style, but no screen exists yet for either).
 
 ---
 

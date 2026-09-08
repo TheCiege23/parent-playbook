@@ -89,6 +89,14 @@ async function screenAccount(){
           <div class="gt"><b>Team Connect safety</b><span>Auto-flagged and parent-reported messages</span></div><i>›</i></div>
       </div>`:''}
 
+      <div class="sec-title">Team &amp; organization</div>
+      <div class="card app-pad">
+        <div class="navrow" id="joinTeam" role="button" tabindex="0"><div class="gi">🔑</div>
+          <div class="gt"><b>Join with a code</b><span>Add your child to a team or organization's roster</span></div><i>›</i></div>
+        <div class="navrow" id="myOrg" role="button" tabindex="0"><div class="gi">🗂️</div>
+          <div class="gt"><b>Your rosters</b><span>Running a team, league, or club? See the whole roster in one place</span></div><i>›</i></div>
+      </div>
+
       <div class="sec-title">Camps &amp; programs</div>
       <div class="card app-pad">
         <div class="navrow" id="browseCamps" role="button" tabindex="0"><div class="gi">🏕️</div>
@@ -132,6 +140,8 @@ async function screenAccount(){
   go('adminDrills', openAdminDrills);
   go('adminCamps', openCampsAdminQueue);
   go('adminTeamConnectSafety', openTeamConnectSafety);
+  go('joinTeam', openJoinTeam);
+  go('myOrg', openMyOrg);
   go('browseCamps', openCamps);
   go('submitCamp', openSubmitCamp);
   go('beTrainer', startTrainerOnboarding);

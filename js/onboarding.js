@@ -1,7 +1,7 @@
 // ===================================================================
 //  ONBOARDING — teaching while collecting
 // ===================================================================
-const OB_BLANK = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:''}, sport:'', showAllSports:false, positions:[], level:'', seasonState:'', practiceDays:[], gameDay:null, seasonStart:null, goals:[], consents:{}, teamCode:'', teamName:'' };
+const OB_BLANK = { i:0, mode:'create', familyId:null, familyName:'', athlete:{first:'',bd:''}, sport:'', showAllSports:false, positions:[], level:'', seasonState:'', practiceDays:[], gameDay:null, seasonStart:null, goals:[], consents:{}, teamCode:'', teamName:'', teamId:null };
 const ob = { ...OB_BLANK };
 function obReset(patch){ Object.assign(ob, JSON.parse(JSON.stringify(OB_BLANK)), patch||{}); }
 const PARENT_EXP=[['','No'],['kid','As a kid'],['jr_high','Jr high'],['hs','High school'],['college','College'],['pro','Pro/elite']];
@@ -17,7 +17,7 @@ async function obApplyTeamCode(code){
   if(error){ console.error(error); return 'Could not check that code — try again.'; }
   const t=(data||[])[0];
   if(!t) return "We don't recognise that code. Check it with your coach.";
-  ob.teamCode=code; ob.teamName=t.name;
+  ob.teamCode=code; ob.teamName=t.name; ob.teamId=t.id;
   if(t.sport_key){ ob.sport=t.sport_key; ob.positions=[]; }
   if(t.level) ob.level=t.level;
   if(Array.isArray(t.practice_days)) ob.practiceDays=t.practice_days.map(Number);
@@ -279,7 +279,7 @@ function obSportBind(){
     if(inp) inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); apply(); } });
   }
   { const cl=$("#obTeamClear"); if(cl) cl.onclick=()=>{
-      ob.teamCode=''; ob.teamName=''; ob.practiceDays=[]; ob.gameDay=null; ob.seasonStart=null; obStep(); }; }
+      ob.teamCode=''; ob.teamName=''; ob.teamId=null; ob.practiceDays=[]; ob.gameDay=null; ob.seasonStart=null; obStep(); }; }
   $("#sports").querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     ob.sport = c.dataset.s; ob.positions=[]; ob.level=''; obStep();
   });
@@ -760,9 +760,17 @@ async function finishOnboarding(){
       const { error:me }=await sb.from('measurements').insert(seed);
       if(me){ console.error('measurement seed failed',me); reportError(me,'onboarding:measurement-seed'); }
     }
-    // Aggregate only — tells a coach how many families used the code, nobody who.
     if(ob.teamCode){
+      // Aggregate only — tells a coach how many families used the code, nobody who.
       try{ await sb.rpc('team_code_used',{ p_code:ob.teamCode }); }catch(e){ console.error(e); }
+      // Puts the child on the team's roster, which is what makes an organization's
+      // roster-wide view possible — the code used to only pre-fill fields. Best-effort:
+      // a failure here must not cost them the profile they just created, but it does
+      // mean they never land on the org's roster, so surface it rather than swallow it.
+      if(ob.teamId){
+        const { error:tme }=await sb.from('team_memberships').insert({ athlete_id:athleteId, team_id:ob.teamId });
+        if(tme){ console.error('team_memberships insert failed',tme); reportError(tme,'onboarding:team-membership'); }
+      }
       // Stop the stashed code re-applying to a sibling added later — that child may well
       // be on a different team, and a silently pre-filled wrong schedule is worse than none.
       clearTeamCode();
