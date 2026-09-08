@@ -201,28 +201,18 @@ async function screenGrowth(){
           :`<p class="empty">No goals yet — add one to shape the week.</p>`}
       </div>
 
-      <!-- The scan lives HERE, on the athlete it measures, and not in Account where it
-           used to sit pointed at the signed-in adult. Editors only: a grandparent with
-           family view cannot give a release for someone else's child. -->
-      ${state.canEdit?H`<div class="sec-title" style="margin-top:18px">Body scan</div>
-      <div class="card app-pad">
-        <div class="navrow" id="growScan" role="button" tabindex="0">
+      <!-- The trigger itself now lives on its own tab (Scan) so it isn't crammed onto
+           Growth alongside everything else — but the POINTER stays here, because these
+           numbers still land right back in this screen's trend bars the moment they're
+           saved. Editors only: a grandparent with family view cannot give a release for
+           someone else's child. -->
+      ${state.canEdit?H`<div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="growToScan" role="button" tabindex="0">
           <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8v3M10 8v5M14 8v3M18 8v5"/></svg></div>
-          <div class="gt"><b>Measure ${esc(a.first_name)} from four photos</b>
-            <span>Wingspan, reach, shoulders and leg length. Measured on this phone — the photos are never
-              uploaded and never saved.</span></div><i>›</i></div>
-      </div>
-      <p class="muted-note">Asks your permission first, and you can withdraw it in Account at any time.</p>
-
-      <div class="card app-pad" style="margin-top:10px">
-        <div class="navrow" id="growJump" role="button" tabindex="0">
-          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v10M12 4l-3.5 3.5M12 4l3.5 3.5"/><path d="M5 20c1.5-3 4-4 7-4s5.5 1 7 4"/></svg></div>
-          <div class="gt"><b>Measure ${esc(a.first_name)}'s vertical jump</b>
-            <span>About five seconds of video, three jumps. Measured on this phone — the video is never
-              uploaded and never saved.</span></div><i>›</i></div>
-      </div>
-      <p class="muted-note">A separate permission from the body scan — asks first, withdraw it in Account
-        anytime.</p>`:''}
+          <div class="gt"><b>Body scan & vertical jump</b>
+            <span>Four photos or a short video, measured on this phone — never uploaded, never saved.</span>
+            </div><i>›</i></div>
+      </div>`:''}
 
       ${primary?.sport_key==='football'?H`<div class="sec-title" style="margin-top:18px">Pop Warner divisions</div>
       <div class="card app-pad">
@@ -250,12 +240,9 @@ async function screenGrowth(){
   { const b=$("#growAsk"); if(b) b.onclick=()=>openGrowthInputs(grow||{}, primary||null); }
   // `a` is the athlete this screen is rendering — the subject of the scan, and the row
   // measurements will be written against.
-  { const s=$("#growScan");
-    if(s){ const open=()=>openBodyScan(a);
+  { const s=$("#growToScan");
+    if(s){ const open=()=>renderApp('scan');
       s.onclick=open; s.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
-  { const j=$("#growJump");
-    if(j){ const open=()=>openJumpScan(a);
-      j.onclick=open; j.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   // Predicted height stays folded until asked for — same idiom as the other collapsers.
   { const t=$("#phToggle"), l=$("#phBody");
     if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;

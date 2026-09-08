@@ -1,6 +1,6 @@
 // `account` is a route, not a tab — it has no nav button and lives one level under
 // Profile. It's in this list so the hash router and the Back button still handle it.
-const APP_TABS=['week','growth','journey','profile','account','activity'];
+const APP_TABS=['week','growth','scan','journey','profile','account','activity'];
 // Whether this guardian can WRITE for the active athlete. RLS is the real gate —
 // private.can_edit_athlete() only passes owner and co_parent — but the UI has to agree,
 // or family view is a screen full of controls that silently fail.
@@ -45,9 +45,9 @@ function ownerFirstName(){ return (state && state.ownerName) || 'Their parent'; 
 async function renderApp(tab, fromPop){
   document.body.classList.remove('auth'); setAppBg();
   await loadRole();
-  // Family view has no Growth tab: goals and measurements are things a parent DOES,
-  // and an empty read-only version of them is just a locked door.
-  if(!state.canEdit && tab==='growth') tab='week';
+  // Family view has no Growth or Scan tab: goals, measurements and starting a scan are
+  // things a parent DOES, and an empty read-only version of them is just a locked door.
+  if(!state.canEdit && (tab==='growth' || tab==='scan')) tab='week';
   // Keep the URL and the Back button in sync. Without this, Back exits the app
   // entirely — badly wrong in an installed PWA. Hash-based because this deploys as
   // static files with no rewrites, so /growth would 404 on refresh but #growth won't.
@@ -66,6 +66,7 @@ async function renderApp(tab, fromPop){
       <div class="sb-brand" aria-hidden="true"><span class="mk">P</span><b>Parent Playbook</b></div>
       ${navBtn('week','Week','M4 5h16M4 12h16M4 19h10')}
       ${state.canEdit?navBtn('growth','Growth','M4 19V5m0 14l6-6 4 4 6-8'):''}
+      ${state.canEdit?navBtn('scan','Scan','M4 8V4H8 M16 4H20V8 M4 16V20H8 M20 16V20H16'):''}
       ${navBtn('journey','Journey','M12 6.5C10 5 7 5 4 6v12c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V6c-3-1-6-1-8 .5z M12 6.5V19')}
       ${navBtn('profile','Profile','M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0')}
       <div class="sb-foot" aria-hidden="true">
@@ -77,6 +78,7 @@ async function renderApp(tab, fromPop){
   try{
     if(tab==='week') await screenWeek();
     else if(tab==='growth') await screenGrowth();
+    else if(tab==='scan') await screenScan();
     else if(tab==='journey') await screenJourney();
     else if(tab==='account') await screenAccount();
     else if(tab==='activity') await screenActivity();
