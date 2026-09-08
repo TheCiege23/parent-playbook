@@ -101,9 +101,9 @@
       <div class="lp-mark" aria-hidden="true">P</div>
       <span class="lp-word">Parent Playbook</span>
       <nav class="lp-nav" aria-label="Sections">
+        <a href="#progress" data-scroll="#progress">Track progress</a>
         <a href="#how" data-scroll="#how">How it works</a>
         <a href="#inside-week" data-scroll="#inside-week">Inside a week</a>
-        <a href="#progress" data-scroll="#progress">Track progress</a>
         <a href="#invite" data-scroll="#invite">Family access</a>
         <a href="#faq" data-scroll="#faq">FAQ</a>
       </nav>
@@ -166,6 +166,72 @@
               <span class="mk-t game">Game</span>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1b. progress & body scan -->
+    <section id="progress" class="lp-scanshow">
+      <div class="glow" aria-hidden="true"></div>
+      <div class="in">
+        <div>
+          <div class="lp-k lp-pill">The tech other apps don't have</div>
+          <h2>Measured with a phone. Not a guess.</h2>
+          <p class="sub">Four photos, on this phone — never a cloud, never a vendor's server. Parent Playbook works out wingspan, reach, shoulder width and leg length from a scan you take at home, and lines every number up against CDC growth data so a height means something. Length only, by design — chest and waist are refused outright, not filtered after the fact.</p>
+          <div class="lp-stats">
+            <div><b>0</b><span>photos ever uploaded</span></div>
+            <div><b>4</b><span>photos, about a minute</span></div>
+            <div><b>12 mo</b><span>retention, published upfront</span></div>
+          </div>
+          <p class="lp-fine" style="margin-top:22px;color:rgba(246,242,233,.6)">Built for BIPA, Texas CUBI and Washington's My Health My Data Act from day one — a signed release before every scan, one tap to withdraw it. The same phone also tracks a 40 time, a broad jump, a height — as a trend across five readings, never just today's number.</p>
+        </div>
+        <div class="scan-visual">
+        <div class="lp-phone" aria-hidden="true">
+          <div class="scr">
+            <div class="mk-bar"><span>9:41</span><span>▮▮▮</span></div>
+            <div class="mk-lab">On-device pose tracking</div>
+            <div style="flex:1;border:1.5px dashed var(--pp-line);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px 10px;text-align:center">
+              <svg width="146" height="240" viewBox="0 0 120 260" aria-hidden="true">
+                <circle cx="60" cy="28" r="16" fill="none" stroke="var(--pp-ink)" stroke-width="2"/>
+                <g stroke="var(--pp-green)" stroke-width="2.5" stroke-linecap="round" opacity=".85">
+                  <path d="M60 50 L34 58"/><path d="M60 50 L86 58"/>
+                  <path d="M34 58 L20 102"/><path d="M20 102 L14 144"/>
+                  <path d="M86 58 L100 102"/><path d="M100 102 L106 144"/>
+                  <path d="M60 50 L60 148"/>
+                  <path d="M60 148 L44 150"/><path d="M60 148 L76 150"/>
+                  <path d="M44 150 L42 202"/><path d="M42 202 L40 246"/>
+                  <path d="M76 150 L78 202"/><path d="M78 202 L80 246"/>
+                </g>
+                <g fill="var(--pp-amber)">
+                  <circle cx="60" cy="50" r="3.5"/><circle cx="34" cy="58" r="3.5"/><circle cx="86" cy="58" r="3.5"/>
+                  <circle cx="20" cy="102" r="3.5"/><circle cx="100" cy="102" r="3.5"/>
+                  <circle cx="14" cy="144" r="4"/><circle cx="106" cy="144" r="4"/>
+                  <circle cx="60" cy="148" r="3.5"/><circle cx="44" cy="150" r="3.5"/><circle cx="76" cy="150" r="3.5"/>
+                  <circle cx="42" cy="202" r="3.5"/><circle cx="78" cy="202" r="3.5"/>
+                  <circle cx="40" cy="246" r="4"/><circle cx="80" cy="246" r="4"/>
+                </g>
+              </svg>
+              <div>
+                <b style="font-family:'Archivo';font-size:14px">Every joint, mapped</b><br/>
+                <span style="font-size:11.5px;color:var(--pp-muted)">Shoulders, hips, knees — tracked in real time, on this phone.</span>
+              </div>
+            </div>
+            <p style="text-align:center;font-size:10.5px;color:var(--pp-muted);margin-top:10px">Stays on this device</p>
+          </div>
+        </div>
+        <div class="lp-trend">
+          <div class="lbl">Height percentile · last 6 months</div>
+          <svg viewBox="0 0 220 90" aria-hidden="true">
+            <polyline points="10,68 75,54 140,44 205,28" fill="none" stroke="var(--pp-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="10" cy="68" r="3" fill="rgba(246,242,233,.4)"/>
+            <circle cx="75" cy="54" r="3" fill="rgba(246,242,233,.4)"/>
+            <circle cx="140" cy="44" r="3" fill="rgba(246,242,233,.4)"/>
+            <circle cx="205" cy="28" r="4.5" fill="var(--pp-amber)"/>
+          </svg>
+          <div class="foot"><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span></div>
+          <div class="headline">58th → 62nd percentile</div>
+          <p style="margin:4px 0 0;font-size:12px;line-height:1.5;color:rgba(246,242,233,.6)">Same math a pediatrician uses. Not a score — just where he's tracking.</p>
+        </div>
         </div>
       </div>
     </section>
@@ -258,72 +324,6 @@
             <p>Log the game — score, stats, and photos into their journey.</p>
             <span class="lp-dt dt-journal">Journal</span>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4b. progress & body scan -->
-    <section id="progress" class="lp-scanshow">
-      <div class="glow" aria-hidden="true"></div>
-      <div class="in">
-        <div>
-          <div class="lp-k lp-pill">The tech other apps don't have</div>
-          <h2>Measured with a phone. Not a guess.</h2>
-          <p class="sub">Four photos, on this phone — never a cloud, never a vendor's server. Parent Playbook works out wingspan, reach, shoulder width and leg length from a scan you take at home, and lines every number up against CDC growth data so a height means something. Length only, by design — chest and waist are refused outright, not filtered after the fact.</p>
-          <div class="lp-stats">
-            <div><b>0</b><span>photos ever uploaded</span></div>
-            <div><b>4</b><span>photos, about a minute</span></div>
-            <div><b>12 mo</b><span>retention, published upfront</span></div>
-          </div>
-          <p class="lp-fine" style="margin-top:22px;color:rgba(246,242,233,.6)">Built for BIPA, Texas CUBI and Washington's My Health My Data Act from day one — a signed release before every scan, one tap to withdraw it. The same phone also tracks a 40 time, a broad jump, a height — as a trend across five readings, never just today's number.</p>
-        </div>
-        <div class="scan-visual">
-        <div class="lp-phone" aria-hidden="true">
-          <div class="scr">
-            <div class="mk-bar"><span>9:41</span><span>▮▮▮</span></div>
-            <div class="mk-lab">On-device pose tracking</div>
-            <div style="flex:1;border:1.5px dashed var(--pp-line);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px 10px;text-align:center">
-              <svg width="146" height="240" viewBox="0 0 120 260" aria-hidden="true">
-                <circle cx="60" cy="28" r="16" fill="none" stroke="var(--pp-ink)" stroke-width="2"/>
-                <g stroke="var(--pp-green)" stroke-width="2.5" stroke-linecap="round" opacity=".85">
-                  <path d="M60 50 L34 58"/><path d="M60 50 L86 58"/>
-                  <path d="M34 58 L20 102"/><path d="M20 102 L14 144"/>
-                  <path d="M86 58 L100 102"/><path d="M100 102 L106 144"/>
-                  <path d="M60 50 L60 148"/>
-                  <path d="M60 148 L44 150"/><path d="M60 148 L76 150"/>
-                  <path d="M44 150 L42 202"/><path d="M42 202 L40 246"/>
-                  <path d="M76 150 L78 202"/><path d="M78 202 L80 246"/>
-                </g>
-                <g fill="var(--pp-amber)">
-                  <circle cx="60" cy="50" r="3.5"/><circle cx="34" cy="58" r="3.5"/><circle cx="86" cy="58" r="3.5"/>
-                  <circle cx="20" cy="102" r="3.5"/><circle cx="100" cy="102" r="3.5"/>
-                  <circle cx="14" cy="144" r="4"/><circle cx="106" cy="144" r="4"/>
-                  <circle cx="60" cy="148" r="3.5"/><circle cx="44" cy="150" r="3.5"/><circle cx="76" cy="150" r="3.5"/>
-                  <circle cx="42" cy="202" r="3.5"/><circle cx="78" cy="202" r="3.5"/>
-                  <circle cx="40" cy="246" r="4"/><circle cx="80" cy="246" r="4"/>
-                </g>
-              </svg>
-              <div>
-                <b style="font-family:'Archivo';font-size:14px">Every joint, mapped</b><br/>
-                <span style="font-size:11.5px;color:var(--pp-muted)">Shoulders, hips, knees — tracked in real time, on this phone.</span>
-              </div>
-            </div>
-            <p style="text-align:center;font-size:10.5px;color:var(--pp-muted);margin-top:10px">Stays on this device</p>
-          </div>
-        </div>
-        <div class="lp-trend">
-          <div class="lbl">Height percentile · last 6 months</div>
-          <svg viewBox="0 0 220 90" aria-hidden="true">
-            <polyline points="10,68 75,54 140,44 205,28" fill="none" stroke="var(--pp-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="10" cy="68" r="3" fill="rgba(246,242,233,.4)"/>
-            <circle cx="75" cy="54" r="3" fill="rgba(246,242,233,.4)"/>
-            <circle cx="140" cy="44" r="3" fill="rgba(246,242,233,.4)"/>
-            <circle cx="205" cy="28" r="4.5" fill="var(--pp-amber)"/>
-          </svg>
-          <div class="foot"><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span></div>
-          <div class="headline">58th → 62nd percentile</div>
-          <p style="margin:4px 0 0;font-size:12px;line-height:1.5;color:rgba(246,242,233,.6)">Same math a pediatrician uses. Not a score — just where he's tracking.</p>
-        </div>
         </div>
       </div>
     </section>
@@ -521,9 +521,9 @@
         <div>
           <h4>Product</h4>
           <ul>
+            <li><a href="#progress" data-scroll="#progress">Track progress</a></li>
             <li><a href="#how" data-scroll="#how">How it works</a></li>
             <li><a href="#inside-week" data-scroll="#inside-week">Inside a week</a></li>
-            <li><a href="#progress" data-scroll="#progress">Track progress</a></li>
             <li><a href="#start" data-scroll="#start">Install to phone</a></li>
             <li><a href="#invite" data-scroll="#invite">Family access</a></li>
             <li><a href="#faq" data-scroll="#faq">FAQ</a></li>
