@@ -1049,36 +1049,46 @@ async function fillScanConsents(){
   }
 
   if(!rows.length){
-    return set(H`<div class="rail-empty" style="padding:4px 0">No scan permission has been given. The body
-      scan on an athlete's Growth screen asks for one before it opens the camera.</div>`);
+    return set(H`<div class="rail-empty" style="padding:4px 0">No scan or jump-measurement permission has been
+      given. Both ask for one, from an athlete's Growth screen, before they open the camera.</div>`);
   }
 
-  // One row per athlete: re-scanning inserts a fresh consent, so several can be live for
-  // the same child. The newest is the one that governs, and it is the only one shown —
-  // withdrawing revokes all of them, which is what a parent means by "stop".
+  // One row per (athlete, engine) — a body-scan release and a jump-measurement release
+  // are separate permissions even for the same child, so dedupe on the PAIR, not just
+  // the athlete. Getting this wrong isn't cosmetic: before this, withdrawing the ONE
+  // consent a parent could see would have silently revoked BOTH engines' permission for
+  // that child the moment a second engine existed. Re-scanning with the same engine
+  // still inserts a fresh consent, so several rows per engine are normal; the newest per
+  // engine is the one that governs.
   const seen = new Set();
-  const latest = rows.filter(r => !seen.has(r.athlete_id) && seen.add(r.athlete_id));
+  const latest = rows.filter(r => {
+    const k = r.athlete_id + '::' + r.scan_engine;
+    return !seen.has(k) && seen.add(k);
+  });
   const nameOf = id => {
     const a = (state.athletes || []).find(x => x.id === id);
     return a ? a.first_name : 'An athlete';
   };
+  const engineLabel = eng => eng === 'ondevice-jump' ? 'Jump measurement' : 'Body scan';
 
   set(latest.map(r => H`<div class="tgl">
-      <div class="gt"><b>${esc(nameOf(r.athlete_id))}</b>
+      <div class="gt"><b>${esc(nameOf(r.athlete_id))} · ${esc(engineLabel(r.scan_engine))}</b>
         <span>Given ${esc(fmtDate(r.granted_at.slice(0, 10)))} · deletes
           ${esc(fmtDate(r.retention_until))}</span></div>
-      <button class="btn sm ghost" data-revoke="${esc(r.athlete_id)}">Withdraw</button>
+      <button class="btn sm ghost" data-revoke="${esc(r.athlete_id)}" data-engine="${esc(r.scan_engine)}">Withdraw</button>
     </div>`).join(''));
 
   host.querySelectorAll('[data-revoke]').forEach(btn => {
-    btn.onclick = () => confirmWithdrawScan(btn.getAttribute('data-revoke'), nameOf(btn.getAttribute('data-revoke')));
+    const athleteId = btn.getAttribute('data-revoke'), engineId = btn.getAttribute('data-engine');
+    btn.onclick = () => confirmWithdrawScan(athleteId, engineId, nameOf(athleteId), engineLabel(engineId));
   });
 }
 
-function confirmWithdrawScan(athleteId, name){
-  const bg = sheet(H`<h3>Withdraw scan permission for ${esc(name)}?</h3>
-    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">No new scan can be started for ${esc(name)}
-      until you give permission again. It takes effect immediately, including on any other phone with a scan
+function confirmWithdrawScan(athleteId, engineId, name, label){
+  const low = (label || 'scan').toLowerCase();
+  const bg = sheet(H`<h3>Withdraw ${esc(low)} permission for ${esc(name)}?</h3>
+    <p style="font-size:14.5px;line-height:1.6;margin:8px 0 0">No new ${esc(low)} can be started for ${esc(name)}
+      until you give permission again. It takes effect immediately, including on any other phone with one
       part-way through.</p>
     <div class="teach" style="margin-top:14px"><div class="ic">📊</div><div>
       <h4>Measurements already saved stay</h4>
@@ -1094,7 +1104,7 @@ function confirmWithdrawScan(athleteId, name){
     e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
     const { error } = await sb.from('biometric_consents')
       .update({ revoked_at: new Date().toISOString(), revoked_by: state.user.id })
-      .eq('athlete_id', athleteId).is('revoked_at', null);
+      .eq('athlete_id', athleteId).eq('scan_engine', engineId).is('revoked_at', null);
     if(error){
       console.error(error); toast('Could not withdraw that');
       e.target.innerHTML = 'Withdraw'; e.target.disabled = false; return;

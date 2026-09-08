@@ -618,6 +618,12 @@
      that function is defined there. Nothing heavy runs here — MediaPipe itself is
      dynamic-imported on the first scan, so a parent who never scans never fetches it. -->
 <script src="/js/pose-measure.js"></script>
+<!-- jump-measure.js is referenced by jump-scan.js's UI flow; jump-scan.js also reads
+     pose-measure.js's shared MediaPipe constants and P/dist/mid helpers directly, so
+     both load after it. Neither downloads or runs anything until a parent actually
+     starts a jump capture. -->
+<script src="/js/jump-measure.js"></script>
+<script src="/js/jump-scan.js"></script>
 <script src="/js/invites.js"></script>
 <script src="/js/pwa.js"></script>
 <script src="/js/init.js"></script>

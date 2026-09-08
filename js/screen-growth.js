@@ -212,7 +212,17 @@ async function screenGrowth(){
             <span>Wingspan, reach, shoulders and leg length. Measured on this phone — the photos are never
               uploaded and never saved.</span></div><i>›</i></div>
       </div>
-      <p class="muted-note">Asks your permission first, and you can withdraw it in Account at any time.</p>`:''}
+      <p class="muted-note">Asks your permission first, and you can withdraw it in Account at any time.</p>
+
+      <div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="growJump" role="button" tabindex="0">
+          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v10M12 4l-3.5 3.5M12 4l3.5 3.5"/><path d="M5 20c1.5-3 4-4 7-4s5.5 1 7 4"/></svg></div>
+          <div class="gt"><b>Measure ${esc(a.first_name)}'s vertical jump</b>
+            <span>About five seconds of video, three jumps. Measured on this phone — the video is never
+              uploaded and never saved.</span></div><i>›</i></div>
+      </div>
+      <p class="muted-note">A separate permission from the body scan — asks first, withdraw it in Account
+        anytime.</p>`:''}
 
       ${primary?.sport_key==='football'?H`<div class="sec-title" style="margin-top:18px">Pop Warner divisions</div>
       <div class="card app-pad">
@@ -243,6 +253,9 @@ async function screenGrowth(){
   { const s=$("#growScan");
     if(s){ const open=()=>openBodyScan(a);
       s.onclick=open; s.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
+  { const j=$("#growJump");
+    if(j){ const open=()=>openJumpScan(a);
+      j.onclick=open; j.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   // Predicted height stays folded until asked for — same idiom as the other collapsers.
   { const t=$("#phToggle"), l=$("#phBody");
     if(t&&l){ const go=()=>{ const open=l.hidden; l.hidden=!open;

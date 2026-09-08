@@ -38,6 +38,9 @@ async function afterLogin(){
   if(typeof bodyScanWasInterrupted === 'function' && bodyScanWasInterrupted()){
     setTimeout(bsInterruptedNotice, 400);   // after the screen has painted
   }
+  if(typeof jumpScanWasInterrupted === 'function' && jumpScanWasInterrupted()){
+    setTimeout(jmpInterruptedNotice, 400);
+  }
 }
 
 // The household this user already belongs to, if any. `fm_select` exposes every member
