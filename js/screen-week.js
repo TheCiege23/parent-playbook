@@ -316,10 +316,10 @@ async function screenWeek(){
     fillWeekRail(a, goals, days, todayIdx).catch(e => console.error('rail', e));
   }
   bindTop();
-  { const gb=$("#goalBanner"); if(gb) gb.onclick=()=>openAddGoal(goals||[]); }
-  { const sc=$("#schedBanner"); if(sc&&primary) sc.onclick=()=>openPracticeSchedule(primary.sport_key,
+  { const gb=$("#goalBanner"); clickableCard(gb,()=>openAddGoal(goals||[])); }
+  { const sc=$("#schedBanner"); if(sc&&primary) clickableCard(sc,()=>openPracticeSchedule(primary.sport_key,
       { practiceDays:primary.practice_days||[], gameDay:primary.game_day,
-        seasonStart:primary.season_start, seasonEnd:primary.season_end }); }
+        seasonStart:primary.season_start, seasonEnd:primary.season_end })); }
 
   // context for a day row — shared by the row, the tick, and today's card so the tally
   // can never disagree with whichever one the parent tapped
@@ -335,7 +335,7 @@ async function screenWeek(){
     const to=$("#todayOpen"); if(to&&todayW&&todayW.act) to.onclick=()=>openActivity(todayW.act,tctx); }
 
   { const tc=$("#tomorrowCard");
-    if(tc&&tomorrowW&&tomorrowW.act) tc.onclick=()=>openActivity(tomorrowW.act,ctxFor(tomorrowIdx)); }
+    if(tc&&tomorrowW&&tomorrowW.act) clickableCard(tc,()=>openActivity(tomorrowW.act,ctxFor(tomorrowIdx))); }
 
   // Ticking a day is the whole interaction — it must not also open the sheet.
   $("#screen").querySelectorAll('[data-tick]').forEach(btn=>{

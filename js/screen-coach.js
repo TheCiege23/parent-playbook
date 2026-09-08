@@ -43,7 +43,7 @@ async function openTeamConnect(subject){
   logUsageEvent('team_connect_viewed');
   const a = subject || state.active;
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
-    <span class="spinner"></span><div>Loading…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Loading…</div></div>`);
 
   const [{ data: updates }, { data: access }] = await Promise.all([
     sb.from('coach_updates').select('id,sender_id,kind,body,created_at')
@@ -117,7 +117,7 @@ function openReportUpdate(updateId){
     const reason = (bg.querySelector('#repReason').value||'').trim();
     const err = bg.querySelector('#repErr'); err.textContent = '';
     if(!reason){ err.textContent = 'Say a bit about what concerned you.'; return; }
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('coach_update_reports').insert({
       update_id: updateId, reported_by: state.user.id, reason,
     });
@@ -183,7 +183,7 @@ async function screenCoach(){
       <div class="sec-title" style="margin-top:22px">Send an update</div>
       <div class="card app-pad">
         <div class="chipgrid" id="cuKind" style="grid-template-columns:repeat(2,1fr)">
-          ${Object.entries(COACH_KIND).map(([k,v],i)=>H`<div class="chip ${i===0?'on':''}" data-k="${k}">${esc(v.label)}</div>`).join('')}
+          ${Object.entries(COACH_KIND).map(([k,v],i)=>H`<div class="chip ${i===0?'on':''}" role="button" tabindex="0" data-k="${k}">${esc(v.label)}</div>`).join('')}
         </div>
         <div class="err" id="cuNote" style="display:none;margin-top:10px;color:var(--amber-ink,#8A5A16);
           background:var(--amber-pale,#FCEEDA);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.5">
@@ -226,7 +226,7 @@ async function screenCoach(){
     const body = ($("#cuBody").value||'').trim();
     const err = $("#cuErr"); err.textContent = '';
     if(!body){ err.textContent = 'Write something before sending.'; return; }
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('coach_updates').insert({
       athlete_id: a.id, sender_id: state.user.id, kind, body,
     });
@@ -252,7 +252,7 @@ async function screenCoach(){
 // the trigger didn't catch is exactly why the report path exists at all.
 async function openTeamConnectSafety(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
 
   let flagged = [], reports = [];
   try{

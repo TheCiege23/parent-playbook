@@ -251,7 +251,7 @@ async function screenGrowth(){
   bindTop();
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
-  { const b=$("#growAsk"); if(b) b.onclick=()=>openGrowthInputs(grow||{}, primary||null); }
+  { const b=$("#growAsk"); clickableCard(b,()=>openGrowthInputs(grow||{}, primary||null)); }
   // `a` is the athlete this screen is rendering — the subject of the scan, and the row
   // measurements will be written against.
   { const s=$("#growToScan");
@@ -267,7 +267,7 @@ async function screenGrowth(){
       t.onclick=go; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; } }
   { const b=$("#addMeas"); if(b) b.onclick=()=>openAddMeasure(); }
   { const b=$("#heroRecord"); if(b&&leadKey) b.onclick=()=>openAddMeasure(leadKey); }
-  { const b=$("#mpBanner"); if(b) b.onclick=openMarketplace; }
+  { const b=$("#mpBanner"); clickableCard(b,openMarketplace); }
   $("#screen").querySelectorAll('[data-rec]').forEach(b=>b.onclick=()=>openAddMeasure(b.dataset.rec));
   // Achieving keeps the goal in the record; removing takes it out of the plan entirely.
   $("#screen").querySelectorAll('[data-achieve]').forEach(b=>b.onclick=async()=>{

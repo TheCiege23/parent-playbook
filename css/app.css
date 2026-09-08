@@ -43,7 +43,8 @@
   .field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
   .field input,.field select,.field textarea{
     width:100%;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
-  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green)}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,83,66,.16)}
+  .field input:focus-visible,.field select:focus-visible,.field textarea:focus-visible{outline:2px solid var(--green);outline-offset:1px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
   /* teaching card */

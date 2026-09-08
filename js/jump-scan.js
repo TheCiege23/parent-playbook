@@ -70,7 +70,7 @@ async function openJumpScan(subject){
      release applies.`);
 
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
-    <span class="spinner"></span><div>Checking…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Checking…</div></div>`);
   const consent = await loadScanConsent(JMP.subject.id, JUMP_ENGINE_ID);
   bg.remove();
 
@@ -143,7 +143,7 @@ function jmpConsent(age){
   go.onclick = async e => {
     const err = bg.querySelector('#jmpCErr'); err.textContent = '';
     if(!boxes.every(b => b.checked)) return;
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
 
     const { data, error } = await sb.from('biometric_consents').insert({
       athlete_id: JMP.subject.id,
@@ -176,7 +176,7 @@ function jmpConsent(age){
 // of their kid jumping, not after.
 async function jmpPrepareEngine(){
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div>Getting the camera ready…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Getting the camera ready…</div></div>`);
   try{
     await loadVideoPoseLandmarker();
     bg.remove();
@@ -285,7 +285,7 @@ function jmpDiscard(){
 async function jmpRun(){
   const subject = JMP.subject;
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div id="jmpProg">Reading the video…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div id="jmpProg">Reading the video…</div></div>`);
   const say = t => { const el = bg.querySelector('#jmpProg'); if(el) el.textContent = t; };
 
   // Second consent check, re-read from the database — the same reason the body scan
@@ -408,7 +408,7 @@ function jmpResult(result){
 
   bg.querySelector('#jmpDrop').onclick = () => bg.remove();
   bg.querySelector('#jmpSave').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: JMP.subject.id, metric_key: 'vertical', value: result.bestHeightIn, unit: 'in',
       measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,

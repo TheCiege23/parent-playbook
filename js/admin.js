@@ -35,7 +35,7 @@ function adminStatusPill(s){
 // ---- queue list ----
 async function openAdminQueue(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading queue…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading queue…</div></div>`;
   let rows=[];
   try{
     let q=sb.from('trainer_profiles').select('id,display_name,city,region,status,submitted_at')
@@ -57,8 +57,8 @@ async function openAdminQueue(){
     </div>
     <p style="color:var(--muted);font-size:13px;margin:0 0 12px">${adminFilter==='pending'?`${rows.length} awaiting review`:`${pendingCount} pending · ${rows.length} total`}</p>
     <div class="chipgrid" id="afilter" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
-      <div class="chip ${adminFilter==='pending'?'on':''}" data-f="pending">Pending</div>
-      <div class="chip ${adminFilter==='all'?'on':''}" data-f="all">All</div>
+      <div class="chip ${adminFilter==='pending'?'on':''}" role="button" tabindex="0" data-f="pending">Pending</div>
+      <div class="chip ${adminFilter==='all'?'on':''}" role="button" tabindex="0" data-f="all">All</div>
     </div>
     <div class="field" style="margin-bottom:10px"><input id="asearch" placeholder="Search name or city…" value="${esc(adminQuery)}"/></div>
     ${capped?`<p style="font-size:11.5px;color:#9a4a12;margin:0 0 10px">Showing the oldest ${ADMIN_PAGE} — narrow with search or the Pending filter.</p>`:''}
@@ -89,7 +89,7 @@ async function adminSignDoc(path){
 
 // ---- single application detail ----
 async function adminReviewTrainer(id){
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let prof,sports,creds,vers,actions;
   try{
     const [p,s,c,v,a]=await Promise.all([
@@ -326,7 +326,7 @@ function adminNote(id,status,title,placeholder,danger){
   bg.querySelector('#ok').onclick=async(e)=>{
     const note=bg.querySelector('#anote').value.trim();
     if(status==='needs_info'&&!note){ toast('Add a note so they know what to fix'); return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const patch={ status, updated_at:new Date().toISOString() };
     if(status==='suspended') patch.suspended_reason=note||null;
     // ONLY a needs_info note goes where the trainer can read it. This dialog promises the

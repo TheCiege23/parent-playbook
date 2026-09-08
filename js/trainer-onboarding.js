@@ -37,7 +37,7 @@ const TR_ATTEST = [
 async function startTrainerOnboarding(){
   if(marketplaceOff()) return;
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Opening…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Opening…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   let prof=null;
   try{ const { data }=await sb.from('trainer_profiles').select('*').eq('id',state.user.id).maybeSingle(); prof=data; }
@@ -113,8 +113,8 @@ function trAbout(){ const p=tr.profile; return H`
   </div>
   <div class="field"><label>Also offer virtual sessions?</label>
     <div class="chipgrid" id="virt" style="grid-template-columns:1fr 1fr">
-      <div class="chip ${p.offers_virtual?'on':''}" data-v="1">Yes, virtual too</div>
-      <div class="chip ${!p.offers_virtual?'on':''}" data-v="0">In-person only</div>
+      <div class="chip ${p.offers_virtual?'on':''}" role="button" tabindex="0" data-v="1">Yes, virtual too</div>
+      <div class="chip ${!p.offers_virtual?'on':''}" role="button" tabindex="0" data-v="0">In-person only</div>
     </div></div>
   <div class="field"><label>Headline</label><input id="hl" maxlength="80" placeholder="Speed & agility for ages 8–14" value="${esc(p.headline)}"/></div>
   <div class="field"><label>About your coaching</label><textarea id="bio" rows="4" placeholder="Your approach, experience, and what parents can expect.">${esc(p.bio)}</textarea></div>
@@ -151,7 +151,7 @@ function trSports(){
   <p>Pick every sport you train — add a specialty for each if you like.</p></div>
   <div class="field"><label>Sports</label>
     <div class="chipgrid" id="trsports">
-      ${sports.map(s=>`<div class="chip ${picked(s.key)?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+      ${sports.map(s=>`<div class="chip ${picked(s.key)?'on':''}" role="button" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
     </div></div>
   ${tr.sports.length?H`<div class="card app-pad">
     ${tr.sports.map(s=>{const nm=sports.find(x=>x.key===s.sport_key)?.name||s.sport_key; return H`
@@ -313,7 +313,7 @@ async function submitTrainerApplication(e){
   const errEl=$("#trerr"); errEl.textContent="";
   const missing=TR_ATTEST.filter(a=>a.req && !tr.attest[a.key]);
   if(missing.length){ errEl.textContent="Please agree to all four safety requirements."; return; }
-  const btn=e.target; const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  const btn=e.target; const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   const uid=state.user.id;
   try{
     // 1. profile (submitted). upsert so a returning applicant resubmits cleanly.
@@ -345,7 +345,7 @@ async function submitTrainerApplication(e){
     for(const c of tr.credentials){
       if(!c.name.trim()) continue;
       let doc_path=c.existing_doc||null;
-      if(c.file){ btn.innerHTML='<span class="spinner"></span> Uploading…'; doc_path=await uploadTrainerDoc('cred',c.file); }
+      if(c.file){ btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…'; doc_path=await uploadTrainerDoc('cred',c.file); }
       const { error:ce }=await sb.from('trainer_credentials').insert({ trainer_id:uid, name:c.name.trim(),
         issuer:(c.issuer||'').trim()||null, credential_number:(c.credential_number||'').trim()||null,
         issued_on:c.issued_on||null, expires_on:c.expires_on||null, doc_path, status:'submitted' });
@@ -357,7 +357,7 @@ async function submitTrainerApplication(e){
     // will not let an admin pass a check that has none, so an empty row here means
     // an application that cannot be approved until the document arrives.
     let idPath=null, bgPath=null, ssPath=null;
-    if(tr.idFile||tr.bgFile||tr.ssFile) btn.innerHTML='<span class="spinner"></span> Uploading…';
+    if(tr.idFile||tr.bgFile||tr.ssFile) btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…';
     if(tr.idFile) idPath=await uploadTrainerDoc('id',tr.idFile);
     if(tr.bgFile) bgPath=await uploadTrainerDoc('bg',tr.bgFile);
     if(tr.ssFile) ssPath=await uploadTrainerDoc('ss',tr.ssFile);
@@ -394,7 +394,7 @@ async function trainerStatusScreen(prof){
   if(marketplaceOff()) return;
   document.body.classList.remove('auth'); setAppBg();
   if(!prof || !prof.status){
-    root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+    root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
     try{ const { data }=await sb.from('trainer_profiles').select('*').eq('id',state.user.id).maybeSingle(); prof=data; }
     catch(err){ console.error(err); return bootError(); }
   }

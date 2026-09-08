@@ -37,7 +37,7 @@ async function startPayout(){
 async function openMarketplace(){
   if(marketplaceOff()) return;
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Finding trainers…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Finding trainers…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   let trainers=[];
   try{
@@ -55,8 +55,8 @@ async function openMarketplace(){
     </div>
     <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Verified coaches for your young athlete — filter by sport.</p>
     <div class="chipgrid" id="mpsports" style="margin-bottom:12px">
-      <div class="chip ${!mpSport?'on':''}" data-s="">All</div>
-      ${sports.map(s=>`<div class="chip ${mpSport===s.key?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+      <div class="chip ${!mpSport?'on':''}" role="button" tabindex="0" data-s="">All</div>
+      ${sports.map(s=>`<div class="chip ${mpSport===s.key?'on':''}" role="button" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
     </div>
     ${shown.length? shown.map(mpTrainerCard).join('')
       : `<div class="card app-pad"><div class="empty">${mpSport?'No trainers for this sport yet.':'No approved trainers yet — check back soon.'}</div></div>`}
@@ -88,7 +88,7 @@ function mpTrainerCard(t){
 // ---------- trainer detail ----------
 async function viewTrainer(id){
   if(marketplaceOff()) return;
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let t,services,sportsRows,reviews;
   try{
     const [p,sv,sp,rv]=await Promise.all([
@@ -167,7 +167,7 @@ function openBookingSheet(service,trainer){
     if(!child){ errEl.textContent='Pick an athlete.'; return; }
     const d=bg.querySelector('#bkdate').value, tm=bg.querySelector('#bktime').value;
     const scheduled_at = d ? new Date(`${d}T${tm||'09:00'}`).toISOString() : null;
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     try{
       const bookingId=uuid();
       const age=ageFrom(child.birthdate);
@@ -197,7 +197,7 @@ function openBookingSheet(service,trainer){
 async function openMyBookings(){
   if(marketplaceOff()) return;
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let rows=[];
   try{
     const { data, error }=await sb.from('bookings')
@@ -242,7 +242,7 @@ function leaveReview(bookingId,trainerId){
   const bg=sheet(H`<h3>Leave a review</h3>
     <div class="field" style="margin-top:8px"><label>Rating</label>
       <div class="chipgrid" id="rvstars" style="grid-template-columns:repeat(5,1fr)">
-        ${[1,2,3,4,5].map(n=>`<div class="chip" data-n="${n}">${n}★</div>`).join('')}</div></div>
+        ${[1,2,3,4,5].map(n=>`<div class="chip" role="button" tabindex="0" data-n="${n}">${n}★</div>`).join('')}</div></div>
     <div class="field"><label>Comments (optional)</label><textarea id="rvbody" rows="3" placeholder="How was the session?"></textarea></div>
     <div class="err" id="rverr"></div>
     <button class="btn" id="rvsave">Post review</button>`);
@@ -251,7 +251,7 @@ function leaveReview(bookingId,trainerId){
     bg.querySelectorAll('#rvstars .chip').forEach(x=>x.classList.toggle('on',+x.dataset.n<=rating)); });
   bg.querySelector('#rvsave').onclick=async(e)=>{
     if(!rating){ bg.querySelector('#rverr').textContent='Pick a rating.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('reviews').insert({ booking_id:bookingId, trainer_id:trainerId, parent_id:state.user.id,
       rating, body:bg.querySelector('#rvbody').value.trim()||null });
     if(error){ console.error(error); bg.querySelector('#rverr').textContent='Could not post. '+(error.message||''); e.target.innerHTML='Post review'; e.target.disabled=false; return; }
@@ -262,7 +262,7 @@ function leaveReview(bookingId,trainerId){
 // ---------- shared: booking message thread ----------
 async function openBookingThread(bookingId,onClose){
   const bg=sheet(H`<h3>Messages</h3><div id="thread" style="max-height:46dvh;overflow:auto;margin:8px 0">
-      <div class="center-screen" style="min-height:80px"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div></div>
+      <div class="center-screen" style="min-height:80px"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div></div>
     </div>
     <div class="row2" style="grid-template-columns:1fr auto;gap:8px">
       <input id="msgin" placeholder="Write a message…" style="padding:12px;border:1.5px solid var(--line);border-radius:12px"/>

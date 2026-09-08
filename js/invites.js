@@ -36,7 +36,7 @@ function inviteRole(r){ return INVITE_ROLE[r] || INVITE_ROLE.family_view; }
 
 async function renderRedeem(token){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Opening invite…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Opening invite…</div></div>`;
   let data, error;
   try{ ({ data, error } = await sb.rpc('invite_preview',{ p_token:token })); }
   catch(e){ console.error(e); return renderInviteDead('We couldn\'t open this link',
@@ -212,7 +212,7 @@ function renderInviteDead(title, why, token, info){
 }
 
 async function acceptAndEnter(token, code){
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
   const { error } = await sb.rpc('accept_invite',{ p_token:token, p_code:code||null });
   if(error){
     const m=error.message||'';

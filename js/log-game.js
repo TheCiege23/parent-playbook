@@ -150,14 +150,14 @@ function lgStepScore(){
       <label>Didn't keep score?</label>
       <div class="chipgrid" id="lgRes" style="grid-template-columns:repeat(4,1fr)">
         ${[['win','Won'],['loss','Lost'],['tie','Tied'],['na','Skip']].map(o=>
-          `<div class="chip ${r.our_score==null&&r.result===o[0]?'on':''}" data-r="${o[0]}">${o[1]}</div>`).join('')}
+          `<div class="chip ${r.our_score==null&&r.result===o[0]?'on':''}" role="button" tabindex="0" data-r="${o[0]}">${o[1]}</div>`).join('')}
       </div>
     </div>
 
     <div class="field"><label>Where</label>
       <div class="chipgrid" id="lgWhere">
         ${['home','away','neutral'].map(w=>
-          `<div class="chip ${r.home_away===w?'on':''}" data-w="${w}">${w[0].toUpperCase()+w.slice(1)}</div>`).join('')}
+          `<div class="chip ${r.home_away===w?'on':''}" role="button" tabindex="0" data-w="${w}">${w[0].toUpperCase()+w.slice(1)}</div>`).join('')}
       </div></div>
 
     ${LG.prefill.fromPlan&&!LG.editing?`<p class="muted-note" style="text-align:left;margin:2px 2px 12px">Pulled from ${esc(LG.prefill.dayLabel)}'s plan. Change any of it before you save.</p>`:''}
@@ -213,7 +213,7 @@ function lgStepScore(){
     const se=bg.querySelector('#lgSeason'); if(se) LG.row.season=se.value.trim()||null;
     const op=bg.querySelector('#lgOpp'); if(op) LG.row.opponent=op.value.trim()||null;
     if(!LG.row.game_date){ errEl.textContent='Pick the game date.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const ok = await lgCommit(errEl);
     if(!ok){ e.target.innerHTML=LG.editing?'Save changes':'Save the game'; e.target.disabled=false; return; }
     bg.remove();
@@ -326,7 +326,7 @@ function lgStepExtras(){
   const finish=async(e,withExtras)=>{
     const errEl=bg.querySelector('#lgErr2'); errEl.textContent='';
     if(withExtras) collect();
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     if(withExtras){
       const ok=await lgCommit(errEl);
       if(!ok){ e.target.innerHTML='Done'; e.target.disabled=false; return; }

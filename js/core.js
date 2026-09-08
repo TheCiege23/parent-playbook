@@ -30,8 +30,28 @@ const H = (strings,...v)=>strings.reduce((a,s,i)=>a+s+(v[i]??''),'');
 const uuid = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
   : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);});
 
+// A .chip is rendered identically across every screen that uses one — a plain
+// <div class="chip" onclick=...> — so rather than touching every bind site
+// individually, Enter/Space on a focused chip just re-fires the click already
+// wired to it. Chips themselves still need role="button" tabindex="0" in their
+// markup for this to matter; that's on the template, not here.
+document.addEventListener('keydown', e=>{
+  if((e.key===' '||e.key==='Enter') && e.target && e.target.classList && e.target.classList.contains('chip')){
+    e.preventDefault(); e.target.click();
+  }
+});
+// A .card used as a button (a banner, a tappable summary) needs the same role +
+// keyboard handling .navrow already gets — this is that pattern, shared, so a
+// card-as-button is never mouse/touch-only.
+function clickableCard(el,fn){
+  if(!el) return;
+  el.setAttribute('role','button'); el.setAttribute('tabindex','0');
+  el.onclick=fn;
+  el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fn(); } };
+}
 function toast(msg){
-  const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
+  const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');
+  t.textContent=msg;document.body.appendChild(t);
   setTimeout(()=>t.remove(),2600);
 }
 // ---------- usage telemetry ----------

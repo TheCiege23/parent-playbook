@@ -218,7 +218,7 @@ function openSeasonState(sportRow, onSaved){
   bg.querySelector('#ssSave').onclick=async e=>{
     const errEl=bg.querySelector('#sserr'); errEl.textContent='';
     if(!picked){ errEl.textContent='Pick one — it changes what the week looks like.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('athlete_sports').update({ season_state:picked })
       .eq('athlete_id',state.active.id).eq('sport_key',sportRow.sport_key);
     if(error){ console.error(error); reportError(error,'sheet:seasonState');
@@ -241,7 +241,7 @@ function openEditMyName(current){
     const v=bg.querySelector('#gname').value.trim();
     const errEl=bg.querySelector('#gnerr'); errEl.textContent='';
     if(!v){ errEl.textContent='Give us something to call you.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('guardians').update({ display_name:v }).eq('id',state.user.id);
     if(error){ console.error(error); reportError(error,'account:displayName');
       errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save'; e.target.disabled=false; return; }
@@ -260,7 +260,7 @@ function openRenameHousehold(household){
     const v=bg.querySelector('#fname').value.trim();
     const errEl=bg.querySelector('#fnerr'); errEl.textContent='';
     if(!v){ errEl.textContent='Give it a name.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('families').update({ name:v }).eq('id',household.id);
     if(error){ console.error(error); reportError(error,'sheet:renameFamily');
       errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save'; e.target.disabled=false; return; }
@@ -282,7 +282,7 @@ function openChangePassword(){
     const errEl=bg.querySelector('#pwerr'); errEl.textContent='';
     if(p1.length<8){ errEl.textContent='At least 8 characters.'; return; }
     if(p1!==p2){ errEl.textContent="Those two don't match."; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.auth.updateUser({ password:p1 });
     if(error){ console.error(error); errEl.textContent=error.message||'Could not update.';
       e.target.innerHTML='Update password'; e.target.disabled=false; return; }
@@ -297,19 +297,23 @@ function openChangePassword(){
 // base64 video is not a useful thing to hand anyone.
 async function openExportEverything(){
   const bg=sheet(H`<h3>Export everything</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">One file with every athlete, game, milestone, measurement and logged session you have access to — plus links to your photos and videos.</p>
-    <div id="exStatus"><div class="center-screen" style="min-height:90px"><span class="spinner"></span></div></div>`);
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">One file with every athlete, game, milestone, measurement, logged session, Team Connect message and consent record you have access to — plus who has access, and links to your photos and videos.</p>
+    <div id="exStatus"><div class="center-screen" style="min-height:90px"><span class="spinner" role="status" aria-label="Loading"></span></div></div>`);
   const out=bg.querySelector('#exStatus');
   try{
     const ids=state.athletes.map(x=>x.id);
     if(!ids.length){ out.innerHTML='<p class="empty">No athletes to export yet.</p>'; return; }
     const grab=t=>sb.from(t).select('*').in('athlete_id',ids);
-    const [ath,sp,goals,meas,games,miles,sess,media]=await Promise.all([
+    // athlete_invites is deliberately left out: it carries a live token/code_hash that
+    // could be used to accept a pending invite, which is a secret, not "data about the child".
+    const [ath,sp,goals,meas,games,miles,sess,media,updates,consentsBio,consentsGeneral,teams,access]=await Promise.all([
       sb.from('athletes').select('*').in('id',ids),
       grab('athlete_sports'), grab('goals'), grab('measurements'),
       grab('games'), grab('milestones'), grab('sessions'), grab('media'),
+      grab('coach_updates'), grab('biometric_consents'), grab('consent_records'),
+      grab('team_memberships'), grab('athlete_access'),
     ]);
-    const errs=[ath,sp,goals,meas,games,miles,sess,media].map(r=>r.error).filter(Boolean);
+    const errs=[ath,sp,goals,meas,games,miles,sess,media,updates,consentsBio,consentsGeneral,teams,access].map(r=>r.error).filter(Boolean);
     if(errs.length){ console.error(errs); reportError(errs[0],'account:export'); }
     let mediaOut=(media.data||[]);
     if(mediaOut.length){
@@ -328,14 +332,18 @@ async function openExportEverything(){
     const payload={
       exported_at:new Date().toISOString(),
       exported_by:state.user?.email||null,
-      about:'Parent Playbook export. Photo and video links expire seven days after this file was made — download anything you want to keep.',
+      about:'Parent Playbook export. Photo and video links expire 6 hours after this file was made — download anything you want to keep before then.',
       athletes:ath.data||[], sports:sp.data||[], goals:goals.data||[],
       measurements:meas.data||[], games:games.data||[], milestones:miles.data||[],
       sessions:sess.data||[], media:mediaOut,
+      coach_updates:updates.data||[], biometric_consents:consentsBio.data||[],
+      consent_records:consentsGeneral.data||[], team_memberships:teams.data||[],
+      access_grants:access.data||[],
     };
     const counts=[['athletes',payload.athletes.length],['games',payload.games.length],
       ['milestones',payload.milestones.length],['measurements',payload.measurements.length],
-      ['sessions logged',payload.sessions.length],['photos & videos',payload.media.length]];
+      ['sessions logged',payload.sessions.length],['photos & videos',payload.media.length],
+      ['coach updates',payload.coach_updates.length],['access grants',payload.access_grants.length]];
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const name='parent-playbook-export-'+isoDay(new Date())+'.json';
@@ -344,7 +352,7 @@ async function openExportEverything(){
         ${counts.map(c=>`<div class="mrow"><span>${esc(c[0])}</span><b>${c[1]}</b></div>`).join('')}
       </div>
       <a class="btn" id="exDl" download="${esc(name)}" href="${url}" style="text-decoration:none">Download the file</a>
-      <p class="muted-note" style="margin-top:12px">Photo and video links inside expire in seven days.${errs.length?' Some sections could not be read and came back empty — contact support if that looks wrong.':''}</p>`;
+      <p class="muted-note" style="margin-top:12px">Photo and video links inside expire 6 hours after export.${errs.length?' Some sections could not be read and came back empty — contact support if that looks wrong.':''}</p>`;
     const dl=out.querySelector('#exDl');
     if(dl) dl.addEventListener('click',()=>setTimeout(()=>{ toast('Saved to your downloads'); URL.revokeObjectURL(url); },600));
   }catch(err){

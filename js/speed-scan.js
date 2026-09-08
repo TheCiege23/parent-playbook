@@ -90,7 +90,7 @@ async function spdOpen(mode, subject){
      release applies.`);
 
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
-    <span class="spinner"></span><div>Checking…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Checking…</div></div>`);
   const consent = await loadScanConsent(SPD.subject.id, SPD_ENGINE_ID);
   bg.remove();
 
@@ -164,7 +164,7 @@ function spdConsent(age){
   go.onclick = async e => {
     const err = bg.querySelector('#spdCErr'); err.textContent = '';
     if(!boxes.every(b => b.checked)) return;
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
 
     const { data, error } = await sb.from('biometric_consents').insert({
       athlete_id: SPD.subject.id,
@@ -194,7 +194,7 @@ function spdConsent(age){
 
 async function spdPrepareEngine(){
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div>Getting the camera ready…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Getting the camera ready…</div></div>`);
   try{
     await loadVideoPoseLandmarker();
     bg.remove();
@@ -300,7 +300,7 @@ function spdDiscard(){
 async function spdRun(){
   const subject = SPD.subject, mode = SPD.mode;
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div id="spdProg">Reading the video…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div id="spdProg">Reading the video…</div></div>`);
   const say = t => { const el = bg.querySelector('#spdProg'); if(el) el.textContent = t; };
 
   // Second consent check, re-read from the database — same reason as body-scan.js and
@@ -426,7 +426,7 @@ function spdResult(result){
 
   bg.querySelector('#spdDrop').onclick = () => bg.remove();
   bg.querySelector('#spdSave').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPD.subject.id, metric_key: metricKey, value, unit,
       measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,

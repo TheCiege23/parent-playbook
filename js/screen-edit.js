@@ -10,7 +10,7 @@ const ed = { first:'', nick:'', bd:'', hand:'', sport:'', origSport:'', position
 
 async function openEditAthlete(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   const a=state.active;
   let rows=[];
@@ -69,20 +69,20 @@ function edRender(){
       <div id="edBand">${edBandNote(ed.bd)}</div></div>
     <div class="field"><label>Sex at birth (optional)</label>
       <div class="chipgrid two" id="edSex">
-        ${['male','female'].map(x=>`<div class="chip ${ed.sex===x?'on':''}" data-x="${x}">${x[0].toUpperCase()+x.slice(1)}</div>`).join('')}
+        ${['male','female'].map(x=>`<div class="chip ${ed.sex===x?'on':''}" role="button" tabindex="0" data-x="${x}">${x[0].toUpperCase()+x.slice(1)}</div>`).join('')}
       </div>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Only used for the growth chart on Growth —
         height percentiles and the adult-height estimate are different for boys and girls. Nothing else reads it.</p></div>
 
     <div class="field"><label>Dominant hand (optional)</label>
       <div class="chipgrid" id="edHand">
-        ${['left','right','both'].map(h=>`<div class="chip ${ed.hand===h?'on':''}" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
+        ${['left','right','both'].map(h=>`<div class="chip ${ed.hand===h?'on':''}" role="button" tabindex="0" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
       </div></div>
 
     <div class="sec-title">The sport</div>
     <div class="field"><label>Sport</label>
       <div class="chipgrid" id="edSport">
-        ${sports.map(s=>`<div class="chip ${ed.sport===s.key?'on':''}" data-s="${esc(s.key)}">${esc(s.name)}</div>`).join('')}
+        ${sports.map(s=>`<div class="chip ${ed.sport===s.key?'on':''}" role="button" tabindex="0" data-s="${esc(s.key)}">${esc(s.name)}</div>`).join('')}
       </div>
       ${sportChanged?`<p style="font-size:11.5px;color:#9a4a12;margin:6px 2px 0">Switching sport clears the positions below — pick new ones. Practice days and everything in the Journey stay put.</p>`:''}
     </div>
@@ -152,7 +152,7 @@ async function edSave(){
       errEl.textContent='Cut-off should look like 08-01 (month-day).'; return; }
   }
   const btn=$("#edSave"); const label=btn.textContent;
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   try{
     const { error:ae }=await sb.from('athletes').update({
       first_name:first, nickname:(ed.nick||'').trim()||null,

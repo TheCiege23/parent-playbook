@@ -135,7 +135,7 @@ function obBindTeamCodeLink(){
       <button class="btn ghost" id="tcNo" style="margin-top:8px">Skip for now</button>`);
     bg.querySelector('#tcNo').onclick=()=>bg.remove();
     const go=async()=>{
-      const b=bg.querySelector('#tcGo'); b.innerHTML='<span class="spinner"></span>'; b.disabled=true;
+      const b=bg.querySelector('#tcGo'); b.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; b.disabled=true;
       const msg=await obApplyTeamCode(bg.querySelector('#tcIn').value);
       b.innerHTML='Apply code'; b.disabled=false;
       if(msg){ bg.querySelector('#tcErr').textContent=msg; return; }
@@ -200,7 +200,7 @@ function obChildBind(){
 function posChips(sportKey, selected, id){
   const list=(state.ref?.positions||[]).filter(p=>p.sport_key===sportKey);
   return `<div class="chipgrid two" id="${id}">${list.map(p=>
-    `<div class="chip ${selected.includes(p.code)?'on':''}" data-p="${esc(p.code)}">${esc(p.code)}${
+    `<div class="chip ${selected.includes(p.code)?'on':''}" role="button" tabindex="0" data-p="${esc(p.code)}">${esc(p.code)}${
       p.name?`<span class="sub">${esc(p.name)}</span>`:''}</div>`).join('')}</div>`;
 }
 
@@ -215,7 +215,7 @@ function obSport(){
   // blank screen mid-signup. Recover instead: reload the catalogue and re-render.
   if(!state.ref || !state.ref.sports){
     loadRef().then(()=>obStep()).catch(err=>{ console.error(err); reportError(err,'onboarding:loadRef'); bootError(err); });
-    return H`<div class="center-screen" style="min-height:40dvh"><span class="spinner"></span></div>`;
+    return H`<div class="center-screen" style="min-height:40dvh"><span class="spinner" role="status" aria-label="Loading"></span></div>`;
   }
   const sports = state.ref.sports;
   const chosen = ob.sport;
@@ -244,7 +244,7 @@ function obSport(){
   </div>`}
   <div class="field"><label>Sport</label>
     <div class="chipgrid two" id="sports">
-      ${shown.map(s=>`<div class="chip ${chosen===s.key?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+      ${shown.map(s=>`<div class="chip ${chosen===s.key?'on':''}" role="button" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
     </div>
     ${allShown?'':`<button class="btn sm ghost" id="obAllSports" style="width:100%;margin-top:9px">All ${sports.length} sports ›</button>`}
   </div>
@@ -269,7 +269,7 @@ function obSportBind(){
   // links this child to the team — see the team_by_code comment in the migration.
   { const go=$("#obTeamGo"), inp=$("#obTeamCode"), err=$("#obTeamErr");
     const apply=async()=>{
-      err.textContent=''; go.innerHTML='<span class="spinner"></span>'; go.disabled=true;
+      err.textContent=''; go.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; go.disabled=true;
       const msg=await obApplyTeamCode(inp.value);
       go.innerHTML='Apply'; go.disabled=false;
       if(msg){ err.textContent=msg; return; }
@@ -406,7 +406,7 @@ const GOAL_LIB = {
 function obGoals(){
   const on = k => ob.goals.some(g=>g.key===k);
   const lib = goalLibFor(ob.sport);
-  const grp = (type)=>lib[type].map(g=>`<div class="chip ${on(g.key)?'on':''}" data-k="${g.key}" data-t="${type}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
+  const grp = (type)=>lib[type].map(g=>`<div class="chip ${on(g.key)?'on':''}" role="button" tabindex="0" data-k="${g.key}" data-t="${type}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
   return H`
   <div class="ob-head"><div class="k">Goals</div><h2>What should we work toward?</h2>
   <p>Pick up to three. This is what shapes ${esc(ob.athlete.first)}'s week.</p></div>
@@ -623,7 +623,7 @@ async function obCreateAccount(){
   ob.email=email;
 
   const btn=$("#n"); const label=btn.textContent;
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   try{
     const res=await sb.auth.signUp({ email, password:pw, options:{ emailRedirectTo:authRedirectUrl() } });
     if(res.error) throw res.error;
@@ -707,7 +707,7 @@ async function finishOnboarding(){
   const missing = CONSENTS.filter(c=>c.req && !ob.consents[c.key]);
   if(missing.length){ errEl.textContent="Please check the required consent boxes."; return; }
   const btn=$("#n"); const label=btn?btn.textContent:'';
-  if(btn){ btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true; }
+  if(btn){ btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true; }
   try{
     // One transactional RPC: family + athlete + sport + goals + consent are saved
     // together or not at all. Guarantees the COPPA consent record is never dropped.

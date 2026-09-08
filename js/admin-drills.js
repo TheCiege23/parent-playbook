@@ -21,7 +21,7 @@ function adSportName(k){ return (state.ref&&state.ref.sports.find(s=>s.key===k)|
 
 async function openAdminDrills(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading library…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading library…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); }
   try{
     let q=sb.from('drills').select('*').order('sport_key').order('band').order('sort');
@@ -242,7 +242,7 @@ async function adminSaveDrill(id,btn){
     err.textContent='A published drill needs a source. Add one, or set the status to Draft.'; return;
   }
 
-  const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   const q = id ? sb.from('drills').update(row).eq('id',id)
                : sb.from('drills').insert({ ...row, id:uuid() });
   const { error }=await q;

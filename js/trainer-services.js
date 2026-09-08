@@ -9,7 +9,7 @@ const SVC_FORMATS=[['in_person','In-person'],['virtual','Virtual'],['hybrid','Bo
 async function openTrainerServices(){
   if(marketplaceOff()) return;
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   let svcs=[];
   try{ const { data, error }=await sb.from('services').select('*').eq('trainer_id',state.user.id).order('created_at',{ascending:false});
@@ -76,7 +76,7 @@ function serviceSheet(existing){
         ${sports.map(x=>`<option value="${x.key}" ${s.sport_key===x.key?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
     <div class="field"><label>Format</label>
       <div class="chipgrid" id="svFmt" style="grid-template-columns:repeat(3,1fr)">
-        ${SVC_FORMATS.map(([k,l])=>`<div class="chip ${s.format===k?'on':''}" data-f="${k}">${l}</div>`).join('')}</div></div>
+        ${SVC_FORMATS.map(([k,l])=>`<div class="chip ${s.format===k?'on':''}" role="button" tabindex="0" data-f="${k}">${l}</div>`).join('')}</div></div>
     <div class="row2">
       <div class="field"><label>Duration (min)</label><input id="svDur" type="number" inputmode="numeric" value="${esc(s.duration_min)}"/></div>
       <div class="field"><label>Price ($)</label><input id="svPrice" type="number" inputmode="decimal" placeholder="40" value="${s.price_cents!==''&&s.price_cents!=null?(s.price_cents/100):''}"/></div>
@@ -96,7 +96,7 @@ function serviceSheet(existing){
     const priceV=bg.querySelector('#svPrice').value;
     if(!title){ errEl.textContent='Give the session a title.'; return; }
     if(priceV===''||isNaN(parseFloat(priceV))){ errEl.textContent='Set a price.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const row={ trainer_id:state.user.id, title,
       sport_key:bg.querySelector('#svSport').value||null, format:fmt,
       duration_min:parseInt(bg.querySelector('#svDur').value,10)||60,
@@ -115,7 +115,7 @@ function serviceSheet(existing){
 // ---------- incoming bookings ----------
 async function openTrainerBookings(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let rows=[];
   try{ const { data, error }=await sb.from('bookings').select('*, services(title)').eq('trainer_id',state.user.id).order('created_at',{ascending:false});
     if(error) throw error; rows=data||[]; }

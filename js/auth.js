@@ -11,7 +11,7 @@ async function afterLogin(){
     const pending = (typeof obReadStash==='function') ? obReadStash() : null;
     if(pending){
       document.body.classList.remove('auth'); setAppBg();
-      root.innerHTML = H`<div class="center-screen"><span class="spinner"></span><div>Building ${esc(pending.athlete.first)}'s playbook…</div></div>`;
+      root.innerHTML = H`<div class="center-screen"><span class="spinner" role="status" aria-label="Loading"></span><div>Building ${esc(pending.athlete.first)}'s playbook…</div></div>`;
       const familyId = await myFamilyId();
       obReset({ ...pending, mode: familyId?'addChild':'create', familyId: familyId||null });
       return finishOnboarding();
@@ -164,7 +164,7 @@ function renderAuth(mode='login', prefill=''){
       const agree=$("#agree");
       if(agree && !agree.checked){ errEl.textContent="Please confirm you're the parent or legal guardian and agree to the Privacy Policy and Terms."; return; }
     }
-    const btn=$("#go"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const btn=$("#go"); const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     try{
       let res;
       if(mode==='signup'){
@@ -263,7 +263,7 @@ function renderForgot(prefill=''){
     const email=$("#email").value.trim(), errEl=$("#autherr"); errEl.textContent="";
     if(!email){ errEl.textContent="Enter your email."; return; }
     if(!validEmail(email)){ errEl.textContent="That email doesn't look right — check it for typos."; return; }
-    const btn=$("#send"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const btn=$("#send"); const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
     // resetPasswordForEmail returns success whether or not the account exists (no
     // enumeration), so any error here is a real config/rate problem — surface it.
@@ -304,7 +304,7 @@ function renderResetPassword(){
     const p=$("#np").value, p2=$("#np2").value, errEl=$("#autherr"); errEl.textContent="";
     if(p.length<8){ errEl.textContent="Password must be at least 8 characters."; return; }
     if(p!==p2){ errEl.textContent="Passwords don't match."; return; }
-    const btn=$("#save"); const label=btn.textContent; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const btn=$("#save"); const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     const { data, error }=await sb.auth.updateUser({ password:p });
     if(error){ errEl.textContent=friendlyAuthErr(error.message); btn.innerHTML=label; btn.disabled=false; return; }
     state.user=data.user||state.user;

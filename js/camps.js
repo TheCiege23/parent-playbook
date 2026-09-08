@@ -25,7 +25,7 @@ let campSport = '';
 async function openCamps(){
   logUsageEvent('camps_viewed');
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Finding camps…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Finding camps…</div></div>`;
   try{ await loadRef(); }catch(err){ console.error(err); return bootError(); }
   let camps=[];
   try{
@@ -43,8 +43,8 @@ async function openCamps(){
     </div>
     <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Sign-up happens with the organization directly — nothing here is booked or paid through Parent Playbook.</p>
     <div class="chipgrid" id="cpsports" style="margin-bottom:12px">
-      <div class="chip ${!campSport?'on':''}" data-s="">All</div>
-      ${sports.map(s=>`<div class="chip ${campSport===s.key?'on':''}" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+      <div class="chip ${!campSport?'on':''}" role="button" tabindex="0" data-s="">All</div>
+      ${sports.map(s=>`<div class="chip ${campSport===s.key?'on':''}" role="button" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
     </div>
     ${shown.length ? shown.map(campCard).join('')
       : `<div class="card app-pad"><div class="empty">${campSport?'No listings for this sport yet.':'No approved listings yet — check back soon.'}</div></div>`}
@@ -114,7 +114,7 @@ function openSubmitCamp(){
     if(!loc) return err.textContent='Add a location.';
     if(!/^https?:\/\/.+/.test(url)) return err.textContent='Add a sign-up link starting with https://';
 
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const ageMin = val('#cAgeMin'), ageMax = val('#cAgeMax');
     const { error } = await sb.from('camps').insert({
       org_name: org, contact_name: cname, contact_email: cemail,
@@ -140,7 +140,7 @@ function openSubmitCamp(){
 // ---------- admin review ----------
 async function openCampsAdminQueue(){
   document.body.classList.remove('auth'); setAppBg();
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let rows=[];
   try{
     const { data, error } = await sb.from('camps')

@@ -39,7 +39,10 @@ function fmtDate(d){ if(!d) return ''; const dt=new Date(d+'T00:00:00'); return 
 function mediaThumbInner(m,url,cls){
   if(!url) return `<div class="${cls}" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px">…</div>`;
   if(m.kind==='video') return `<video class="${cls}" src="${esc(url)}#t=0.1" preload="metadata" muted playsinline></video><span class="play">▶</span>`;
-  return `<img class="${cls}" src="${esc(url)}" loading="lazy" alt="${esc(m.caption||'')}"/>`;
+  // An uncaptioned photo still needs a real accessible name — it's the primary
+  // content of this screen, not decoration, so alt="" would wrongly hide it
+  // from a screen reader entirely.
+  return `<img class="${cls}" src="${esc(url)}" loading="lazy" alt="${esc(m.caption||'Journey photo'+(m.taken_on?' from '+fmtDate(m.taken_on):''))}"/>`;
 }
 
 // ===================================================================

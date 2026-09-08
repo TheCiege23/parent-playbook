@@ -43,7 +43,7 @@ function openAddMilestone(onDate){
     const t=bg.querySelector('#mt').value.trim(), d=bg.querySelector('#md').value;
     if(!t){ errEl.textContent='Give the milestone a title.'; return; }
     if(!d){ errEl.textContent='Pick a date.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const mrow={ id:uuid(), athlete_id:state.active.id, milestone_date:d, title:t,
       note:bg.querySelector('#mn').value.trim()||null, created_by:state.user.id };
     if(!navigator.onLine && typeof owQueue==='function'){
@@ -77,7 +77,7 @@ function openAddMedia(games, preselect){
     const files=bg.querySelector('#mf').files;
     if(!files.length){ errEl.textContent='Choose at least one photo or video.'; return; }
     const big=oversize(files); if(big){ errEl.textContent=`“${big.name}” is over 100 MB — trim it and try again.`; return; }
-    e.target.innerHTML='<span class="spinner"></span> Uploading…'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…'; e.target.disabled=true;
     try{
       await uploadMedia(files,{ gameId:(bg.querySelector('#mg')?.value||null),
         caption:bg.querySelector('#mc').value.trim()||null, takenOn:bg.querySelector('#md').value||null });
@@ -139,7 +139,7 @@ function openMediaViewer(id){
   bg.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{ close(); openMediaViewer(b.dataset.jump); });
   { const d=bg.querySelector('#mvDel');
     if(d) d.onclick=async()=>{
-      d.innerHTML='<span class="spinner"></span>'; d.disabled=true;
+      d.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; d.disabled=true;
       // Storage first, then the row — the existing order. A row without its file is a
       // broken thumbnail; a file without its row is invisible and harmless.
       await sb.storage.from('athlete-media').remove([m.path]);
@@ -151,18 +151,47 @@ function openMediaViewer(id){
 }
 
 // ---------- sheets / modals ----------
+let sheetIdSeq=0;
 function sheet(html){
+  // Wire the sheet's own heading up as its accessible name, reusing whatever <h1-4>
+  // it already opens with rather than asking every call site to supply a label.
+  let labelledby='';
+  const withId=html.replace(/<(h[1-4])((?:\s+[^>]*)?)>/i,(m,tag,attrs)=>{
+    const existing=/\bid=["']([^"']+)["']/.exec(attrs||'');
+    if(existing){ labelledby=existing[1]; return m; }
+    const id='sheetTitle'+(++sheetIdSeq);
+    labelledby=id;
+    return `<${tag}${attrs||''} id="${id}">`;
+  });
   const bg=document.createElement('div');bg.className='modal-bg';
-  bg.innerHTML=`<div class="sheet" tabindex="-1" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
-  // Esc-to-close + focus. Override remove() so every existing bg.remove() call
-  // also tears down the key listener (no dangling handlers).
+  bg.innerHTML=`<div class="sheet" tabindex="-1" role="dialog" aria-modal="true"${labelledby?` aria-labelledby="${labelledby}"`:''}><div class="grab"></div>${withId}</div>`;
+  const opener=document.activeElement;
+  const card=bg.querySelector('.sheet');
+  const focusables=()=>Array.from(card.querySelectorAll(
+    'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+  )).filter(el=>el.offsetParent!==null);
+  // Esc-to-close + a focus trap so Tab can't leave the sheet for the obscured page
+  // behind it, + focus restore so closing doesn't strand keyboard users at <body>.
+  // Override remove() so every existing bg.remove() call gets all three for free.
   const _remove=bg.remove.bind(bg);
-  const onKey=e=>{ if(e.key==='Escape') bg.remove(); };
-  bg.remove=()=>{ document.removeEventListener('keydown',onKey); _remove(); };
+  const onKey=e=>{
+    if(e.key==='Escape'){ bg.remove(); return; }
+    if(e.key==='Tab'){
+      const items=focusables();
+      if(!items.length){ e.preventDefault(); return; }
+      const first=items[0], last=items[items.length-1];
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    }
+  };
+  bg.remove=()=>{
+    document.removeEventListener('keydown',onKey); _remove();
+    if(opener && document.contains(opener) && typeof opener.focus==='function') opener.focus();
+  };
   bg.onclick=e=>{ if(e.target===bg) bg.remove(); };
   document.addEventListener('keydown',onKey);
   document.body.appendChild(bg);
-  const card=bg.querySelector('.sheet'); if(card) card.focus();
+  if(card) card.focus();
   return bg;
 }
 function openSwitch(){
@@ -210,16 +239,16 @@ function openInvite(){
 
     <div class="field"><label>Access level</label>
       <div class="chipgrid" id="role" style="grid-template-columns:1fr 1fr">
-        <div class="chip on" data-r="family_view">Family view</div>
-        <div class="chip" data-r="co_parent">Co-parent (edit)</div>
-        <div class="chip" data-r="coach">Team Connect (coach)</div>
+        <div class="chip on" role="button" tabindex="0" data-r="family_view">Family view</div>
+        <div class="chip" role="button" tabindex="0" data-r="co_parent">Co-parent (edit)</div>
+        <div class="chip" role="button" tabindex="0" data-r="coach">Team Connect (coach)</div>
       </div></div>
 
     <div class="field"><label>How should it reach them?</label>
       <div class="chipgrid" id="chan" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="chip on" data-c="text">Text</div>
-        <div class="chip" data-c="email">Email</div>
-        <div class="chip" data-c="link">Just a link</div>
+        <div class="chip on" role="button" tabindex="0" data-c="text">Text</div>
+        <div class="chip" role="button" tabindex="0" data-c="email">Email</div>
+        <div class="chip" role="button" tabindex="0" data-c="link">Just a link</div>
       </div></div>
 
     <div class="field" id="fPhone"><label>Their mobile number</label>
@@ -250,7 +279,7 @@ function openInvite(){
   });
 
   bg.querySelector('#gen').onclick=async(e)=>{
-    const btn=e.target; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const btn=e.target; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     const errEl=bg.querySelector('#inverr'); errEl.textContent='';
     const stop=msg=>{ errEl.textContent=msg; btn.innerHTML='Create invite'; btn.disabled=false; };
 
@@ -274,7 +303,7 @@ function openInvite(){
     // One invite row per child, each with its OWN token and code — the loop is what's
     // new here, but every invite it produces is exactly as narrow as the single-child
     // flow always was. Accepting CJ's invite still never touches Savannah's.
-    if(chan==='text'||chan==='email') btn.innerHTML='<span class="spinner"></span> Sending…';
+    if(chan==='text'||chan==='email') btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Sending…';
     const results=[]; // { name, ok, sent, code, link, why, chan }
     for(const kidId of kidIds){
       const kid = kids.find(k=>k.id===kidId) || state.active;
@@ -390,8 +419,8 @@ function openAddGoal(existing){
   // "Read the game better" here either.
   const lib=goalLibFor(state.activeSportKey||null);
   const grp=t=>lib[t].map(g=>taken.has(g.key)
-    ? `<div class="chip" style="opacity:.45;cursor:default" title="Already a goal">${esc(g.label)} ✓</div>`
-    : `<div class="chip" data-k="${g.key}" data-t="${t}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
+    ? `<div class="chip" style="opacity:.45;cursor:default" aria-disabled="true" title="Already a goal">${esc(g.label)} ✓</div>`
+    : `<div class="chip" role="button" tabindex="0" data-k="${g.key}" data-t="${t}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
   const bg=sheet(H`<h3>Add a goal</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 0">${room
       ? `Up to ${GOAL_MAX} at a time — room for ${room} more. Focus beats a long list.`
@@ -416,7 +445,7 @@ function openAddGoal(existing){
   });
   bg.querySelector('#save').onclick=async(e)=>{
     if(!picks.length){toast('Pick a goal first');return;}
-    e.target.innerHTML='<span class="spinner"></span>';e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>';e.target.disabled=true;
     const sport=(await sb.from('athlete_sports').select('sport_key').eq('athlete_id',state.active.id).eq('is_primary',true).maybeSingle()).data?.sport_key||null;
     const { error }=await sb.from('goals').insert(picks.map(p=>({athlete_id:state.active.id,type:p.type,sport_key:sport,key:p.key,label:p.label,created_by:state.user.id})));
     // restore the button on failure — bailing out early left it a disabled spinner
@@ -460,7 +489,7 @@ function openAddMeasure(presetKey){
     if(isNaN(val)){ errEl.textContent='Enter a value.'; return; }
     if(val<=0){ errEl.textContent='Enter a value greater than zero.'; return; }
     if(date>today){ errEl.textContent="That date is in the future — pick today or earlier."; return; }
-    e.target.innerHTML='<span class="spinner"></span>';e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>';e.target.disabled=true;
     const { error }=await sb.from('measurements').insert({athlete_id:state.active.id,metric_key:key,value:val,unit:unit||null,measured_on:date,source:'manual',created_by:state.user.id});
     if(error){ console.error(error); errEl.textContent='Could not save. '+(error.message||''); e.target.innerHTML='Save measurement'; e.target.disabled=false; return; }
     bg.remove(); toast('Recorded'); renderApp('growth');
@@ -487,7 +516,7 @@ function openSportEditor(row, onSaved){
         : 'Positions and level for this sport.'}</p>
       ${adding?H`<div class="field"><label>Sport</label>
         <div class="chipgrid" id="spk">
-          ${pick.length?pick.map(s=>`<div class="chip ${sportKey===s.key?'on':''}" data-k="${esc(s.key)}">${esc(s.name)}</div>`).join('')
+          ${pick.length?pick.map(s=>`<div class="chip ${sportKey===s.key?'on':''}" role="button" tabindex="0" data-k="${esc(s.key)}">${esc(s.name)}</div>`).join('')
             :'<p style="color:var(--muted);font-size:13px;grid-column:1/-1">Every sport is already added.</p>'}
         </div></div>`:''}
       ${sportKey?H`
@@ -520,7 +549,7 @@ function openSportEditor(row, onSaved){
       const errEl=bg.querySelector('#sperr'); errEl.textContent='';
       if(!positions.length){ errEl.textContent='Choose at least one position.'; return; }
       if(!level){ errEl.textContent='Select a level.'; return; }
-      e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+      e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
       let error;
       if(adding){
         ({ error }=await sb.from('athlete_sports').insert({
@@ -576,7 +605,7 @@ function confirmDeleteAccount(){
     if((bg.querySelector('#delWord').value||'').trim().toUpperCase()!=='DELETE'){
       errEl.textContent='Type DELETE to confirm.'; return;
     }
-    const btn=e.target; btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+    const btn=e.target; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     let res;
     try{ res=await sb.functions.invoke('delete-account',{ body:{ confirm:'DELETE' } }); }
     catch(err){ console.error(err); res={ error:err }; }
@@ -604,7 +633,7 @@ function confirmRemoveSport(row, name){
     <button class="btn ghost" id="no">Keep it</button>`);
   bg.querySelector('#no').onclick=()=>bg.remove();
   bg.querySelector('#yes').onclick=async(e)=>{
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('athlete_sports').delete().eq('id',row.id);
     if(error){ console.error(error); toast('Could not remove'); e.target.innerHTML='Remove sport'; e.target.disabled=false; return; }
     // never leave the athlete with no primary
@@ -619,7 +648,7 @@ function confirmRemoveSport(row, name){
 // ---- practice schedule: the week is planned AROUND these days ----
 function schedChips(sel,id){
   return `<div class="chipgrid" id="${id}" style="grid-template-columns:repeat(4,1fr)">
-    ${DAY_LABELS.map((d,i)=>`<div class="chip ${sel.includes(i)?'on':''}" data-d="${i}">${d}</div>`).join('')}</div>`;
+    ${DAY_LABELS.map((d,i)=>`<div class="chip ${sel.includes(i)?'on':''}" role="button" tabindex="0" data-d="${i}">${d}</div>`).join('')}</div>`;
 }
 function openPracticeSchedule(sportKey, current, onSaved){
   let picked=[...(current?.practiceDays||[])];
@@ -658,7 +687,7 @@ function openPracticeSchedule(sportKey, current, onSaved){
     const ss=bg.querySelector('#ss').value||null, se=bg.querySelector('#se').value||null;
     if(ss&&se&&se<ss){ errEl.textContent="The last game can't be before the first one."; return; }
     if(gd==null&&ss){ errEl.textContent="Pick a game day too, or clear the season dates."; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const { error }=await sb.from('athlete_sports')
       .update({ practice_days:picked.sort((a,b)=>a-b), game_day:gd, season_start:ss, season_end:se })
       .eq('athlete_id',state.active.id).eq('sport_key',sportKey);
@@ -676,7 +705,7 @@ function confirmDelete(){
     <button class="btn ghost" id="no">Keep it</button>`);
   bg.querySelector('#no').onclick=()=>bg.remove();
   bg.querySelector('#yes').onclick=async(e)=>{
-    e.target.innerHTML='<span class="spinner"></span>';e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>';e.target.disabled=true;
     // Server-side: verifies ownership, deletes the athlete (cascades all rows),
     // AND purges the child's photos/videos from storage so nothing is left behind.
     const { data, error }=await sb.functions.invoke('delete-athlete',{ body:{ athlete_id:a.id } });

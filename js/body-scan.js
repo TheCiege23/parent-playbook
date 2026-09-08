@@ -307,7 +307,7 @@ async function openBodyScan(subject){
   if(!p) return bsNoProviderUp();
 
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
-    <span class="spinner"></span><div>Checking…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Checking…</div></div>`);
   const [consent, height] = await Promise.all([
     loadScanConsent(BS.subject.id, p.id),
     latestHeightIn(BS.subject.id),
@@ -481,7 +481,7 @@ function bsConsent(age, p, height){
   go.onclick = async e => {
     const err = bg.querySelector('#bsCErr'); err.textContent = '';
     if(!boxes.every(b => b.checked)) return;
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
 
     // Recorded BEFORE the camera opens, never after. A release written once the photos
     // exist is a release for something that already happened.
@@ -522,7 +522,7 @@ function bsConsent(age, p, height){
 // ---------------------------------------------------------------------------
 async function bsPrepareEngine(){
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div>Getting the camera ready…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Getting the camera ready…</div></div>`);
   try{
     await loadPoseLandmarker();
     bg.remove();
@@ -659,7 +659,7 @@ async function bsRun(){
   const subject = BS.subject;
 
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div id="bsProg">Measuring…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div id="bsProg">Measuring…</div></div>`);
   const say = t => { const el = bg.querySelector('#bsProg'); if(el) el.textContent = t; };
 
   // SECOND CHECK, and it re-reads the database rather than trusting BS.consent. The
@@ -787,7 +787,7 @@ function bsResult(result){
     <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos have been discarded. These
       numbers are what was kept.</p>
 
-    ${wantsMesh ? H`<div class="bs-mesh" id="bsMesh"><div class="bs-mesh-load"><span class="spinner"></span></div></div>` : ''}
+    ${wantsMesh ? H`<div class="bs-mesh" id="bsMesh"><div class="bs-mesh-load"><span class="spinner" role="status" aria-label="Loading"></span></div></div>` : ''}
 
     ${bsRatioCards(result)}
 
@@ -838,7 +838,7 @@ function bsResult(result){
   };
   bg.querySelector('#bsDrop').onclick = close;
   bg.querySelector('#bsSave').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const today = new Date().toISOString().slice(0,10);
     // `photo` is a real value of the measure_source enum. This said 'scan' for as long
     // as the file has existed, which is not one of (manual, guided, photo, import) —
@@ -1113,7 +1113,7 @@ function confirmWithdrawScan(athleteId, engineId, name, label){
     </div>`);
   bg.querySelector('#wdNo').onclick = () => bg.remove();
   bg.querySelector('#wdYes').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('biometric_consents')
       .update({ revoked_at: new Date().toISOString(), revoked_by: state.user.id })
       .eq('athlete_id', athleteId).eq('scan_engine', engineId).is('revoked_at', null);

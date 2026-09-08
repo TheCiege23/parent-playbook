@@ -269,7 +269,7 @@ function sptResult(elapsedS, videoFile){
   const cleanup = () => { if(url){ try{ URL.revokeObjectURL(url); }catch(e){} } };
   bg.querySelector('#sptDrop').onclick = () => { cleanup(); bg.remove(); };
   bg.querySelector('#sptSave').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPT.subject.id, metric_key: d.key, value: Math.round(elapsedS * 100) / 100, unit: 's',
       measured_on: new Date().toISOString().slice(0,10), source: 'guided', created_by: state.user.id,
@@ -308,7 +308,7 @@ async function sptvOpen(){
      release applies.`);
 
   const bg = sheet(H`<div class="center-screen" style="min-height:24dvh">
-    <span class="spinner"></span><div>Checking…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div>Checking…</div></div>`);
   const consent = await loadScanConsent(SPTV.subject.id, SPRINT_ENGINE_ID);
   bg.remove();
 
@@ -371,7 +371,7 @@ function sptvConsent(age){
   go.onclick = async e => {
     const err = bg.querySelector('#sptvCErr'); err.textContent = '';
     if(!boxes.every(b => b.checked)) return;
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
 
     const { data, error } = await sb.from('biometric_consents').insert({
       athlete_id: SPTV.subject.id,
@@ -539,7 +539,7 @@ const SPRINT_FAIL = {
 
 async function sptvRun(){
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
-    <span class="spinner"></span><div id="sptvProg">Getting the camera ready…</div></div>`);
+    <span class="spinner" role="status" aria-label="Loading"></span><div id="sptvProg">Getting the camera ready…</div></div>`);
   const say = t => { const el = bg.querySelector('#sptvProg'); if(el) el.textContent = t; };
 
   try{ await loadVideoPoseLandmarker(say); }
@@ -622,7 +622,7 @@ function sptvResult(result){
 
   bg.querySelector('#sptvDrop').onclick = () => bg.remove();
   bg.querySelector('#sptvSave').onclick = async e => {
-    e.target.innerHTML = '<span class="spinner"></span>'; e.target.disabled = true;
+    e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPT.subject.id, metric_key: d.key, value: result.elapsedS, unit: 's',
       measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,

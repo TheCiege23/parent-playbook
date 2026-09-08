@@ -365,8 +365,8 @@ function openGrowthInputs(cur, sportRow, onSaved){
 
     <div class="field"><label>${esc(state.active.first_name)}'s sex at birth</label>
       <div class="chipgrid two" id="gxSex">
-        <div class="chip ${c.sex_at_birth==='male'?'on':''}" data-v="male">Male</div>
-        <div class="chip ${c.sex_at_birth==='female'?'on':''}" data-v="female">Female</div>
+        <div class="chip ${c.sex_at_birth==='male'?'on':''}" role="button" tabindex="0" data-v="male">Male</div>
+        <div class="chip ${c.sex_at_birth==='female'?'on':''}" role="button" tabindex="0" data-v="female">Female</div>
       </div>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Growth charts and the height formula are
         different for boys and girls — there's no accurate way to skip this one.</p></div>
@@ -413,7 +413,7 @@ function openGrowthInputs(cur, sportRow, onSaved){
       if(v!==null && (v<48||v>84)) { err.textContent=`That ${who}'s height looks off — we expect inches, roughly 48 to 84.`; return; }
     if(cut && !/^\d{2}-\d{2}$/.test(cut)) { err.textContent='Cut-off should look like 08-01 (month-day).'; return; }
 
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const upd={};
     if(sex) upd.sex_at_birth=sex;
     if(m!==null) upd.mother_height_in=m;

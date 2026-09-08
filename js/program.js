@@ -1356,7 +1356,7 @@ async function markSessionDone(ctx, btn){
   // round tick on a day row. Restore whatever label was actually there on failure —
   // hardcoding "Mark done" turned a failed tick into a button reading "Mark done".
   const was=btn.innerHTML;
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   // Offline: queue it and move on. A parent standing on a field with one bar should
   // not lose the tick, and should not be told to try again later.
   if(!navigator.onLine && typeof owQueue==='function'){
@@ -1379,7 +1379,7 @@ async function markSessionDone(ctx, btn){
 // Rain day / cancelled practice. Frees that day's load so the plan can offer something
 // at home instead — or keep it as rest if the week is already full.
 async function markCancelled(ctx, btn, on){
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   let error;
   if(on){
     ({ error }=await sb.from('schedule_exceptions').upsert({
@@ -1397,7 +1397,7 @@ async function markCancelled(ctx, btn, on){
 
 async function undoSessionDone(ctx, btn){
   const was=btn.innerHTML;
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
   if(!navigator.onLine && typeof owQueue==='function'){
     await owQueue({ kind_op:'session_undo', athlete_id:state.active.id,
       done_on:ctx.date, title:ctx.title });

@@ -78,7 +78,7 @@ async function screenProfile(){
         <div class="grow" style="border:none;padding:0"><div class="gi">✦</div>
           <div class="gt"><b>Did you play ${esc(sportName||'this sport')}?</b><span>We'll add notes written for someone who already knows the drill.</span></div></div>
         <div class="chipgrid" id="pexpEdit" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
-          ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" data-e="${v}">${esc(l)}</div>`).join('')}
+          ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" role="button" tabindex="0" data-e="${v}">${esc(l)}</div>`).join('')}
         </div>
         ${_primary.sport_key==='football'?H`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
           <div class="gt" style="margin-bottom:8px"><b>Your league's ball-carrier weight limit</b>

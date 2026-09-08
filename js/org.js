@@ -35,7 +35,7 @@ async function openJoinTeam(){
     const code=(bg.querySelector('#jtCode').value||'').trim();
     const err=bg.querySelector('#jtErr'); err.textContent='';
     if(!code){ err.textContent='Enter the code you were given.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const reset=()=>{ e.target.innerHTML='Join'; e.target.disabled=false; };
     let data,error;
     try{ ({data,error}=await sb.rpc('team_by_code',{ p_code:code })); }
@@ -57,7 +57,7 @@ async function openJoinTeam(){
 
 // ---- entry point from Account: your own roster(s), or start one ----
 async function openMyOrg(){
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let teams=[];
   try{
     const { data, error }=await sb.from('teams').select('id,name,sport_key,join_code,is_active')
@@ -131,7 +131,7 @@ async function openOrgCreate(){
     const err=$("#ocErr"); err.textContent='';
     if(!name){ err.textContent='Give the roster a name.'; return; }
     if(!sport){ err.textContent='Pick a sport.'; return; }
-    e.target.innerHTML='<span class="spinner"></span>'; e.target.disabled=true;
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const row={ name, sport_key:sport, created_by:state.user.id, is_active:true };
     if(level) row.level=level;
     if(days.length) row.practice_days=days.sort((a,b)=>a-b);
@@ -153,7 +153,7 @@ async function openOrgCreate(){
 // ---- the roster-wide table + coach-connection oversight ----
 async function openOrgRoster(teamId){
   logUsageEvent('org_roster_viewed');
-  root.innerHTML = H`<div class="center-screen"><div class="spinner" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
+  root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Loading…</div></div>`;
   let team, memberships=[], athletes=[], sports=[], meas=[], access=[];
   try{
     const { data:t, error:te }=await sb.from('teams').select('*').eq('id',teamId).maybeSingle();
