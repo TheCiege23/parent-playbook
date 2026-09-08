@@ -69,7 +69,7 @@ async function screenGrowth(){
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),
     sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(60),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(60),
-    sb.from('athlete_sports').select('sport_key,is_primary,age_cutoff_md').eq('athlete_id',a.id),
+    sb.from('athlete_sports').select('sport_key,is_primary,age_cutoff_md,pw_ball_carrier_lb').eq('athlete_id',a.id),
     // sex + parent heights drive the maturity card. Read fresh rather than from
     // state.active, which is cached from a login that predates these columns.
     sb.from('athletes').select('sex_at_birth,mother_height_in,father_height_in,birthdate')
@@ -85,6 +85,14 @@ async function screenGrowth(){
 
   const byMetric={}; (meas||[]).forEach(m=>{ (byMetric[m.metric_key]=byMetric[m.metric_key]||[]).push(m); });
   const metricKeys=Object.keys(byMetric);
+
+  // Pop Warner division/position guidance — football only, and only as far as the
+  // national matrix can honestly go. See js/pop-warner.js for why there's no single
+  // ball-carrier cutoff baked in here.
+  const pwWeight = byMetric.weight && byMetric.weight[0] ? Number(byMetric.weight[0].value) : null;
+  const pwDivisions = primary?.sport_key==='football' ? pwEligibleDivisions(age, pwWeight) : [];
+  const pwLimit = primary?.pw_ball_carrier_lb!=null ? Number(primary.pw_ball_carrier_lb) : null;
+  const pwNote = primary?.sport_key==='football' ? pwPositionNote(pwWeight, pwLimit, a.first_name) : '';
   const active=(goals||[]).filter(g=>g.status==='active');
   const lead=active[0]||null;
   const leadKey=lead?GOAL_METRIC[lead.key]:null;
@@ -205,6 +213,18 @@ async function screenGrowth(){
               uploaded and never saved.</span></div><i>›</i></div>
       </div>
       <p class="muted-note">Asks your permission first, and you can withdraw it in Account at any time.</p>`:''}
+
+      ${primary?.sport_key==='football'?H`<div class="sec-title" style="margin-top:18px">Pop Warner divisions</div>
+      <div class="card app-pad">
+        ${pwWeight==null
+          ?H`<p class="empty">Record a weight above and this shows which division${age!=null?' fits a '+age+'-year-old':''} at that weight.</p>`
+          : pwDivisions.length
+            ?pwDivisions.map(d=>H`<div class="mrow"><span>${esc(d.label)}${d.via==='older-lighter'?' (older/lighter)':''}</span>
+                <b>${esc(pwDivisionRange(d,d.via))}</b></div>`).join('')
+            :H`<p class="empty">${esc(String(pwWeight))} lb at age ${age} doesn't land in a standard division band —
+                check the current matrix with your league; birth-date cutoffs shift each season.</p>`}
+        <p style="font-size:12.5px;line-height:1.55;color:var(--muted);margin:${pwWeight==null?0:12}px 2px 0">${esc(pwNote)}</p>
+      </div>`:''}
 
       ${MARKETPLACE_ENABLED?H`<div class="card app-pad" id="mpBanner" style="cursor:pointer;margin-top:14px">
         <div class="grow" style="border:none;padding:0"><div class="gi">🔎</div>

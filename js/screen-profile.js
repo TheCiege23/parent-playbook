@@ -79,6 +79,17 @@ async function screenProfile(){
         <div class="chipgrid" id="pexpEdit" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
           ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" data-e="${v}">${esc(l)}</div>`).join('')}
         </div>
+        ${_primary.sport_key==='football'?H`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+          <div class="gt" style="margin-bottom:8px"><b>Your league's ball-carrier weight limit</b>
+            <span>Pop Warner's "X-Man" rule is real but set locally — enter your league's number and it shows up on Growth. Leave it blank and Growth just explains the rule instead.</span></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="pwLimit" type="number" inputmode="numeric" min="1" max="400" placeholder="e.g. 130"
+              value="${_primary.pw_ball_carrier_lb!=null?esc(String(_primary.pw_ball_carrier_lb)):''}"
+              style="width:90px"/>
+            <span style="font-size:13px;color:var(--muted)">lb</span>
+            <button class="btn sm ghost" id="pwSave">Save</button>
+          </div>
+        </div>`:''}
       </div>`:''}
 
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -141,6 +152,15 @@ async function screenProfile(){
       state.coach = v ? { sportKey:_primary.sport_key, level:v } : null;
       toast(v?'Coach\'s Corner on ✦':'Coach\'s Corner off');
     }); }
+  { const ps=$("#pwSave"); if(ps&&_primary) ps.onclick=async()=>{
+      const raw=$("#pwLimit").value;
+      const n = raw==='' ? null : Number(raw);
+      if(raw!=='' && (!isFinite(n)||n<=0)){ toast('Enter a number in pounds'); return; }
+      ps.disabled=true;
+      const { error }=await sb.from('athlete_sports').update({ pw_ball_carrier_lb:n }).eq('athlete_id',a.id).eq('sport_key',_primary.sport_key);
+      if(error){ console.error(error); reportError(error,'profile:pwLimit'); toast('Could not save'); ps.disabled=false; return; }
+      toast(n!=null?'Saved':'Cleared'); renderApp('profile');
+    }; }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
 }
 
