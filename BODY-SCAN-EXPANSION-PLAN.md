@@ -1,4 +1,4 @@
-# Body scan expansion — vendor evaluation, biomechanics scope, cohort roadmap
+# Body scan expansion — vendor evaluation, biomechanics scope, cohort roadmap, speed/footwork scope
 
 **Date:** 2026-09-08
 **Context:** fitmatch.ai's sports-science tier (body composition, biomechanics/asymmetry, cohort
@@ -136,6 +136,96 @@ what terms — building ahead of that answer risks having to unwind it.
 
 ---
 
+---
+
+## Part 4 — Speed & footwork: scoped, not built
+
+Prompted by: *"can we also do video for increasing speed, catches, shooting in basketball,
+defense, footwork, etc?"* This part covers only **speed and footwork** — catches, shooting and
+defense are addressed separately below, because they hit a different wall than anything built so
+far.
+
+### The line that separates "buildable honestly" from "not yet"
+
+Everything shipped in this app's movement engines (`pose-measure.js`, `jump-measure.js`) measures
+**the athlete's own body against itself or against a clock** — a joint angle, a flight time, a
+proportion. Nothing has ever needed to track anything *other than* the athlete. Speed and footwork
+split cleanly along that same line:
+
+- **No object to track, no real-world distance needed** → same effort tier as vertical jump.
+  Buildable now.
+- **A real-world distance, held to a stationary, calibrated camera** → same *category* of honest as
+  vertical jump, but a materially bigger build with more ways for a parent's setup to invalidate
+  the result.
+- **Catches, shot makes, defensive grading** → needs the system to see and track a *ball* (and for
+  basketball, a hoop), which is a different model entirely, not an extension of pose tracking. See
+  below — this is not scoped here.
+
+### Phase 1 — buildable now, same tier as vertical jump (no distance, no calibration)
+
+Both reuse the exact pipeline `jump-measure.js` already proved out: `PoseLandmarker` in `VIDEO`
+mode, sampled on a clock, landmark visibility gating, reject-rather-than-guess. New analysis file
+only — no new capture UI beyond "record N seconds," no new consent category beyond extending
+`biometric_consents` to another `scan_engine` value the same way `jump` was added.
+
+- **First-step / reaction quickness.** Time from a stationary "set" position to the first frame
+  hip or ankle displacement crosses a movement threshold (the same kind of threshold-crossing
+  `findJumps()` already does for liftoff, applied to a horizontal or any-direction displacement
+  instead of a vertical one). A duration, not a score — comparable to the athlete's own past
+  sessions, not to a population.
+- **Footwork cadence.** Steps (foot-strike events) per second across a fixed-duration drill —
+  ladder work, quick feet in place. A rate, no distance required, same threshold-crossing method
+  applied to ankle up/down cycles instead of a single liftoff/landing pair.
+
+Neither of these needs the athlete to cover a measured distance, so neither needs the parent to do
+anything beyond point the phone and record — the same "no equipment the phone can't see" bar the
+jump MVP already holds itself to.
+
+### Phase 2 — real sprint speed, bigger lift, worth naming honestly
+
+A true speed number (yards/sec, a 10-yard-split-style time) needs **distance ÷ time**, and time-of-
+flight tricks don't apply to a body translating across the ground — there's no formula that
+recovers distance from time alone the way `height = g·t²/8` recovers height. Distance has to come
+from somewhere real, the same way the body scan's inch values come from a height someone measured
+with a tape rather than being invented. That means:
+
+- A **stationary** camera (panning to follow the athlete destroys the calibration).
+- A **known real-world distance** between two points in frame — a parent measures it once (tape
+  measure or a measuring wheel, same act as entering height for the scan) and enters the number.
+- A one-time **calibration tap**: the parent marks the start and finish line's on-screen position
+  in a preview frame before recording.
+- Crossing-time detection: the hip midpoint's horizontal position interpolated frame-to-frame
+  against the two marked lines, same sampling cadence as jump/footwork.
+
+This is real and honest — it's the same smartphone-radar-gun pattern several consumer speed-timing
+apps already use — but it is a **bigger build than Phase 1**: a new calibration step in the capture
+UI, a new geometry path (pixel-distance → real-distance via the two marked points, distinct from
+the height-anchored scaling `pose-measure.js` uses), and meaningfully more failure modes to design
+honest rejection messaging for — camera moved mid-recording, phone not level/perpendicular to the
+running line, the athlete drifting off-axis. Comparable in size to the original body-scan build,
+not the smaller jump/footwork add-ons above.
+
+### Catches, shot makes, defense — not scoped here, different capability
+
+These all require detecting and tracking an **object** (a ball, a hoop) in addition to the
+athlete's body. `PoseLandmarker` has no opinion about a ball — it isn't built to see one. Getting
+this right needs a *separate* object-detection model, evaluated the same way body composition was
+in Part 1: what's licensable, at what accuracy, at what cost, and — the question that mattered most
+there — whether it's actually validated for the fast, low-quality, single-camera video a phone on a
+sideline produces, versus the broadcast-camera conditions most sports-analytics vendors are built
+and tested against. Nothing here should be assumed buildable until that evaluation happens; it's a
+research question before it's an engineering one, same shape as Part 1.
+
+### Recommendation
+
+Build **Phase 1** (reaction time + footwork cadence) next — it's honest, it reuses everything
+already shipped, and it's the same size of effort as the vertical jump build. Treat **Phase 2**
+(calibrated sprint speed) as its own scoped decision once Phase 1 is live and you've seen how
+parents actually use it. Treat **catches/shooting/defense** as a Part-1-style vendor/capability
+evaluation, not a build, until that evaluation happens.
+
+---
+
 ## Summary for the business plan
 
 | Feature | Path | Cost/timeline | Ready to build now? |
@@ -143,3 +233,6 @@ what terms — building ahead of that answer risks having to unwind it.
 | Body composition | License AHI (or similar), budget ~$3/scan at volume | Vendor negotiation + integration; pediatric-validation question goes to counsel first | No — legal question first |
 | Biomechanics (jump height + symmetry) | Build in-house, reuses existing MediaPipe integration | Comparable to the original scan build — a real multi-session engineering effort | **Yes, once you confirm scope** |
 | Cohort benchmarking | Product/legal decision, then (maybe) a phased build | Gated on counsel's answer, then gated on user scale | No — not an engineering task yet |
+| Speed/footwork — reaction time + cadence | Build in-house, reuses jump-measure pipeline, no calibration | Same tier as the jump build | **Yes, once you confirm scope** |
+| Speed/footwork — calibrated sprint speed | Build in-house, new calibration step + new geometry path | Comparable to the original scan build | Not yet — scope again after Phase 1 ships |
+| Catches / shooting / defense | Needs a ball/hoop object-detection model — separate capability evaluation | Unknown until that evaluation happens | No — research question first |
