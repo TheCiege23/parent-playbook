@@ -814,6 +814,8 @@ function bsResult(result){
         ? ' ' + d.skipped.map(s => `${esc(nameOf(s.key))} isn't in this scan — ${esc(s.reason)}.`).join(' ')
         : ''}</p></div></div>
 
+    <div id="bsMaturity"></div>
+
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
       <button class="btn amber" id="bsSave">Save to Growth</button>
@@ -826,6 +828,7 @@ function bsResult(result){
     const host = bg.querySelector('#bsMesh');
     renderBodyMesh(host, result.meshUrl).then(ok => { if(!ok && host) host.remove(); });
   }
+  bsAppendMaturity(bg);
 
   const close = () => {
     const host = bg.querySelector('#bsMesh');
@@ -853,6 +856,39 @@ function bsResult(result){
     }
     close(); toast('Saved'); renderApp('growth');
   };
+}
+
+// Progressive, same idiom as the mesh above: the primary result renders immediately and
+// this fills in behind it if the data for it exists. This is NOT computed from the scan
+// — the scan measures proportions, not a standing height — it is the same published-
+// science growth read maturity.js already shows on the Growth screen (predicted adult
+// height, height percentile, growth spurt, relative age), pulled in here so a parent
+// who just measured their kid sees it without a second trip. A family with no parent
+// heights or height reading on file sees nothing added here, not a gap or an error —
+// growthCard() itself returns '' when there is nothing it can show.
+async function bsAppendMaturity(bg){
+  const host = bg.querySelector('#bsMaturity');
+  if(!host || typeof maturityReport !== 'function' || typeof growthCard !== 'function') return;
+  try{
+    const [{ data: ath }, { data: heightRows }, { data: sportRow }] = await Promise.all([
+      sb.from('athletes').select('sex_at_birth,mother_height_in,father_height_in,birthdate')
+        .eq('id', BS.subject.id).maybeSingle(),
+      sb.from('measurements').select('metric_key,value,measured_on')
+        .eq('athlete_id', BS.subject.id).eq('metric_key', 'height')
+        .order('measured_on', { ascending:false }).limit(60),
+      sb.from('athlete_sports').select('sport_key,age_cutoff_md')
+        .eq('athlete_id', BS.subject.id).eq('is_primary', true).maybeSingle(),
+    ]);
+    if(!ath || !document.body.contains(host)) return;
+    const mat = maturityReport({ ...ath, birthdate: ath.birthdate || BS.subject.birthdate },
+                               heightRows || [], sportRow || null);
+    const html = growthCard(mat, BS.subject);
+    if(html) host.innerHTML = html;
+  }catch(e){
+    // Decoration on top of a result that already stands on its own — a failure here
+    // must never be visible as anything other than the card simply not appearing.
+    console.error('maturity card failed to load on scan result', e);
+  }
 }
 
 // ===================================================================
