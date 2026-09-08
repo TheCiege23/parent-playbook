@@ -865,6 +865,10 @@
   .bs-shutter{width:68px;height:68px;border-radius:50%;background:var(--paper);
     border:4px solid var(--green);margin:14px auto 0;display:block}
   .bs-shutter:active{transform:scale(.94)}
+  /* The sprint stopwatch button toggles onto this once tapped — green means "tap to
+     start," this means "tap to stop," same colour language the rest of the app uses
+     for an in-progress state. */
+  .bs-shutter.recording{border-color:#D65A4A;background:#FBEAE7}
 
   /* Setup diagram. */
   .bs-setup{background:var(--pine-900);border-radius:18px;padding:18px;margin-top:4px}

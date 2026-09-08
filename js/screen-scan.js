@@ -14,7 +14,7 @@ async function screenScan(){
 
   const { data: recent } = await sb.from('measurements')
     .select('metric_key,value,unit,measured_on,source')
-    .eq('athlete_id', a.id).in('source', ['photo','video'])
+    .eq('athlete_id', a.id).in('source', ['photo','video','guided'])
     .order('measured_on', { ascending:false }).limit(6);
 
   $("#screen").innerHTML = H`
@@ -53,8 +53,17 @@ async function screenScan(){
               never saved.</span></div><i>›</i></div>
       </div>
 
-      <p class="muted-note" style="margin-top:10px">Each asks your permission first — a signed, revocable
-        release — before the camera opens. Manage or withdraw any of them from Account.</p>
+      <div class="card app-pad" style="margin-top:10px">
+        <div class="navrow" id="scanSprint" role="button" tabindex="0">
+          <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></div>
+          <div class="gt"><b>Time ${esc(a.first_name)}'s sprint</b>
+            <span>A stopwatch, not a camera — pick a distance, tap to start and stop. No camera or permission
+              needed for this one.</span></div><i>›</i></div>
+      </div>
+
+      <p class="muted-note" style="margin-top:10px">The scans above each ask your permission first — a signed,
+        revocable release — before the camera opens. Manage or withdraw any of them from Account. The sprint
+        timer doesn't use the camera to measure, so it doesn't ask.</p>
 
       <div class="sec-title" style="margin-top:22px">Recent scans</div>
       ${recent && recent.length ? H`
@@ -83,6 +92,9 @@ async function screenScan(){
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   { const b=$("#scanFootwork");
     if(b){ const open=()=>openFootworkScan(a);
+      b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
+  { const b=$("#scanSprint");
+    if(b){ const open=()=>openSprintScan(a);
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   { const b=$("#scanToGrowth"); if(b) b.onclick=()=>renderApp('growth'); }
 }
