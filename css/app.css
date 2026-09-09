@@ -195,6 +195,16 @@
   .day .body{flex:1;min-width:0}
   .day .body h4{font-size:14.5px;margin-bottom:2px}
   .day .body p{font-size:12.5px;color:var(--muted);margin:0}
+  /* Tapping a day row ticks it off; the task NAME is the one part that opens the
+     how-to. That only works if the name reads as tappable, so it carries a dotted
+     underline — the row has no other affordance competing with it. */
+  .tasklink{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
+    text-decoration-color:var(--line);text-underline-offset:3px}
+  .tasklink:hover{text-decoration-color:var(--green)}
+  .tasklink:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  /* A completed row already carries a line-through from the parent h4; a second
+     underline on top of it just reads as noise. */
+  .day.is-done .tasklink{text-decoration-line:none}
   .tag{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.03em}
   .t-train{background:#DFF0E8;color:#0E3B31} .t-game{background:#FBE3D6;color:#8E3F22}
   .t-gym{background:#EFEAF7;color:#5a3d8a} .t-rest{background:#ECE8DD;color:#5D5A50}

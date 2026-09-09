@@ -125,9 +125,7 @@ async function screenWeek(){
           <div class="gt"><b>${esc(tomorrowW.title)}</b><span>${esc(tomorrowW.sub||'')}</span></div>
           ${tomorrowW.act?'<span class="pill">Open ›</span>':''}
         </div>
-      </div>
-      ${railSkeleton()}
-    </div>`;
+      </div>`;
 
   // Three states, one card. Rest takes the whole thing and offers nothing to complete —
   // that is the screen that proves the product means what it says about rest.
@@ -261,7 +259,9 @@ async function screenWeek(){
                   aria-label="${isDone?'Mark not done':'Mark done'}: ${esc(w.title)}">${isDone?'✓':''}</button>`
             : H`<span class="chk static ${w.t==='rest'?'rest':''} ${isDone?'seen':''}" aria-hidden="true">${isDone?'✓':(w.t==='rest'?'z':(isMoved?'→':''))}</span>`}
           <div class="d"><b>${w.d}</b>${isToday?'<span>Today</span>':'<span>&nbsp;</span>'}</div>
-          <div class="body"><h4>${esc(w.title)}</h4><p>${esc(w.t==='rest'?(w.sub||'')+' — counts as done':(w.sub||''))}</p></div>
+          <div class="body"><h4>${w.act
+            ? H`<span class="tasklink" data-open="${idx}" role="button" tabindex="0">${esc(w.title)}</span>`
+            : esc(w.title)}</h4><p>${esc(w.t==='rest'?(w.sub||'')+' — counts as done':(w.sub||''))}</p></div>
           <span class="tag t-${w.t}">${esc(w.type)}</span>
         </div>`;}).join('')}
 
@@ -290,6 +290,8 @@ async function screenWeek(){
       </div>
 
       <p class="muted-note" style="margin-top:18px">Parent Playbook gives general, age-appropriate guidance — not medical or nutrition advice. Check with your pediatrician, a registered dietitian, or your child's coach before starting new training, and stop any activity that causes pain.</p>
+      </div>
+      ${railSkeleton()}
     </div>`;
   // Snapshot for the offline screen. Small and non-sensitive: the plan, who it's for,
   // and which days are ticked. Never the journey.
@@ -342,9 +344,27 @@ async function screenWeek(){
     const i=+btn.getAttribute('data-tick'); const ctx=ctxFor(i); if(!ctx) return;
     btn.onclick=e=>{ e.stopPropagation(); ctx.done?undoSessionDone(ctx,btn):markSessionDone(ctx,btn); };
   });
+  // Tapping the row is the common action — ticking the day off — and it must not
+  // leave the screen: a parent standing in a kitchen ticking off Tuesday should not
+  // be thrown into a how-to sheet they then have to back out of. It delegates to the
+  // tick button rather than repeating its logic, so the spinner, the offline queue
+  // and the re-render all stay in exactly one place.
+  //
+  // Reading how-to is the less frequent thing, so it gets the smaller target: the
+  // task name, which is styled to look tappable. Rows with nothing to tick — rest,
+  // moved, and family view — keep opening on a row tap, because there is no
+  // competing action to protect.
   $("#screen").querySelectorAll('[data-day]').forEach(el=>{
-    const i=+el.getAttribute('data-day'); const w=days[i]; if(!w||!w.act) return;
-    el.onclick=()=>openActivity(w.act,ctxFor(i));
+    const i=+el.getAttribute('data-day'); const w=days[i]; if(!w) return;
+    const tick=el.querySelector('[data-tick]');
+    if(tick){ el.onclick=()=>tick.click(); el.style.cursor='pointer'; }
+    else if(w.act){ el.onclick=()=>openActivity(w.act,ctxFor(i)); el.style.cursor='pointer'; }
+  });
+  $("#screen").querySelectorAll('[data-open]').forEach(h=>{
+    const i=+h.getAttribute('data-open'); const w=days[i]; if(!w||!w.act) return;
+    const go=e=>{ if(e) e.stopPropagation(); openActivity(w.act,ctxFor(i)); };
+    h.onclick=go;
+    h.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); go(); } };
   });
 
   // Reference material stays collapsed: it is not the plan, and seven days plus three
