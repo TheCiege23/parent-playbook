@@ -1,74 +1,56 @@
-# playbookbp.com — DNS cutover runbook
+# playbookbp.com — domain migration
 
-**Registrar:** GoDaddy · **Target DNS:** Cloudflare · **Host:** Railway (project `ParentPlaybook`, service `parent-playbook`)
+**Status: complete, 2026-09-08.** `playbookbp.com` is the canonical origin and is live.
 
-Verified state as of 2026-09-08. Every value below was read from the Railway API or from live DNS, not inferred.
+**Registrar:** GoDaddy · **DNS:** Cloudflare · **Host:** Railway (`ParentPlaybook` / `parent-playbook`)
+· **Backend:** Supabase `xqvqjkdxykowwpcmyudz`
 
----
-
-## STATUS — cutover is done, app is live on the new domain
-
-Completed and verified 2026-09-08:
-
-- ✅ `playbook.chimaura.com` restored, re-pointed to `yygz44bo.up.railway.app`, cert valid
-- ✅ Zone moved to Cloudflare (`abdullah.ns.cloudflare.com` / `jessica.ns.cloudflare.com`)
-- ✅ **All M365 mail records imported intact** — MX, SPF, DMARC, both DKIM selectors,
-  autodiscover/sip/lyncdiscover/msoid, email, pay, both SRVs. Verified byte-identical to the
-  old GoDaddy zone.
-- ✅ `playbookbp.com` and `www.playbookbp.com` both serving the app, HTTP 200, proxied
-- ✅ Railway certificates **VALID** for both new domains
-
-Sections §1–§3 below are therefore historical reference. **§4 is still outstanding** — those are
-the items that still break things if skipped. See also "Remaining" at the bottom.
+Every value here was read from a live API or a DNS query, not inferred. This is now a reference
+record rather than a set of instructions — the step-by-step has been removed because it has been
+carried out. What remains is the configuration as it stands, what went wrong on the way, and the
+one piece of work still deliberately open.
 
 ---
 
-## 0. Fix first — `playbook.chimaura.com` is down
+## How it is wired
 
-`playbook.chimaura.com` was detached from the Railway service during setup. DNS still points at
-Railway (`3bdbfsz3.up.railway.app`), but Railway no longer holds a certificate for that hostname, so
-the host now fails TLS outright:
+| | |
+|---|---|
+| Nameservers | `abdullah.ns.cloudflare.com` · `jessica.ns.cloudflare.com` |
+| Apex `playbookbp.com` | CNAME → `pkh4udaj.up.railway.app` (Cloudflare flattens it) |
+| `www.playbookbp.com` | CNAME → `a8wbweyg.up.railway.app` → 301 to apex |
+| `playbook.chimaura.com` | CNAME → `yygz44bo.up.railway.app` → 301 to apex |
+| Cloudflare SSL/TLS | **Full (strict)** + Always Use HTTPS |
+| Cloudflare Browser Cache TTL | **Respect Existing Headers** — see the gotcha below |
+| Mail | Microsoft 365 via GoDaddy, tenant `NETORGFT21109080` |
+| Outbound mail | Resend, `send.playbookbp.com`, verified |
 
-```
-curl: (60) schannel: SNI or certificate check failed: SEC_E_WRONG_PRINCIPAL
-```
+Railway certificates are valid for all three hostnames. Each custom domain gets its **own** CNAME
+target — they are not interchangeable, and deleting and re-adding a domain issues a new one.
 
-It returned `200` earlier the same session, so this is a regression, not a pre-existing condition.
+### The redirect
 
-**Impact:** every coach invite link carrying a team code, every password-reset email already in an
-inbox, and every parent bookmark points at this host. All of them are dead until it is re-attached.
-
-**Fix:** in the Railway dashboard → `parent-playbook` → Settings → Networking → Custom Domain, add
-`playbook.chimaura.com` back with target port **8080**. Its DNS record already exists and is
-correct, so it should verify immediately.
-
-Do **not** remove it again. The Caddyfile serves a permanent redirect from it on purpose:
+`playbook.chimaura.com` and `www` both 301 to the apex, path and query preserved, from the
+Caddyfile:
 
 ```
 @moved host playbook.chimaura.com www.playbookbp.com
 handle @moved { redir https://playbookbp.com{uri} permanent }
 ```
 
-That redirect is the only thing keeping the links already in inboxes working. It needs the hostname
-attached to Railway to ever receive the request.
+It is a `handle` block rather than a bare `redir` on purpose: handle blocks run in source order, so
+the redirect wins before `try_files` can rewrite `/privacy` into a redirect to `/privacy.html`. The
+Railway-generated `*.up.railway.app` host is deliberately unmatched so health checks are never
+answered with a 301.
 
 ---
 
-## 1. The hazard: this domain already runs live email
+## DNS inventory
 
-`playbookbp.com` is not a parked domain. It has **Microsoft 365 email already configured through
-GoDaddy** (tenant `NETORGFT21109080`). Moving the nameservers to Cloudflare without recreating these
-records first will silently break mail — including `support@playbookbp.com`, which the privacy
-policy, terms, data-deletion page, coaches page, organizations page, and several in-app error
-strings all now name as the contact address.
+Kept because it is the rollback reference, and because a missed mail record is silent data loss
+rather than an error page. All of these are **DNS only (grey cloud)**.
 
-Cloudflare's scan usually imports most of these automatically when you add the zone. **Verify each
-one by hand against this table before flipping the nameservers** — the scan misses records that
-aren't publicly enumerable, and a missed MX is silent data loss, not an error page.
-
-### Records that must exist in Cloudflare before the nameserver change
-
-All of these are mail/service records — leave every one of them **DNS only (grey cloud)**.
+### Microsoft 365 — moved intact from GoDaddy
 
 | Type  | Name                     | Value                                                                            |
 |-------|--------------------------|----------------------------------------------------------------------------------|
@@ -82,166 +64,133 @@ All of these are mail/service records — leave every one of them **DNS only (gr
 | CNAME | `sip`                    | `sipdir.online.lync.com`                                                           |
 | CNAME | `lyncdiscover`           | `webdir.online.lync.com`                                                           |
 | CNAME | `msoid`                  | `clientconfig.microsoftonline-p.net`                                               |
-| CNAME | `email`                  | `email.secureserver.net`  *(GoDaddy email marketing — drop only if unused)*         |
-| CNAME | `pay`                    | `paylinks.commerce.godaddy.com`  *(GoDaddy Pay Links — drop only if unused)*        |
+| CNAME | `email`                  | `email.secureserver.net`  *(GoDaddy email marketing)*                              |
+| CNAME | `pay`                    | `paylinks.commerce.godaddy.com`  *(GoDaddy Pay Links)*                             |
 | SRV   | `_sipfederationtls._tcp` | priority 100, weight 1, port 5061, target `sipfed.online.lync.com`                 |
 | SRV   | `_sip._tls`              | priority 100, weight 1, port 443, target `sipdir.online.lync.com`                  |
 
-`_domainconnect` → `_domainconnect.gd.domaincontrol.com` exists today but is GoDaddy's own
-provisioning hook. It has no meaning once the zone leaves GoDaddy — don't recreate it.
+Cloudflare's import scan carried all of these across correctly; each was verified byte-identical to
+the old GoDaddy zone, and a real test message reached `support@playbookbp.com` afterwards.
 
-### Records to drop
+`_domainconnect` was GoDaddy's own provisioning hook and was deliberately not recreated.
 
-The apex currently resolves to `76.223.105.230` / `13.248.243.5` (GoDaddy parking), and `www` is a
-CNAME to the apex. Both are replaced in step 3 — do not carry them over.
+### Resend — outbound mail for invites
 
----
+| Type  | Name                     | Value                                                    |
+|-------|--------------------------|----------------------------------------------------------|
+| TXT   | `resend._domainkey.send` | the DKIM public key (218 chars)                          |
+| MX    | `send.send`              | `feedback-smtp.us-east-1.amazonses.com` (priority 10)    |
+| TXT   | `send.send`              | `v=spf1 include:amazonses.com ~all`                      |
 
-## 2. Move the zone
-
-1. Cloudflare → Add a site → `playbookbp.com` → Free plan. Let it scan.
-2. Reconcile the imported records against the table in §1. Add anything missing.
-3. Cloudflare gives you two nameservers (e.g. `xxx.ns.cloudflare.com`).
-4. GoDaddy → Domain Settings → Nameservers → Change → "I'll use my own nameservers" → enter both.
-
-Propagation is typically under an hour, occasionally up to 24. Mail keeps flowing throughout **if
-and only if** §1 was done correctly, because the old and new zones serve identical answers.
+`send.send` looks wrong but is not — it is the bounce/return-path host `send.send.playbookbp.com`.
+Everything sits under `send.`, so the apex MX and apex SPF that `support@playbookbp.com` depends on
+are untouched. A second SPF record at the apex *would* have broken mail; this is not that.
 
 ---
 
-## 3. Point the web records at Railway
+## Three things that went wrong
 
-Both custom domains are already attached to the Railway service and verified. These are the exact
-targets Railway assigned — each custom domain gets its own, they are not interchangeable:
+Recorded because none of them would be obvious the second time either.
 
-| Type  | Name  | Value                      | Proxy       |
-|-------|-------|----------------------------|-------------|
-| CNAME | `@`   | `pkh4udaj.up.railway.app`  | DNS only    |
-| CNAME | `www` | `a8wbweyg.up.railway.app`  | DNS only    |
+### `playbook.chimaura.com` went down mid-migration
 
-The apex CNAME is legal here because Cloudflare flattens it automatically — this is the main reason
-Cloudflare is the right choice over GoDaddy's DNS, which can't do apex CNAMEs at all.
+The domain was detached from the Railway service while the new domains were being added. DNS still
+pointed at Railway, but Railway no longer held a certificate for the hostname, so it failed TLS
+outright — `SEC_E_WRONG_PRINCIPAL`. Every coach invite link, password-reset email and bookmark
+already in circulation was dead until it was re-attached.
 
-If Railway's dashboard also shows a `_railway-verify.www` TXT record, add it with the **full** value
-copied from Railway. (The value is truncated in the dashboard's summary view — click through for the
-whole string.)
+Root cause was reaching for Railway's open-ended agent to do something its API could not do: it
+wrote custom domains into `networking.serviceDomains` (the generated-subdomain collection), which
+allocated two junk `*.up.railway.app` hosts and pushed whole-collection patches while the dashboard
+was being edited in parallel. **Custom domains are a dashboard operation.** Re-adding also issued a
+new CNAME target, so `chimaura.com`'s DNS had to be updated to match.
 
-### On the Cloudflare proxy (orange cloud)
+### Cloudflare silently overrode the origin cache headers
 
-Leave both records **grey (DNS only)** until Railway reports the certificate as issued for each
-domain. Railway validates ownership over the live connection; proxying before that can stall it.
+Cloudflare's default **Browser Cache TTL of 4 hours** rewrites `Cache-Control` on the way out
+regardless of what the origin sends. Immediately after cutover, `sw.js`, `js/*` and `css/*` were all
+being served as `max-age=14400` even though Caddy correctly sent `max-age=0, must-revalidate`.
 
-Current certificate state:
-- `www.playbookbp.com` — **VALID**
-- `playbookbp.com` — **VALIDATING_OWNERSHIP** (completes once the apex CNAME resolves)
+That quietly undoes the policy the Caddyfile sets on purpose — a cached `sw.js` is how an installed
+phone keeps running last week's app. It produces no error; deploys just roll out unevenly over the
+following four hours. Fixed by setting Browser Cache TTL to **Respect Existing Headers**. If this
+project ever wants long cache lifetimes for fingerprinted assets, set them at the origin, not by
+letting Cloudflare override everything including the service worker.
 
-Once both read valid, you may switch the proxy on. If you do, set Cloudflare **SSL/TLS → Full
-(strict)** first. Do **not** use **Flexible**: Cloudflare would talk plain HTTP to Railway while
-Railway's edge redirects to HTTPS, producing an infinite redirect loop. Turn on **Always Use HTTPS**
-either way.
+### A Railway deploy failed on infrastructure, not code
 
-Railway's dashboard also offers a "One-click DNS Setup / Connect Cloudflare" button. It only works
-once the zone is already on Cloudflare, so it's an alternative to this step — not a replacement for
-§1 or §2.
+Commit `412abe4` failed at `CREATE_CONTAINER` with *"the registry could not be reached to pull the
+image"*. All build stages had succeeded. Railway keeps the previous container serving when a new
+deployment fails to start, so there was no user impact, and a retry succeeded. Worth recognising the
+signature: build green, deploy logs empty, failure isolated to container creation.
 
 ---
 
-## 4. Loose ends that break things if skipped
+## Still open — retire `playbook.chimaura.com`, on purpose
 
-**Resend sending domain does not exist yet.** `send.playbookbp.com` has no DNS and is not registered
-in Resend — the account has `send.chimaura.com` (verified) but nothing for the new domain. The
-staged code in `supabase/functions/send-invite/index.ts` now defaults to:
+The old host must keep working while invite links, password-reset emails and bookmarks carrying it
+are still in circulation. Revisit when traffic to it approaches zero, and then do all four together:
 
-```
-'Parent Playbook <hello@send.playbookbp.com>'
-```
+1. Remove the `playbook` CNAME from `chimaura.com`'s DNS (GoDaddy)
+2. Remove `playbook.chimaura.com` as a custom domain on the Railway service
+3. Remove `https://playbook.chimaura.com/**` from the Supabase redirect allowlist
+4. Drop the `@moved` host from the Caddyfile
 
-Deploying that before the domain is verified in Resend means Resend rejects every invite send.
-Either create and verify `send.playbookbp.com` in Resend (add its DKIM/SPF records to Cloudflare) —
-or set the `INVITE_FROM` env var to keep using `send.chimaura.com` until you do.
-
-**Supabase auth URLs.** Site URL and the redirect allowlist still need `https://playbookbp.com`
-added. Keep the old origin in the allowlist during the redirect window, or password-reset and
-confirmation links already in inboxes will fail validation. (Dashboard → Authentication → URL
-Configuration.)
-
-**`SITE_URL` env var** on the Supabase Edge Functions — the staged defaults are correct now, but if
-`SITE_URL` is set explicitly it still says `playbook.chimaura.com` and overrides them.
-
-**The rename is staged but uncommitted.** 27 files in the working tree carry the domain change
-(HTML, JS, Caddyfile, edge functions, sitemap, llms.txt). None of it is live until committed and
-deployed. Note that `js/core.js` in the same working tree also carries unrelated premium/paywall
-work — worth separating before committing.
+Doing any one of these early breaks links that are still live. Step 3 in particular is what keeps
+reset links already sitting in inboxes validating until they expire.
 
 ---
 
 ## Verification
 
 ```bash
-# after nameserver change
-nslookup -type=NS playbookbp.com
-nslookup -type=MX playbookbp.com          # must still be outlook.com
+# redirects, with path and query preserved
+curl -sI https://playbookbp.com/ | head -1                        # 200
+curl -sI https://www.playbookbp.com/ | head -1                    # 301 -> apex
+curl -sI "https://playbook.chimaura.com/?team=BEARS26" | head -1  # 301, query kept
 
-# after web records land
-curl -sI https://playbookbp.com/ | head -1
-curl -sI https://www.playbookbp.com/ | head -1        # expect 301 -> playbookbp.com
-curl -sI https://playbook.chimaura.com/ | head -1     # expect 301 -> playbookbp.com
+# clean URLs must be 200, NOT a redirect to .html
+for p in /privacy /terms /datadeletion /coaches /organizations; do
+  curl -sI "https://playbookbp.com$p" | head -1
+done
+
+# mail must keep answering from Microsoft
+nslookup -type=MX playbookbp.com 8.8.8.8
+
+# cache headers must match the origin, not Cloudflare's default
+curl -sI https://playbookbp.com/sw.js | grep -i cache-control     # max-age=0
+curl -sI https://parent-playbook-production.up.railway.app/sw.js | grep -i cache-control
 ```
-
-Send a test message to `support@playbookbp.com` from an outside address once the zone has moved.
 
 ---
 
-## Gotcha found during cutover: Cloudflare overrides origin cache headers
+## Related work done alongside this
 
-Cloudflare's default **Browser Cache TTL is 4 hours**, and it rewrites `Cache-Control` on the way
-out — regardless of what Caddy sends. Immediately after the cutover, `sw.js`, `js/*` and `css/*`
-were all being served as `max-age=14400` even though the origin correctly sent `max-age=0,
-must-revalidate`.
+The migration surfaced two gaps that had nothing to do with DNS but were worse than it:
 
-That silently undoes the deliberate no-cache policy in the Caddyfile, whose comment is explicit
-that a cached `sw.js` is how an installed phone keeps running last week's app. Symptom is not an
-error — it's deploys rolling out unpredictably over the following four hours.
+- **69 Supabase migrations** existed only as untracked files inside a disposable worktree — the
+  entire schema history, including every RLS policy protecting children's data. Committed in
+  `c644878`.
+- **9 of 15 deployed Edge Functions had no source in git**, including all four that handle money.
+  Pulled from the live deployment and committed in `df4979e`.
 
-**Fix:** Cloudflare → Caching → Configuration → **Browser Cache TTL** → **Respect Existing
-Headers**. Applied 2026-09-08; verified origin and edge headers now match on every path.
+Both are now in the repo, and all 14 remaining functions were redeployed from it so source and
+production match. That guarantee only holds if functions continue to be deployed *from* the repo —
+if they are edited in the Supabase dashboard, these files drift silently, and a stale file that
+looks authoritative is worse than a missing one.
 
-If this project ever adds fingerprinted assets and *wants* long cache lifetimes, set them at the
-origin in the Caddyfile — not by letting Cloudflare override, which applies bluntly to everything
-including the service worker.
-
----
-
-## Migration complete — 2026-09-08
-
-All steps done and verified end to end:
-
-1. ✅ Cloudflare SSL/TLS **Full (strict)** + Always Use HTTPS. `tls_verify=0` on all three hosts.
-2. ✅ Real test email delivered to `support@playbookbp.com`.
-3. ✅ Supabase Site URL + redirect allowlist updated (chimaura origin retained).
-4. ✅ Resend `send.playbookbp.com` **verified** — DKIM, MX and SPF all green.
-5. ✅ Rename shipped as `0bc5237`, merged to `main`, deployed by Railway.
-   Premium/paywall work was kept out of the commit and remains uncommitted in the working tree.
-
-Post-deploy verification:
-
-```
-www.playbookbp.com       301 -> https://playbookbp.com/
-playbook.chimaura.com    301 -> https://playbookbp.com/
-  ...?team=BEARS26       301 -> https://playbookbp.com/?team=BEARS26   (invite links intact)
-playbookbp.com           200
-/privacy /terms /datadeletion /coaches /organizations   200  (no .html redirect)
-404 -> 404.html          404
-http:// -> https://      301
-manifest Content-Type    application/manifest+json
-apex MX                  playbookbp-com.mail.protection.outlook.com   (mail unaffected)
+```bash
+npx supabase functions deploy <name> --project-ref xqvqjkdxykowwpcmyudz
 ```
 
-### Still open
+### Commits
 
-- **Retire `playbook.chimaura.com` eventually — on purpose, not by forgetting.** It must stay
-  attached to the Railway service and keep its DNS while old invite links, reset emails and
-  bookmarks are still in circulation. Revisit once traffic to it approaches zero.
-- The chimaura entry in the Supabase redirect allowlist should be removed at the same time, not
-  before.
-- `js/core.js` and friends still carry uncommitted premium/paywall work.
+```
+412abe4  Remove migrate-bg from the repo now that it is deleted from production
+f6776b7  Point the six stale domain fallbacks at playbookbp.com
+df4979e  Track the nine deployed Edge Functions that had no source in git
+f8f5a34  Merge premium-paywall: billing and free-tier caps, flag off
+c644878  Track the Supabase migration history in the repo
+b717ef8  Record domain migration outcome and the Cloudflare cache-header gotcha
+0bc5237  Move canonical domain to playbookbp.com
+```
