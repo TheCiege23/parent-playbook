@@ -30,7 +30,7 @@ const ROLE_LABEL: Record<string, string> = {
 // The template is fetched from the site rather than bundled here: it is 7KB of HTML
 // whose entire purpose is to be mailed to strangers, so there is nothing to protect,
 // and this way you edit the email by redeploying the site — not this function.
-const TEMPLATE_URL = (Deno.env.get('SITE_URL') || 'https://playbook.chimaura.com') + '/emails/invite.html';
+const TEMPLATE_URL = (Deno.env.get('SITE_URL') || 'https://playbookbp.com') + '/emails/invite.html';
 let TEMPLATE_CACHE: string | null = null;
 async function loadTemplate(): Promise<string> {
   if (TEMPLATE_CACHE) return TEMPLATE_CACHE;
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       : null;
     const inviterFull = (guardian?.display_name || '').trim() || 'A parent';
     const inviterFirst = inviterFull.split(/\s+/)[0];
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://playbook.chimaura.com';
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://playbookbp.com';
     const inviteUrl = siteUrl + '/?invite=' + encodeURIComponent(inv.token);
     const expires = new Date(inv.expires_at).toLocaleDateString('en-US',
       { weekday: 'long', month: 'long', day: 'numeric' });
@@ -141,12 +141,12 @@ Deno.serve(async (req) => {
     const html = TEMPLATE.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? '');
 
     const subject = inviterFirst + ' wants you to follow ' + (ath?.first_name || 'their athlete') + "'s season";
-    const from = Deno.env.get('INVITE_FROM') || 'Parent Playbook <hello@send.chimaura.com>';
+    const from = Deno.env.get('INVITE_FROM') || 'Parent Playbook <hello@send.playbookbp.com>';
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [inv.invited_email], subject, html, reply_to: 'support@chimaura.com' }),
+      body: JSON.stringify({ from, to: [inv.invited_email], subject, html, reply_to: 'support@playbookbp.com' }),
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) {

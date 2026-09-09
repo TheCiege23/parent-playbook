@@ -140,7 +140,7 @@ function downloadGameIcs(a, day, isoDate){
   const title = (a.first_name ? a.first_name + ' — ' : '') + (day.title || 'Game day');
   const ics = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Parent Playbook//EN', 'BEGIN:VEVENT',
-    'UID:pp-' + a.id + '-' + stamp + '@playbook.chimaura.com',
+    'UID:pp-' + a.id + '-' + stamp + '@playbookbp.com',
     'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z',
     'DTSTART;VALUE=DATE:' + stamp,
     'DTEND;VALUE=DATE:' + stamp,

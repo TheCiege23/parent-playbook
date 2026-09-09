@@ -115,7 +115,7 @@ async function screenActivity(){
       ${(!loop&&!stills)?H`<div class="act-ask">
         <b>Got a clip of this drill?</b>
         <span>A six-second video of a real kid doing it beats any description. We review everything before it goes near the app.</span>
-        <a href="mailto:support@chimaura.com?subject=${encodeURIComponent('Drill clip: '+act.title)}">Send it in</a>
+        <a href="mailto:support@playbookbp.com?subject=${encodeURIComponent('Drill clip: '+act.title)}">Send it in</a>
       </div>`:''}
 
       ${sourceHTML(act)}

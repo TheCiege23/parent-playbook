@@ -10,9 +10,9 @@ say, and when to stop. Plans are age-banded and rest-first: the more the team tr
 in a given week, the less the app adds at home.
 
 ## Pages
-- [Home](https://playbook.chimaura.com/): the marketing page and the app itself — the app boots in place at `#app`.
-- [Privacy Policy](https://playbook.chimaura.com/privacy): what is collected about a child and why, and how to delete it.
-- [Terms of Service](https://playbook.chimaura.com/terms)
+- [Home](https://playbookbp.com/): the marketing page and the app itself — the app boots in place at `#app`.
+- [Privacy Policy](https://playbookbp.com/privacy): what is collected about a child and why, and how to delete it.
+- [Terms of Service](https://playbookbp.com/terms)
 
 ## What it does
 - Weekly plan: seven days of skill work, age-safe strength, game day and real rest, generated from the child's age, sport, position, goals and team schedule.
@@ -28,4 +28,4 @@ in a given week, the less the app adds at home.
 - Not a scouting, recruiting or ranking service.
 
 ## Contact
-support@chimaura.com — Parent Playbook is made by Brown Pig LLC.
+support@playbookbp.com — Parent Playbook is made by Brown Pig LLC.

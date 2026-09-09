@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       // or review, which are financial records. Say so plainly instead of failing silently.
       return json({
         error: "Your data was removed, but the login could not be deleted automatically: " +
-               delErr.message + " Please contact support@chimaura.com to finish.",
+               delErr.message + " Please contact support@playbookbp.com to finish.",
         partial: true, families_deleted: familiesDeleted, files_removed: filesRemoved,
       }, 500);
     }

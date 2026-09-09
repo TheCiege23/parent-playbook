@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     ]);
     const inviterFirst = ((guardian?.display_name || '').trim() || 'A parent').split(/\s+/)[0];
     const athleteFirst = ath?.first_name || 'their athlete';
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://playbook.chimaura.com';
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://playbookbp.com';
     const inviteUrl = siteUrl + '/?invite=' + encodeURIComponent(inv.token);
 
     // Kept close to two segments. The opt-out line is not optional decoration — US

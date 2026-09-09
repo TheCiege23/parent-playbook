@@ -611,7 +611,7 @@ function confirmDeleteAccount(){
     catch(err){ console.error(err); res={ error:err }; }
     if(res.error){
       console.error(res.error);
-      errEl.textContent=await fnError(res.error,'Could not delete your account. Please email support@chimaura.com.');
+      errEl.textContent=await fnError(res.error,'Could not delete your account. Please email support@playbookbp.com.');
       btn.innerHTML='Permanently delete everything'; btn.disabled=false; return;
     }
     // Sign out locally too — the token is dead server-side, but leaving it in storage

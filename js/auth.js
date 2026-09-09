@@ -217,8 +217,8 @@ function friendlyAuthErr(m){
   if(/sending.*email|smtp|mail server/i.test(m)){
     // A failed signup is rolled back; a failed reset simply didn't send. Say the right one.
     return /recovery|reset/i.test(m)
-      ? "We couldn't send your reset email. That's a fault on our side, not yours — please try again in a few minutes, or email support@chimaura.com."
-      : "We couldn't send your confirmation email, so your account wasn't created. That's a fault on our side, not yours — please try again in a few minutes, or email support@chimaura.com.";
+      ? "We couldn't send your reset email. That's a fault on our side, not yours — please try again in a few minutes, or email support@playbookbp.com."
+      : "We couldn't send your confirmation email, so your account wasn't created. That's a fault on our side, not yours — please try again in a few minutes, or email support@playbookbp.com.";
   }
   if(/already registered/i.test(m)) return "That email already has an account. Try logging in.";
   if(/invalid login/i.test(m)) return "Email or password is incorrect.";

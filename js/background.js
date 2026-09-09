@@ -27,7 +27,7 @@ function setAppBg(){
 setAppBg();
 function inviteTokenFromUrl(){ return new URLSearchParams(location.search).get('invite'); }
 
-// A coach's link carries the team code: playbook.chimaura.com/?team=BEARS26
+// A coach's link carries the team code: playbookbp.com/?team=BEARS26
 // Stashed in sessionStorage because signup bounces through an email confirmation that
 // lands on a fresh URL — the same trap that used to lose ?invite= (finding A1).
 function teamCodeFromUrl(){

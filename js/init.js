@@ -75,7 +75,7 @@ function owFailScreen(glyph, title, body, retry, btnLabel, btnFn){
       <button class="btn" id="owGo">${esc(btnLabel||'Try again')}</button>
       ${signedIn?'<button class="btn ghost" id="owOut">Log out</button>':''}
     </div>
-    <p class="muted-note">Still stuck? <a href="mailto:support@chimaura.com" style="color:var(--green-d)">support@chimaura.com</a></p>
+    <p class="muted-note">Still stuck? <a href="mailto:support@playbookbp.com" style="color:var(--green-d)">support@playbookbp.com</a></p>
   </div>`;
   if(typeof owBadge==='function') owBadge();
   $("#owGo").onclick = btnFn || (()=>location.reload());

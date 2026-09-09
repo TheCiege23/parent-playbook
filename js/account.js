@@ -74,7 +74,7 @@ async function screenAccount(){
         <div class="navrow" id="toLegal" role="button" tabindex="0"><div class="gi">📄</div>
           <div class="gt"><b>Privacy &amp; terms</b><span>What we store, and what we never do with it</span></div><i>›</i></div>
         <div class="navrow" id="helpRow" role="button" tabindex="0"><div class="gi">✉️</div>
-          <div class="gt"><b>Need help?</b><span>support@chimaura.com — we read every message</span></div><i>›</i></div>
+          <div class="gt"><b>Need help?</b><span>support@playbookbp.com — we read every message</span></div><i>›</i></div>
       </div>
 
       ${isAdmin?H`<div class="sec-title">Admin</div>
@@ -135,7 +135,7 @@ async function screenAccount(){
   fillScanConsents();
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
-  go('helpRow', ()=>{ location.href='mailto:support@chimaura.com'; });
+  go('helpRow', ()=>{ location.href='mailto:support@playbookbp.com'; });
   go('adminQueue', openAdminQueue);
   go('adminDrills', openAdminDrills);
   go('adminCamps', openCampsAdminQueue);

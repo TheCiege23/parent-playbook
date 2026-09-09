@@ -9,8 +9,30 @@
 	root * /srv
 	encode gzip zstd
 
-	# cleanUrls. /terms -> terms.html, and a real file always wins over the guess.
-	try_files {path} {path}.html {path}/index.html
+	# playbookbp.com is canonical. Two other hosts reach this container and both
+	# have to end up there:
+	#   playbook.chimaura.com  the old home. Coach invite links carrying a team
+	#                          code, password-reset emails, and anything a parent
+	#                          bookmarked all point at it and are already in
+	#                          inboxes — a 301 is the only thing that keeps them
+	#                          working. Retire it on purpose, not by forgetting.
+	#   www.playbookbp.com     so the www form is never a second, competing origin.
+	#
+	# A handle block rather than a bare redir: handle blocks run in source order,
+	# so the redirect is guaranteed to win before try_files rewrites the path and
+	# turns /privacy into a redirect to /privacy.html. The Railway-generated
+	# *.up.railway.app host is deliberately not matched — health checks must not
+	# be answered with a 301.
+	@moved host playbook.chimaura.com www.playbookbp.com
+	handle @moved {
+		redir https://playbookbp.com{uri} permanent
+	}
+
+	handle {
+		# cleanUrls. /terms -> terms.html, and a real file always wins over the guess.
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
 
 	# The service worker and the manifest must never be served stale — a cached sw.js
 	# is how an installed phone keeps running last week's app forever. Everything else
@@ -32,8 +54,6 @@
 		Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
-
-	file_server
 
 	handle_errors {
 		@404 expression {err.status_code} == 404

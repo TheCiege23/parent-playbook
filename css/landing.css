@@ -1,5 +1,5 @@
 /* ===================================================================
-   LANDING PAGE — playbook.chimaura.com marketing page
+   LANDING PAGE — playbookbp.com marketing page
    Loaded BEFORE app.css. Everything here is scoped under #landing (or
    body:not(.in-app)) so it can never leak into the app shell, and the
    app's fixed photo layers can never bleed onto this page.

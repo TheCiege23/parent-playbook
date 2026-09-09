@@ -2,7 +2,7 @@
 
 A private weekly playbook for sports parents — weekly plans, at‑home activities, an athlete journey (games, milestones, photos), and age‑appropriate parent guidance. Installable progressive web app (add to home screen, no app store). No build step.
 
-- **Live:** https://playbook.chimaura.com
+- **Live:** https://playbookbp.com
 - **Backend:** Supabase (auth, database, storage)
 - **Hosting:** Railway — Caddy serving static files from a container (project `ParentPlaybook`)
 

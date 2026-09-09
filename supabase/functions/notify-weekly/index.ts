@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
       if (!pub || !priv) {
         return json({ error: 'VAPID keys are not configured for edge functions', sent: 0 }, 500);
       }
-      webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:support@chimaura.com', pub, priv);
+      webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:support@playbookbp.com', pub, priv);
     }
 
     const capped = await overCap(svc, [...new Set(subs.map((s: any) => s.user_id))]);
