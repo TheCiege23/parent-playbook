@@ -21,6 +21,78 @@ function marketplaceOff(){
   return true;
 }
 
+// Premium (item 8): billing, the price-point test, and both feature caps are fully
+// wired and live-ready in Stripe — same "built but not imposed" posture as the
+// marketplace flag above. The difference here is who it affects: flipping this on
+// changes what EXISTING free families can already do (a second child, unlimited
+// scans) the moment it's true, so it stays off until that's a deliberate call, not
+// a side effect of a deploy. Nothing is deleted or blocked while it's false.
+const PREMIUM_ENABLED = false;
+const PREMIUM_PRICES = { a:499, b:699, c:999 }; // cents/mo — must match the Stripe Price objects
+// Same deterministic bucketing the stripe-subscribe Edge Function uses server-side
+// (SHA-256 of the guardian id, first byte mod 3), so the price shown here always
+// matches what Checkout actually charges — no separate round trip just to display it.
+async function premiumBucket(guardianId){
+  const enc = new TextEncoder().encode(guardianId);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  const n = new Uint8Array(digest)[0];
+  return ['a','b','c'][n % 3];
+}
+async function loadPremium(){
+  if(!PREMIUM_ENABLED || !state.user){ state.premium=false; return; }
+  const { data } = await sb.from('subscriptions').select('status,current_period_end').eq('guardian_id',state.user.id).maybeSingle();
+  state.premium = !!(data && data.status==='active' && (!data.current_period_end || new Date(data.current_period_end)>new Date()));
+}
+function isPremium(){ return !!state.premium; }
+const SCAN_FREE_MONTHLY_CAP = 3;
+// Approximates "scans this month" as distinct capture days in the last 30 days —
+// there's no dedicated attempts log, and a single capture can write several
+// measurement rows at once (body scan writes 5 lengths from one session), so
+// counting raw rows would overcount. source in ('photo','guided') covers the
+// on-device engines (photo = body scan, guided = jump/speed/sprint's video
+// flows); 'manual'/'import' entries never counted against the cap.
+async function scanCapOk(athleteId){
+  athleteId = athleteId || state.active?.id;
+  if(!PREMIUM_ENABLED || isPremium() || !athleteId) return true;
+  const since=new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
+  const { data } = await sb.from('measurements').select('measured_on')
+    .eq('athlete_id',athleteId).in('source',['photo','guided']).gte('measured_on',since);
+  const days=new Set((data||[]).map(r=>r.measured_on));
+  if(days.size < SCAN_FREE_MONTHLY_CAP) return true;
+  await openPaywall(`Free accounts get ${SCAN_FREE_MONTHLY_CAP} scans a month — Premium removes the limit.`);
+  return false;
+}
+// The paywall itself — shown wherever a free-tier cap is hit. `reason` is one short
+// sentence naming what triggered it (e.g. "Free accounts can add one athlete.").
+async function openPaywall(reason){
+  if(!PREMIUM_ENABLED) return; // caps never fire while the flag is off, but stay defensive
+  logUsageEvent('paywall_shown');
+  const bucket = await premiumBucket(state.user.id);
+  const price = (PREMIUM_PRICES[bucket]/100).toFixed(2);
+  const bg = sheet(H`<h3>Parent Playbook Premium</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">${esc(reason||'')}</p>
+    <div class="card app-pad">
+      <div class="mrow"><span>A second child (and beyond)</span><b>✓</b></div>
+      <div class="mrow"><span>Unlimited on-device scans</span><b>✓</b></div>
+      <div class="mrow"><span>Advanced growth insights</span><b>✓</b></div>
+    </div>
+    <p style="font-size:22px;font-weight:700;margin:16px 2px 0">$${price}<span style="font-size:13px;font-weight:500;color:var(--muted)">/month</span></p>
+    <div class="err" id="pwErr"></div>
+    <button class="btn amber" id="pwGo" style="margin-top:14px">Upgrade</button>
+    <button class="btn ghost" id="pwCancel" style="margin-top:8px">Not now</button>`);
+  bg.querySelector('#pwCancel').onclick=()=>bg.remove();
+  bg.querySelector('#pwGo').onclick=async e=>{
+    logUsageEvent('paywall_upgrade_clicked');
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
+    const err=bg.querySelector('#pwErr'); err.textContent='';
+    try{
+      const { data, error } = await sb.functions.invoke('stripe-subscribe',{ body:{} });
+      if(error){ err.textContent=await fnError(error,'Could not start checkout'); e.target.innerHTML='Upgrade'; e.target.disabled=false; return; }
+      if(data&&data.url){ location.href=data.url; } else { err.textContent=(data&&data.error)||'Could not start checkout'; e.target.innerHTML='Upgrade'; e.target.disabled=false; }
+    }catch(ex){ console.error(ex); err.textContent='Could not start checkout'; e.target.innerHTML='Upgrade'; e.target.disabled=false; }
+  };
+}
+
 const $ = (s,el=document)=>el.querySelector(s);
 const root = $("#root");
 const esc = s => (s??"").toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -74,4 +146,4 @@ function ageFrom(bd){ if(!bd) return null;
   let a=n.getFullYear()-d.getFullYear(); if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--; return a; }
 
 // ---------- app state ----------
-const state = { user:null, ref:null, athletes:[], active:null, activeSportKey:null, coach:null };
+const state = { user:null, ref:null, athletes:[], active:null, activeSportKey:null, coach:null, premium:false };
