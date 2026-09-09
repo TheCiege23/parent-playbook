@@ -3,7 +3,7 @@ async function afterLogin(){
   // onboarding — without it the app shows raw keys, loses `lower_is_better` so trend
   // arrows point the wrong way, and "Record a measurement" renders an empty picker
   // and throws on save. Load it on every entry into the app, not just first-run.
-  await Promise.all([ loadAthletes(), loadRef() ]);
+  await Promise.all([ loadAthletes(), loadRef(), loadPremium() ]);
   if(state.athletes.length===0){
     // Account-last onboarding: the profile was built before the account existed and
     // stashed on this device. A session now exists, so finish the job silently — the

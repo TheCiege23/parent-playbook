@@ -295,9 +295,10 @@ const BS = { frames:{}, consent:false, subject:null, heightIn:null, consentId:nu
 // user id is not an athlete id. Nothing ever hit it, because no provider existed to
 // produce a result worth saving. Now one does.
 async function openBodyScan(subject){
+  BS.subject = subject || state.active;
+  if(!(await scanCapOk(BS.subject?.id))) return;
   logUsageEvent('scan_body_started');
   BS.frames = {}; BS.consent = false; BS.consentId = null; BS.heightIn = null;
-  BS.subject = subject || state.active;
   if(!BS.subject || !BS.subject.id) return;
 
   if(!state.canEdit) return bsBlocked('Only a parent or co-parent can start a scan.',

@@ -56,9 +56,10 @@ function jmpInterruptedNotice(){
 // check, then either straight to setup or the release screen. No height requirement —
 // see js/jump-measure.js for why flight time needs none.
 async function openJumpScan(subject){
+  JMP.subject = subject || state.active;
+  if(!(await scanCapOk(JMP.subject?.id))) return;
   logUsageEvent('scan_jump_started');
   JMP.videoBlob = null; JMP.consent = false; JMP.consentId = null;
-  JMP.subject = subject || state.active;
   if(!JMP.subject || !JMP.subject.id) return;
 
   if(!state.canEdit) return jmpBlocked('Only a parent or co-parent can start this.',
