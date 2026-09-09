@@ -16,3 +16,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# supabase cli scratch (machine-specific link state)
+supabase/.temp/
