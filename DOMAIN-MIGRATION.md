@@ -192,17 +192,56 @@ Send a test message to `support@playbookbp.com` from an outside address once the
 
 ---
 
-## Remaining — in order
+## Gotcha found during cutover: Cloudflare overrides origin cache headers
 
-1. **Cloudflare SSL/TLS mode.** Confirm it reads **Full (strict)**, not Flexible. Both Railway certs
-   are valid, so strict will work. Turn on **Always Use HTTPS** while you're there.
-2. **Send a test email to `support@playbookbp.com`** from an outside address. DNS says it will work;
-   confirm it actually does before relying on it.
-3. **Supabase auth URLs** — add `https://playbookbp.com` as Site URL, keep the chimaura origin in
-   the redirect allowlist so links already in inboxes still validate.
-4. **Resend** — either verify `send.playbookbp.com`, or set `INVITE_FROM` to hold on
-   `send.chimaura.com`. Do this *before* step 5.
-5. **Commit and deploy the rename.** Only after 3 and 4. This is what activates the
-   `www` → apex and `chimaura` → `playbookbp` redirects. Until then both hosts serve the app
-   directly, which is harmless but means two live copies and a stale canonical tag.
-   Separate the unrelated `js/core.js` premium work out first.
+Cloudflare's default **Browser Cache TTL is 4 hours**, and it rewrites `Cache-Control` on the way
+out — regardless of what Caddy sends. Immediately after the cutover, `sw.js`, `js/*` and `css/*`
+were all being served as `max-age=14400` even though the origin correctly sent `max-age=0,
+must-revalidate`.
+
+That silently undoes the deliberate no-cache policy in the Caddyfile, whose comment is explicit
+that a cached `sw.js` is how an installed phone keeps running last week's app. Symptom is not an
+error — it's deploys rolling out unpredictably over the following four hours.
+
+**Fix:** Cloudflare → Caching → Configuration → **Browser Cache TTL** → **Respect Existing
+Headers**. Applied 2026-09-08; verified origin and edge headers now match on every path.
+
+If this project ever adds fingerprinted assets and *wants* long cache lifetimes, set them at the
+origin in the Caddyfile — not by letting Cloudflare override, which applies bluntly to everything
+including the service worker.
+
+---
+
+## Migration complete — 2026-09-08
+
+All steps done and verified end to end:
+
+1. ✅ Cloudflare SSL/TLS **Full (strict)** + Always Use HTTPS. `tls_verify=0` on all three hosts.
+2. ✅ Real test email delivered to `support@playbookbp.com`.
+3. ✅ Supabase Site URL + redirect allowlist updated (chimaura origin retained).
+4. ✅ Resend `send.playbookbp.com` **verified** — DKIM, MX and SPF all green.
+5. ✅ Rename shipped as `0bc5237`, merged to `main`, deployed by Railway.
+   Premium/paywall work was kept out of the commit and remains uncommitted in the working tree.
+
+Post-deploy verification:
+
+```
+www.playbookbp.com       301 -> https://playbookbp.com/
+playbook.chimaura.com    301 -> https://playbookbp.com/
+  ...?team=BEARS26       301 -> https://playbookbp.com/?team=BEARS26   (invite links intact)
+playbookbp.com           200
+/privacy /terms /datadeletion /coaches /organizations   200  (no .html redirect)
+404 -> 404.html          404
+http:// -> https://      301
+manifest Content-Type    application/manifest+json
+apex MX                  playbookbp-com.mail.protection.outlook.com   (mail unaffected)
+```
+
+### Still open
+
+- **Retire `playbook.chimaura.com` eventually — on purpose, not by forgetting.** It must stay
+  attached to the Railway service and keep its DNS while old invite links, reset emails and
+  bookmarks are still in circulation. Revisit once traffic to it approaches zero.
+- The chimaura entry in the Supabase redirect allowlist should be removed at the same time, not
+  before.
+- `js/core.js` and friends still carry uncommitted premium/paywall work.
