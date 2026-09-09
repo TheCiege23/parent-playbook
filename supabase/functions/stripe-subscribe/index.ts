@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: 'unauthorized' }, 401);
     const svc = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2024-06-20' });
-    const appUrl = Deno.env.get('APP_URL') || 'https://playbook.chimaura.com';
+    const appUrl = Deno.env.get('APP_URL') || 'https://playbookbp.com';
 
     let { data: sub } = await svc.from('subscriptions').select('*').eq('guardian_id', user.id).maybeSingle();
     if (sub?.status === 'active') return json({ error: 'Already premium' }, 400);

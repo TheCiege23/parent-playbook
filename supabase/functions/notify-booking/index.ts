@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { data: subs } = await svc.from('push_subscriptions').select('*').eq('user_id', recipient);
     webpush.setVapidDetails(
-      Deno.env.get('VAPID_SUBJECT') || 'mailto:support@chimaura.com',
+      Deno.env.get('VAPID_SUBJECT') || 'mailto:support@playbookbp.com',
       Deno.env.get('VAPID_PUBLIC_KEY')!, Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
     let sent = 0;

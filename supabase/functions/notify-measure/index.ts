@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
     if (!dry) {
       const pub = Deno.env.get('VAPID_PUBLIC_KEY'), priv = Deno.env.get('VAPID_PRIVATE_KEY');
       if (!pub || !priv) return json({ error: 'VAPID keys are not configured', sent: 0 }, 500);
-      webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:support@chimaura.com', pub, priv);
+      webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:support@playbookbp.com', pub, priv);
     }
 
     // Headroom check rather than the plain cap — see CAP_HEADROOM.
