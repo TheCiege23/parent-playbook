@@ -43,9 +43,9 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Company SDK: https://playbookbp.com/company-sdk-demo
 - Adult persistence: https://playbookbp.com/company-persistence-demo
 - Composition gate: https://playbookbp.com/company-composition-demo
-- Git HEAD: `7bb724d` on `main`. The composition increment is uncommitted and unpushed.
+- Git: branch `composition-storage-and-provider-registry` pushed to origin at `32c1c29`, on top of baseline `54a19fe` which finally tracks the 139 previously-uncommitted files production was already serving. `main` is unmoved at `7bb724d`. The repository is private.
 - Service-worker release: **`pp-v86` deployed to production on 2026-09-10** (`railway up`, service `parent-playbook`, environment `production`). Repository and production now match.
-- Railway deployment: 18af9078-3b56-4503-9d21-a1b0ee8c0e35
+- Railway deployment: 22d90350-50d4-4d43-bd96-5025661ce110 (SUCCESS, 2026-09-10). Project a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2, service caf9bbfb-1084-422b-913a-2b90d004410f, environment production. The service source is pinned to branch `main`, so pushing a feature branch does not deploy; the live site was published with `railway up` from the working directory.
 - Full JavaScript suite: **263/263 passing** — `node --test "tests/*.test.cjs"`
 - Executable database tests: **151/151 passing** — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
 - Migration replay into a disposable cluster: **76 of 77 applied**; only `20260812174514_enable_cron_and_net.sql` fails, because pg_cron and pg_net binaries are unavailable outside Supabase
