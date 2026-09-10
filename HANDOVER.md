@@ -6,6 +6,24 @@ The acquisition constraint in `FITMATCH-PARITY-PLAN.md` is that the core must be
 operable by an acquirer. This document is the operating half of that; `tools/schema-parity.cjs` is
 the falsifiable half.
 
+## Start here
+
+One command, from the root of this package:
+
+```sh
+node tools/acceptance.cjs
+```
+
+It verifies the checksum manifest, scans for content that should never have been packaged,
+runs the contract suite against the shipped modules, replays every migration into a throwaway
+PostgreSQL cluster and runs the security suite as restricted roles, then starts the bundled
+host and checks it serves modules correctly. Add `--json` for a machine-readable result.
+
+A check that cannot run on your machine reports SKIP with the reason and is listed again at
+the end under "Not run here, so not evidence" — the PostgreSQL replay is the usual one, and it
+needs a local PostgreSQL installation. The run ends by stating what a clean result does **not**
+establish. Read that part.
+
 ## Standing it up
 
 **1. Database.** Apply every migration in `supabase/migrations/` in filename order to an empty
@@ -124,11 +142,13 @@ Pin it exactly before relying on the demos in a regulated environment.
 
 | Command | Proves |
 |---|---|
+| `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
+| `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
 | `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 159 security cases pass as restricted roles |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
-| `node --test "tests/*.test.cjs"` | 263 contract, adapter, UI and packaging checks |
+| `node --test tests/<name>.test.cjs` | 107 contract and adapter checks against the shipped modules. The full 283-check suite covers app code that is not part of this package and runs in the source repository, not here |
 
 The checksum manifest is unsigned. It detects accidental change, not a determined substitution, and
 it can be replaced alongside modified files. Keep a separately trusted copy if you are verifying a

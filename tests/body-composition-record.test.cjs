@@ -227,7 +227,7 @@ test('the Supabase adapter keeps adult-reference and child-athlete scopes apart'
   assert.equal(captured.filters.athlete_id,null);
   // Configuration errors, not silent coercions.
   assert.throws(()=>createSupabaseCompanyCompositionAdapter(client(),{teamId:ORG,subjectReference:'synthetic-subject-001',subjectScope:'adult_reference',athleteId:athlete}),{code:'INVALID_COMPOSITION_SCOPE'});
-  assert.throws(()=>createSupabaseCompanyCompositionAdapter(client(),{teamId:ORG,subjectReference:'friday-adult-reference-001',subjectScope:'child_athlete',athleteId:athlete}),{code:'INVALID_COMPOSITION_SCOPE'});
+  assert.throws(()=>createSupabaseCompanyCompositionAdapter(client(),{teamId:ORG,subjectReference:'synthetic-adult-subject-001',subjectScope:'child_athlete',athleteId:athlete}),{code:'INVALID_COMPOSITION_SCOPE'});
   assert.throws(()=>createSupabaseCompanyCompositionAdapter(client(),{teamId:ORG,subjectReference:athlete,subjectScope:'child_athlete'}),{code:'INVALID_COMPOSITION_SCOPE'});
   assert.throws(()=>createSupabaseCompanyCompositionAdapter(client(),{teamId:ORG,subjectReference:athlete,subjectScope:'roster'}),{code:'INVALID_COMPOSITION_SCOPE'});
   // Child athlete: the athlete id is both the roster row and the opaque subject reference.
@@ -345,6 +345,9 @@ test('the executable database harness is present, self-contained and cannot reac
   assert.match(fixtures,/SYNTHETIC/);
   // The fixture header names the live record only to say it is NOT used, so check the SQL itself.
   const statements=source=>source.split(String.fromCharCode(10)).filter(line=>!line.trim().startsWith('--')).join(String.fromCharCode(10));
+  // The needles here are the LIVE record identifiers, deliberately. This asserts the
+  // database fixtures never reference the real adult-reference record; renaming these
+  // to the synthetic fixture names would make the assertion test nothing.
   for(const source of [fixtures,read('00-preamble.sql')])assert.doesNotMatch(statements(source),/friday-adult-reference-001|friday-reference-001/);
   // The README must keep stating what the harness does not prove.
   const readme=read('README.md');

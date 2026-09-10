@@ -10,7 +10,10 @@ function fixture(t){
   return {output,result:buildBundle(output)};
 }
 test('portable bundle includes only allowlisted source, matched imports and an intact manifest',t=>{
-  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,132);
+  // Derived, not a literal: the deepEqual below already pins the exact file list, and
+  // tests/deck-evidence.test.cjs fails if BUNDLE_FILES grows without the published
+  // documents being updated. A second hardcoded count here only needs hand-syncing.
+  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,BUNDLE_FILES.length);
   const manifest=JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
   assert.deepEqual(manifest.files.map(x=>x.path),BUNDLE_FILES);
   assert.equal(manifest.sdkVersion,'0.13.0');

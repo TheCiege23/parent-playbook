@@ -31,14 +31,26 @@ const SECRETS=[
   [/postgres(ql)?:\/\/[^\s'"]*:[^\s'"@]+@/,'database URL with password'],
 ];
 
-// Identifiers that belong to real, live records or to a project this package has
-// no business referencing. These are exact strings, not heuristics.
-const LIVE=[
-  ['friday-adult-reference-001','live adult-reference subject'],
-  ['friday-reference-001','live assessment reference'],
-  ['Bergenfield','live organization name'],
-  ['ksgrcdpinvqfwxdirzyg','unrelated Supabase project'],
-];
+// Identifiers that belong to real, live records or to a project this package has no
+// business referencing. Exact strings, not heuristics — and deliberately NOT written
+// here: this file ships inside the package, and a hardcoded list would publish the
+// very identifiers it exists to keep out. tools/package-scan-identifiers.json stays
+// in the source repository and is read when present.
+//
+// A shipped copy therefore runs with this rule switched off, and says so rather than
+// reporting a clean result it did not actually check.
+const IDENTIFIER_FILE=path.join(__dirname,'package-scan-identifiers.json');
+const LIVE=(()=>{
+  if(!fs.existsSync(IDENTIFIER_FILE))return null;
+  try{
+    const parsed=JSON.parse(fs.readFileSync(IDENTIFIER_FILE,'utf8'));
+    if(!Array.isArray(parsed.identifiers))throw new Error('no identifiers array');
+    return parsed.identifiers;
+  }catch(error){
+    // A malformed list must not silently degrade to "nothing to check".
+    throw new Error('package-scan-identifiers.json is present but unreadable: '+error.message);
+  }
+})();
 
 // Raw observation payloads: the arrays a scan produces, not the code that makes them.
 const CAPTURE=[
@@ -72,10 +84,12 @@ function scan(dir){
     if(bytes.subarray(0,4096).includes(0))continue;
     const text=bytes.toString('utf8');
     for(const [re,name] of SECRETS)if(re.test(text))add('secret',name);
-    for(const [needle,name] of LIVE)if(text.includes(needle))add('live identifier',name+' ('+needle+')');
+    if(LIVE)for(const [needle,name] of LIVE)if(text.includes(needle))add('live identifier',name+' ('+needle+')');
     for(const [re,name] of CAPTURE)if(re.test(text))add('capture data',name);
   }
-  return {directory:path.resolve(dir),scanned:files.length,ok:findings.length===0,findings};
+  // liveIdentifiersChecked is part of the result on purpose: a caller must be able to
+  // tell a clean scan from a scan that skipped a rule.
+  return {directory:path.resolve(dir),scanned:files.length,ok:findings.length===0,liveIdentifiersChecked:LIVE!==null,findings};
 }
 
 if(require.main===module){
@@ -87,6 +101,7 @@ if(require.main===module){
     else{
       console.log('scanned '+result.scanned+' files in '+result.directory);
       for(const f of result.findings)console.log('  FAIL  '+f.file+'  ['+f.rule+'] '+f.detail);
+      if(!result.liveIdentifiersChecked)console.log('  NOTE  live-identifier rule not run: tools/package-scan-identifiers.json is absent (expected in a shipped package)');
       console.log(result.ok?'clean: no excluded content found':result.findings.length+' finding(s)');
     }
     if(!result.ok)process.exitCode=1;

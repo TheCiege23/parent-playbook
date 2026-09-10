@@ -54,8 +54,32 @@ const BUNDLE_MIGRATIONS = Object.freeze([
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.
+// Contract suites that run against the shipped modules alone. A buyer can execute the
+// contracts rather than read them. Membership here is checked by running them inside an
+// extracted package: a suite that needs an unshipped file must not be listed, because a
+// missing test file is silently reported as success by `node --test`.
+const BUNDLE_CONTRACT_TESTS = Object.freeze([
+  'tests/body-composition-contract.test.cjs',
+  'tests/body-sdk-surface.test.cjs',
+  'tests/body-sdk.test.cjs',
+  'tests/body-surface-repeat.test.cjs',
+  'tests/composition-authorization-races.test.cjs',
+  'tests/heic-import.test.cjs',
+  'tests/photo-identity.test.cjs',
+  'tests/sdk-company-record.test.cjs',
+  'tests/sdk-demo.test.cjs',
+  'tests/sdk-measurement-report.test.cjs',
+  'tests/sdk-reference-history.test.cjs',
+  'tests/sdk-reference-import.test.cjs',
+  'tests/sdk-reference-supabase.test.cjs',
+  'tests/sdk-section.test.cjs',
+  'tests/sdk-supabase-adapter.test.cjs',
+  'tests/surface-location-report.test.cjs',
+  'tests/surface-review.test.cjs',
+]);
+
 const BUNDLE_VERIFICATION = Object.freeze([
-  'tools/sdk-files.cjs','tools/sdk-verify.cjs','tools/sdk-host.cjs','tools/schema-parity.cjs','tools/operations-check.cjs',
+  'tools/sdk-files.cjs','tools/sdk-verify.cjs','tools/sdk-host.cjs','tools/package-scan.cjs','tools/acceptance.cjs','tools/schema-parity.cjs','tools/operations-check.cjs',
   'tests/db/run.cjs','tests/db/replay.cjs','tests/db/inventory.sql','tests/db/posture.sql',
   'tests/db/00-preamble.sql','tests/db/05-post-identity-seed.sql','tests/db/10-fixtures.sql',
   'tests/db/security-tests.cjs','tests/db/README.md',
@@ -65,7 +89,8 @@ const BUNDLE_FILES = Object.freeze([
   ...SDK_FILES.map(name=>'js/'+name),
   'tools/sdk-demo.cjs','tools/sdk-demo.html','tools/sdk-demo.mjs','company-persistence-demo.html','tools/company-persistence-demo.mjs',
   ...BUNDLE_VERIFICATION,
+  ...BUNDLE_CONTRACT_TESTS,
   ...BUNDLE_MIGRATIONS,
   'HANDOVER.md','REFERENCE-COHORTS.md','BODY-SDK.md','HEIC-IMPORT.md','README.md',
 ]);
-module.exports={SDK_FILES,BUNDLE_FILES,BUNDLE_MIGRATIONS,BUNDLE_VERIFICATION};
+module.exports={SDK_FILES,BUNDLE_FILES,BUNDLE_MIGRATIONS,BUNDLE_VERIFICATION,BUNDLE_CONTRACT_TESTS};

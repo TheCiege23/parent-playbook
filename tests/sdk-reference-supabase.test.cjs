@@ -11,7 +11,7 @@ function client(){
 }
 test('adult-reference adapter persists a company record without an athlete row',async()=>{
   const [{createSupabaseCompanyReferenceAdapter},{createCompanyAssessmentStore}]=await Promise.all([import('../js/body-sdk-reference-supabase.mjs'),import('../js/body-sdk-record.mjs')]),db=client();
-  const adapter=createSupabaseCompanyReferenceAdapter(db,{teamId:ids.team,subjectReference:'friday-adult-reference-001',adultAttestedAt:'2026-09-10T03:59:00Z'}),store=createCompanyAssessmentStore(adapter),pointer={assessmentId:'friday-reference-001',subjectId:'friday-adult-reference-001'};
+  const adapter=createSupabaseCompanyReferenceAdapter(db,{teamId:ids.team,subjectReference:'synthetic-adult-subject-001',adultAttestedAt:'2026-09-10T03:59:00Z'}),store=createCompanyAssessmentStore(adapter),pointer={assessmentId:'synthetic-assessment-001',subjectId:'synthetic-adult-subject-001'};
   const record=await store.save(fixture(),{...pointer,consentReference:'adult-reference-permission-2026-09-10',savedAt:'2026-09-10T04:01:00Z',retentionUntil:'2026-10-10T04:00:00Z'});
   const row=[...db.rows.values()][0];assert.equal(row.athlete_id,undefined);assert.equal(row.subject_reference,pointer.subjectId);assert.equal(row.adult_attested_at,'2026-09-10T03:59:00.000Z');assert.equal(row.record.photos,undefined);
   assert.equal((await store.reopen(pointer)).assessmentId,pointer.assessmentId);assert.equal(JSON.parse((await store.exportRecord(pointer)).content).subjectId,pointer.subjectId);assert.equal((await store.delete(pointer)).deleted,true);

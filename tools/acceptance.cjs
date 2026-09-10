@@ -1,0 +1,251 @@
+// One command a buyer runs to find out what this package can prove about itself.
+//
+//   node tools/acceptance.cjs            everything available on this machine
+//   node tools/acceptance.cjs --json     machine-readable result
+//   node tools/acceptance.cjs --skip-db  skip the PostgreSQL replay
+//
+// Design rule, and the reason this file exists rather than a list of commands in a
+// README: a check that cannot run must say so loudly and must never look like a
+// pass. HANDOVER.md previously told buyers to run the JavaScript suite inside the
+// package, where it matched no files, reported "tests 0" and exited 0 — green, and
+// worth nothing. Every step below therefore reports PASS, FAIL or SKIP with a
+// reason, a suite that runs zero tests is a FAIL, and the summary ends with what
+// none of this establishes.
+const { execFileSync, spawn, spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const http = require('node:http');
+const net = require('node:net');
+const path = require('node:path');
+
+const root = path.join(__dirname, '..');
+const args = process.argv.slice(2);
+const JSON_OUT = args.includes('--json');
+const has = flag => args.includes(flag);
+
+const results = [];
+const record = (id, status, detail, extra) => {
+  results.push({ id, status, detail, ...(extra || {}) });
+  if (!JSON_OUT) {
+    const mark = status === 'pass' ? 'PASS' : status === 'skip' ? 'SKIP' : 'FAIL';
+    console.log('  ' + mark.padEnd(5) + id.padEnd(14) + detail);
+  }
+  return status;
+};
+
+// --- 1. runtime -----------------------------------------------------------
+function checkRuntime() {
+  const major = Number(process.versions.node.split('.')[0]);
+  if (major < 18) return record('runtime', 'fail', `Node ${process.versions.node}; this package needs 18 or newer`);
+  return record('runtime', 'pass', `Node ${process.versions.node} on ${process.platform}`);
+}
+
+// --- 2. manifest ----------------------------------------------------------
+function checkManifest() {
+  let verify;
+  try { verify = require(path.join(root, 'tools/sdk-verify.cjs')); }
+  catch (e) { return record('manifest', 'fail', 'tools/sdk-verify.cjs did not load: ' + e.message); }
+  const check = verify.verifyBundle(root);
+  if (!check.ok) return record('manifest', 'fail', check.errors.slice(0, 3).join('; '), { errors: check.errors });
+  return record('manifest', 'pass',
+    `${check.fileCount} files match the checksum manifest, no extras, no symlinks`, { fileCount: check.fileCount });
+}
+
+// --- 3. exclusions --------------------------------------------------------
+function checkExclusions() {
+  let scan;
+  try { scan = require(path.join(root, 'tools/package-scan.cjs')); }
+  catch (e) { return record('exclusions', 'fail', 'tools/package-scan.cjs did not load: ' + e.message); }
+  const result = scan.scan(root);
+  if (!result.ok) {
+    const first = result.findings.slice(0, 3).map(f => `${f.file} [${f.rule}]`).join('; ');
+    return record('exclusions', 'fail', `${result.findings.length} finding(s): ${first}`, { findings: result.findings });
+  }
+  // Report only the rules that actually ran. A shipped package has no identifier list
+  // — see tools/package-scan.cjs — so claiming it was checked for live identifiers
+  // would be the same kind of false green this tool exists to prevent.
+  const rules = 'images, capture geometry and credentials'
+    + (result.liveIdentifiersChecked ? ', and live record identifiers' : '');
+  return record('exclusions', 'pass', `${result.scanned} files carry no ${rules}`
+    + (result.liveIdentifiersChecked ? '' : ' (the live-identifier rule needs an operator-supplied list and did not run here)'),
+    { liveIdentifiersChecked: result.liveIdentifiersChecked });
+}
+
+// --- 4. contracts ---------------------------------------------------------
+function checkContracts() {
+  const dir = path.join(root, 'tests');
+  const files = fs.existsSync(dir)
+    ? fs.readdirSync(dir).filter(f => f.endsWith('.test.cjs')).map(f => path.join('tests', f))
+    : [];
+  // A suite with no files is the exact trap this tool exists to close. Node exits 0.
+  if (!files.length) return record('contracts', 'fail', 'no contract tests are present in this package');
+
+  // Enumerate the files rather than passing a glob: --test glob support varies by
+  // Node version, and an unmatched glob is another way to report zero tests as success.
+  const run = spawnSync(process.execPath, ['--test', ...files],
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const out = (run.stdout || '') + (run.stderr || '');
+  const number = label => { const m = out.match(new RegExp('^# ?' + label + ' (\\d+)', 'm')) || out.match(new RegExp('\\b' + label + ' (\\d+)')); return m ? Number(m[1]) : null; };
+  const total = number('tests'), pass = number('pass'), fail = number('fail');
+  if (total === null) return record('contracts', 'fail', 'could not read the test summary', { output: out.slice(-2000) });
+  if (total === 0) return record('contracts', 'fail', 'the contract suite ran zero tests; it is not verifying anything');
+  if (fail) return record('contracts', 'fail', `${fail} of ${total} contract tests failed`, { total, pass, fail });
+  return record('contracts', 'pass', `${pass} of ${total} contract tests pass against the shipped modules`, { total, pass });
+}
+
+// --- 5. database ----------------------------------------------------------
+function postgresAvailable() {
+  const exe = process.platform === 'win32' ? '.exe' : '';
+  const dirs = [process.env.PP_PG_BIN, null].filter(d => d !== undefined);
+  for (const dir of dirs) {
+    const initdb = dir ? path.join(dir, 'initdb' + exe) : 'initdb' + exe;
+    const probe = spawnSync(initdb, ['--version'], { encoding: 'utf8' });
+    if (probe.status === 0) return (probe.stdout || '').trim();
+  }
+  return null;
+}
+
+function checkDatabase() {
+  if (has('--skip-db')) return record('database', 'skip', 'skipped by --skip-db');
+  const runner = path.join(root, 'tests/db/run.cjs');
+  if (!fs.existsSync(runner)) return record('database', 'skip', 'tests/db/run.cjs is not in this package');
+  const version = postgresAvailable();
+  if (!version) return record('database', 'skip',
+    'no PostgreSQL on PATH. Install it, or set PP_PG_BIN to its bin directory, then re-run. ' +
+    'Until then the row-level-security evidence is UNVERIFIED on this machine.');
+  // The harness is reliable; the platform underneath it is not always. On Windows a
+  // stray console control event terminates a PostgreSQL backend (0xC000013A) and the
+  // postmaster then drops every connection mid-run. run.cjs labels that CLUSTER_LOST.
+  // It says nothing about the migrations, so retry once rather than reporting a
+  // security failure that did not happen — but never silently, and never more than once.
+  const attempt = () => {
+    try {
+      const out = execFileSync(process.execPath, [runner], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+      return { out };
+    } catch (e) { return { out: (e.stdout || '') + (e.stderr || ''), error: e }; }
+  };
+
+  let run = attempt();
+  let retried = false;
+  if (run.error && /CLUSTER_LOST/.test(run.out)) {
+    retried = true;
+    if (!JSON_OUT) console.log('  ..... database      cluster died mid-run (environment fault); retrying once');
+    run = attempt();
+  }
+
+  const suffix = retried ? ' after one retry past an environment fault' : '';
+  if (run.error) {
+    if (/CLUSTER_LOST/.test(run.out)) return record('database', 'fail',
+      'the disposable cluster died mid-run twice. This is an environment fault, not a failed ' +
+      'security case: a console control event terminated a PostgreSQL backend. Re-run, or run ' +
+      'tests/db/run.cjs directly, before concluding anything about the policies.',
+      { environmentFault: true, retried });
+    const tail = run.out.trim().split('\n').slice(-4).join(' | ');
+    return record('database', 'fail', 'the database suite did not complete: ' + tail.slice(0, 400), { retried });
+  }
+  const m = run.out.match(/TOTAL: (\d+)\/(\d+) pass, (\d+) fail/);
+  if (!m) return record('database', 'fail', 'the database suite produced no total line', { retried });
+  if (Number(m[3])) return record('database', 'fail', `${m[3]} database security cases failed`, { retried });
+  return record('database', 'pass',
+    `${m[1]}/${m[2]} security cases pass on a disposable cluster built from this package's migrations (${version})${suffix}`,
+    { passed: Number(m[1]), total: Number(m[2]), retried });
+}
+
+// --- 6. host --------------------------------------------------------------
+function freePort() {
+  return new Promise(resolve => {
+    const probe = net.createServer();
+    probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); });
+  });
+}
+const get = (port, pathname) => new Promise(resolve => {
+  const req = http.get({ host: '127.0.0.1', port, path: pathname, timeout: 4000 }, res => {
+    let body = ''; res.on('data', d => { body += d; });
+    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', body }));
+  });
+  req.on('timeout', () => { req.destroy(); resolve({ status: 0, type: '', body: 'timeout' }); });
+  req.on('error', e => resolve({ status: 0, type: '', body: e.message }));
+});
+
+async function checkHost() {
+  if (has('--skip-host')) return record('host', 'skip', 'skipped by --skip-host');
+  const host = path.join(root, 'tools/sdk-host.cjs');
+  if (!fs.existsSync(host)) return record('host', 'skip', 'tools/sdk-host.cjs is not in this package');
+  const port = await freePort();
+  const child = spawn(process.execPath, [host, '--port', String(port)], { cwd: root, stdio: 'ignore' });
+  try {
+    // Poll rather than sleep a fixed amount: a slow machine should not fail this.
+    let health = { status: 0 };
+    for (let i = 0; i < 40 && health.status !== 200; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      health = await get(port, '/healthz');
+    }
+    if (health.status !== 200) return record('host', 'fail', `/healthz did not answer on port ${port}`);
+    // Serving a module with the right type is what a browser integration depends on.
+    const mod = await get(port, '/js/body-sdk.mjs');
+    if (mod.status !== 200) return record('host', 'fail', `/js/body-sdk.mjs returned ${mod.status}`);
+    if (!/javascript/.test(mod.type)) return record('host', 'fail', `/js/body-sdk.mjs served as "${mod.type}", which a browser will refuse as a module`);
+    // And a path outside the allowlist must not be reachable.
+    const leak = await get(port, '/manifest.json');
+    if (leak.status === 200) return record('host', 'fail', 'the host served /manifest.json, which is outside its allowlist');
+    return record('host', 'pass', `serves /healthz and /js/body-sdk.mjs as ${mod.type.split(';')[0]}; off-allowlist paths refused`);
+  } finally {
+    child.kill();
+  }
+}
+
+// --- report ---------------------------------------------------------------
+// Stated as plainly as the passes. A buyer reading a screen of PASS lines should
+// not have to infer what is missing from what is absent.
+const NOT_ESTABLISHED = [
+  'Measurement accuracy. Nothing here compares an output to a physical measurement.',
+  'Anatomical validity. The surface perimeters are clothed-surface contours, not girths.',
+  'Body composition. No model ships and no composition value is ever produced.',
+  'FITMATCH equivalence, DEXA equivalence and clinical validity are not claimed or tested.',
+  'Restore and deletion. Standing the schema up is proven; restoring data from backup is not.',
+  'Buyer-host deployment and physical-device capture have not been performed.',
+  'The checksum manifest is unsigned: it detects accidental change, not substitution.',
+];
+
+async function main() {
+  if (!JSON_OUT) {
+    console.log('Parent Playbook package acceptance');
+    console.log(path.resolve(root));
+    console.log('');
+  }
+  checkRuntime();
+  checkManifest();
+  checkExclusions();
+  checkContracts();
+  checkDatabase();
+  await checkHost();
+
+  const failed = results.filter(r => r.status === 'fail');
+  const skipped = results.filter(r => r.status === 'skip');
+  const ok = failed.length === 0;
+  const summary = {
+    schema: 'PP_PACKAGE_ACCEPTANCE_V1',
+    ok, checkedAt: new Date().toISOString(),
+    passed: results.filter(r => r.status === 'pass').length,
+    failed: failed.length, skipped: skipped.length,
+    results, notEstablished: NOT_ESTABLISHED,
+  };
+  if (JSON_OUT) { console.log(JSON.stringify(summary, null, 2)); }
+  else {
+    console.log('');
+    console.log(ok
+      ? `${summary.passed} checks passed` + (skipped.length ? `, ${skipped.length} could not run on this machine` : '')
+      : `${failed.length} check(s) FAILED`);
+    if (skipped.length) {
+      console.log('');
+      console.log('Not run here, so not evidence:');
+      for (const s of skipped) console.log('  - ' + s.id + ': ' + s.detail);
+    }
+    console.log('');
+    console.log('What a clean run does NOT establish:');
+    for (const line of NOT_ESTABLISHED) console.log('  - ' + line);
+  }
+  if (!ok) process.exitCode = 1;
+}
+
+if (require.main === module) main();
+module.exports = { NOT_ESTABLISHED };

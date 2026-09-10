@@ -87,6 +87,16 @@ let dataDir = null;
 let started = false;
 let logPath = null;
 
+// True when the cluster we started is no longer answering. Used only to explain a
+// failure after the fact, never to decide whether a test passed.
+let clusterPort = null;
+function clusterGone() {
+  if (!clusterPort) return false;
+  const probe = spawnSync(bin('psql'), ['-h', '127.0.0.1', '-p', String(clusterPort), '-U', 'pptest',
+    '-d', 'postgres', '-X', '-A', '-t', '-c', 'select 1'], { encoding: 'utf8', timeout: 10000 });
+  return !(probe.status === 0 && String(probe.stdout).trim() === '1');
+}
+
 function stopCluster() {
   if (!started || !dataDir) return;
   try {
@@ -95,8 +105,16 @@ function stopCluster() {
   } catch { /* already down */ }
   started = false;
 }
+// Set once the run has failed, so cleanup keeps the postmaster log instead of deleting
+// the only artifact that explains what went wrong. A harness that tidies away its own
+// evidence on failure is worse than one that leaves temp files behind.
+let failed = false;
+
 function removeCluster() {
-  if (logPath) { try { fs.rmSync(logPath, { force: true }); } catch {} logPath = null; }
+  if (logPath) {
+    if (failed) { console.error('postmaster log kept for diagnosis: ' + logPath); logPath = null; }
+    else { try { fs.rmSync(logPath, { force: true }); } catch {} logPath = null; }
+  }
   if (!dataDir) return;
   // Only ever remove a directory this process created under the OS temp root.
   const resolved = path.resolve(dataDir);
@@ -154,6 +172,7 @@ async function main() {
     const log = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').split('\n').slice(-15).join('\n') : '(no log)';
     throw new Error('The disposable cluster did not become ready within 60s.\n' + log);
   }
+  clusterPort = port; // from here on a failure can be attributed to the cluster dying
   console.log('server started and accepting connections');
 
   execFileSync(bin('createdb'), ['-h', '127.0.0.1', '-p', String(port), '-U', user, database],
@@ -214,6 +233,21 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { process.e
 main().then(() => {
   console.log('\nAll executable database tests passed.');
 }).catch(error => {
+  failed = true; // keeps the postmaster log; the exit handler cleans up the rest
   console.error('\n' + (error && error.message ? error.message : error));
+  // A failure here means one of two very different things, and a reader must not have
+  // to guess which. Either a security case genuinely failed, or the disposable cluster
+  // died underneath the run — on Windows the backends are reachable by console control
+  // events, and a stray one terminates a backend with 0xC000013A, after which the
+  // postmaster shuts every connection. That is an environment fault: it says nothing
+  // about the migrations or the policies. Probe the server and label it.
+  if (started && clusterGone()) {
+    const tail = logPath && fs.existsSync(logPath)
+      ? fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean).slice(-6).join('\n  ') : '(no log)';
+    console.error('\nCLUSTER_LOST: the disposable cluster stopped accepting connections during the run.');
+    console.error('This is an environment fault, not a failed security case. Re-run before drawing');
+    console.error('any conclusion about the migrations or the row-level-security policies.');
+    console.error('  ' + tail);
+  }
   process.exitCode = 1;
 });
