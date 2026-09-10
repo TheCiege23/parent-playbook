@@ -55,7 +55,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.
 const BUNDLE_VERIFICATION = Object.freeze([
-  'tools/sdk-files.cjs','tools/sdk-verify.cjs','tools/schema-parity.cjs','tools/operations-check.cjs',
+  'tools/sdk-files.cjs','tools/sdk-verify.cjs','tools/sdk-host.cjs','tools/schema-parity.cjs','tools/operations-check.cjs',
   'tests/db/run.cjs','tests/db/replay.cjs','tests/db/inventory.sql','tests/db/posture.sql',
   'tests/db/00-preamble.sql','tests/db/05-post-identity-seed.sql','tests/db/10-fixtures.sql',
   'tests/db/security-tests.cjs','tests/db/README.md',

@@ -146,6 +146,23 @@ a CDN at runtime, so the package is not offline-capable.
 The live adult-reference record's identifiers no longer appear anywhere in the package. They were
 prefilled defaults in two demo pages and are now neutral placeholders.
 
+## Independent-host deployment
+
+On 2026-09-10 the handover package was deployed to a Railway service with no connection to the
+Parent Playbook repository, origin or database, given a public HTTPS domain, verified, and deleted.
+All 28 SDK modules served 200 with a JavaScript content type; the demo page rendered; every module
+imported in a real browser; the composition gate returned `MODEL_NOT_CONFIGURED` on a host with zero
+configuration; the record contract still rejected a forbidden payload. Migrations, tests, docs, the
+checksum manifest and the deployment config all returned 404.
+
+Getting there found that the package had **no hostable server at all**. `tools/sdk-demo.cjs` binds
+127.0.0.1 and refuses a non-localhost Host header — correct for a demo, undeployable by design — so
+an acquirer had nothing to serve the SDK with. `tools/sdk-host.cjs` is the missing piece.
+
+**This is independent-host evidence, not buyer-host acceptance.** The service ran in the same
+Railway account. It proves the package runs on infrastructure that shares nothing with production;
+it does not prove an acquirer ran it on theirs. FM11 stays at 0.75.
+
 ## Real-data boundary
 
 The live Bergenfield Bears organization has one real adult record: subject `friday-adult-reference-001`, assessment `friday-reference-001`, 25 outputs, 74-inch supplied height, 14.4-second processing, retained through October 10, 2026. Do not read, modify or delete it without explicit user authorization in the current session. Do not upload the user's photos or create another personal record for testing. Synthetic fixtures are allowed in automated tests and must be labelled synthetic.

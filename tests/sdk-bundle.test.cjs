@@ -10,7 +10,7 @@ function fixture(t){
   return {output,result:buildBundle(output)};
 }
 test('portable bundle includes only allowlisted source, matched imports and an intact manifest',t=>{
-  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,129);
+  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,130);
   const manifest=JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
   assert.deepEqual(manifest.files.map(x=>x.path),BUNDLE_FILES);
   assert.equal(manifest.sdkVersion,'0.13.0');
@@ -55,6 +55,60 @@ test('bundle verification rejects unexpected content and untrusted manifest path
   assert.ok(result.errors.includes('Unexpected file: accidental-capture.jpg'));
   assert.ok(result.errors.includes('Invalid, duplicate or unexpected manifest entry'));
 });
+test('the package ships a server a host can actually run, and it serves only the SDK', async t => {
+  const {output} = fixture(t);
+  // tools/sdk-demo.cjs binds 127.0.0.1 and refuses a non-localhost Host header, which is correct
+  // for a demo and useless to an acquirer. tools/sdk-host.cjs is the hostable counterpart; this
+  // proves it binds a real interface, serves the SDK with loadable MIME types, and exposes
+  // nothing else from the package — no migrations, no tests, no manifest, no docs.
+  const reserve = net.createServer();
+  await new Promise(resolve => reserve.listen(0, '127.0.0.1', resolve));
+  const port = reserve.address().port;
+  await new Promise(resolve => reserve.close(resolve));
+
+  const child = spawn(process.execPath, [path.join(output, 'tools/sdk-host.cjs'), '--port', String(port), '--host', '127.0.0.1'],
+    {cwd: output, stdio: ['ignore','pipe','pipe'], windowsHide: true});
+  try {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('host did not start')), 8000);
+      child.stdout.once('data', () => { clearTimeout(timeout); resolve(); });
+      child.once('error', error => { clearTimeout(timeout); reject(error); });
+      child.once('exit', code => { clearTimeout(timeout); reject(new Error('host exited ' + code)); });
+    });
+    const base = 'http://127.0.0.1:' + port;
+
+    const health = await fetch(base + '/healthz');
+    assert.equal(health.status, 200);
+
+    // Every SDK module must load, and .mjs must carry a JavaScript type or the module loader
+    // refuses it outright — a wrong Content-Type here breaks the SDK with no error in the file.
+    for (const name of SDK_FILES) {
+      const res = await fetch(base + '/js/' + name);
+      assert.equal(res.status, 200, name);
+      assert.match(res.headers.get('content-type') || '', /javascript/, name + ' content-type');
+    }
+    const demo = await fetch(base + '/');
+    assert.equal(demo.status, 200);
+
+    // Response headers production sets.
+    const headers = (await fetch(base + '/js/body-sdk.mjs')).headers;
+    assert.equal(headers.get('x-content-type-options'), 'nosniff');
+    assert.match(headers.get('cache-control') || '', /must-revalidate/);
+
+    // Everything else in the package stays unreachable over HTTP.
+    for (const hidden of [
+      '/HANDOVER.md', '/README.md', '/manifest.json', '/tools/sdk-files.cjs',
+      '/tests/db/run.cjs', '/tests/db/10-fixtures.sql', '/package.json',
+      '/supabase/migrations/20260910190000_company_composition_results.sql',
+    ]) {
+      assert.equal((await fetch(base + hidden)).status, 404, hidden + ' must not be served');
+    }
+    assert.equal((await fetch(base + '/js/body-sdk.mjs', {method:'POST'})).status, 405);
+  } finally {
+    if (child.exitCode === null) await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
+  }
+});
+
 test('copied bundle serves its demo and every SDK asset without repository access',async t=>{
   const {output}=fixture(t);
   const reserve=net.createServer();await new Promise(resolve=>reserve.listen(0,'127.0.0.1',resolve));

@@ -39,9 +39,44 @@ database; `node tools/operations-check.cjs --verify <snapshot>` asserts every an
 non-zero on failure. Run it after standing up, and on a schedule thereafter.
 
 **4. Browser SDK.** Copy `js/` to a versioned path on your own origin and serve it same-origin. See
-`BODY-SDK.md` for the API, result contracts and host responsibilities. `node tools/sdk-verify.cjs`
-checks the package against its checksum manifest. `node tools/sdk-demo.cjs 8774` serves a
-loopback-only demo.
+`BODY-SDK.md` for the API, result contracts and host responsibilities.
+
+Two servers ship, and the difference matters:
+
+- `tools/sdk-demo.cjs` is **loopback-only by design**. It binds 127.0.0.1 and refuses any Host
+  header that is not localhost, so it cannot be deployed and should not be. Use it to try the SDK
+  on a workstation: `node tools/sdk-demo.cjs 8774`.
+- `tools/sdk-host.cjs` is the one you can deploy. It binds `0.0.0.0`, reads `PORT`, serves only the
+  allowlisted SDK modules and the demo page, sets the same headers production sets, and returns 404
+  for everything else in the package — migrations, tests, manifests and these documents included.
+  It exposes `/healthz` for platform health checks.
+
+It is a reference, not a product: no TLS, no rate limiting, no access logging, no authentication.
+It needs none of those, because it serves public source code. Put it behind whatever your platform
+provides. What it does get right is the part that silently breaks otherwise — `.mjs` must be served
+with a JavaScript content type or the browser refuses the module with no useful error.
+
+Deployment configuration is yours to supply and is deliberately **not** in this package. On Railway,
+two files beside it are enough:
+
+```json
+// railway.json
+{ "build": { "builder": "RAILPACK" },
+  "deploy": { "startCommand": "node tools/sdk-host.cjs", "healthcheckPath": "/healthz" } }
+
+// package.json
+{ "name": "your-sdk-host", "private": true, "scripts": { "start": "node tools/sdk-host.cjs" } }
+```
+
+This exact recipe was executed on 2026-09-10: the package was deployed to a Railway service with no
+connection to the Parent Playbook repository, origin or database, given a public HTTPS domain, and
+verified — all 28 SDK modules served 200 with `text/javascript`, the demo page rendered, every
+module imported in a real browser, the composition gate returned `MODEL_NOT_CONFIGURED` on a host
+with zero configuration, and the record contract still rejected a forbidden payload with
+`CAPTURE_DATA_FORBIDDEN`. Migrations, tests, docs, the manifest and the deployment config were all
+404. The service was deleted afterwards.
+
+`node tools/sdk-verify.cjs` checks the package against its checksum manifest.
 
 ## Dependency and license inventory
 
