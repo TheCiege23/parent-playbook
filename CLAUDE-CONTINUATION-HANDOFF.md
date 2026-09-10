@@ -163,6 +163,35 @@ an acquirer had nothing to serve the SDK with. `tools/sdk-host.cjs` is the missi
 Railway account. It proves the package runs on infrastructure that shares nothing with production;
 it does not prove an acquirer ran it on theirs. FM11 stays at 0.75.
 
+## Reference cohorts
+
+`js/reference-cohort.mjs` generalises the CDC stature machinery to any published cohort, and
+**ships with zero cohorts loaded**. That is the honest state, and `REFERENCE-COHORTS.md` records why.
+
+The blocker for FM09's whole-body cohorts is not data. ANSUR II is public domain, free and has 93
+measurements on 6,068 subjects. It cannot be wired to our 25 outputs because **definitional
+equivalence has not been established** — ours are pose-landmark distances scaled by supplied height,
+ANSUR II is tape and caliper anthropometry to ISO definitions, and FM03 already records that metric
+equivalence is unproven. It is also adult US Army personnel, which is the wrong population for child
+athletes. Running one through the other would produce a number more authoritative-looking than the
+measurement it came from.
+
+So `referencePercentile()` refuses any metric whose cohort has not declared an established
+equivalence **with the evidence that established it**; `status: established` alone is an assertion.
+It also refuses to extrapolate past a cohort's age range, to answer for an uncovered sex, or to
+accept a mismatched unit, and every percentile it returns carries the cohort's source, citation,
+version, population, sample size and method.
+
+The statistics are verified even though nothing uses them: the normal CDF against published
+standard-normal values, the LMS z-score analytically at L=1, at the L=0 log limit and at a general L,
+and one real LMS row cross-checked against `js/cdc-stature.js`, which was itself verified against
+CDC's published P3/P50/P97 columns across all 436 rows. When a cohort clears the gate the arithmetic
+is already known to be right — it is the equivalence, not the mathematics, that is missing.
+
+Unblocking one metric needs an agreement study: same subjects, our estimate and the reference
+protocol, across the age and body range served, reporting bias and limits of agreement. That is
+research, not engineering.
+
 ## Real-data boundary
 
 The live Bergenfield Bears organization has one real adult record: subject `friday-adult-reference-001`, assessment `friday-reference-001`, 25 outputs, 74-inch supplied height, 14.4-second processing, retained through October 10, 2026. Do not read, modify or delete it without explicit user authorization in the current session. Do not upload the user's photos or create another personal record for testing. Synthetic fixtures are allowed in automated tests and must be labelled synthetic.

@@ -10,7 +10,7 @@ function fixture(t){
   return {output,result:buildBundle(output)};
 }
 test('portable bundle includes only allowlisted source, matched imports and an intact manifest',t=>{
-  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,130);
+  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,132);
   const manifest=JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
   assert.deepEqual(manifest.files.map(x=>x.path),BUNDLE_FILES);
   assert.equal(manifest.sdkVersion,'0.13.0');
