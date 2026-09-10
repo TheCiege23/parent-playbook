@@ -557,6 +557,34 @@ add('J02', 'least-privilege', 'SELECT still reaches authenticated on every publi
 add('J03', 'least-privilege', 'default privileges no longer hand DDL-adjacent rights to tenant roles', {
   sql: `select count(*)::text from pg_default_acl d join pg_namespace n on n.oid=d.defaclnamespace cross join unnest(d.defaclacl) as a(item) where n.nspname='public' and d.defaclobjtype='r' and (a.item::text like 'anon=%' or a.item::text like 'authenticated=%') and split_part(split_part(a.item::text,'/',1),'=',2) ~ '[Dxtm]';`, expect: 'ok', expectOut: '0' });
 
+// =========================================================== K. auto-RLS guardrail
+// public.rls_auto_enable() runs on ddl_command_end and enables row level security on every new
+// table in public. It existed in production but in no migration, so a restore lost it. These
+// prove it is reproduced, that it actually fires, and that revoking EXECUTE does not disable it
+// (the event trigger mechanism invokes the function as its owner and never consults EXECUTE).
+add('K01', 'auto-rls', 'the event trigger and its function are reproduced by the migrations', {
+  sql: `select (select count(*) from pg_event_trigger where evtname='ensure_rls')::text || '|' ||
+        (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+         where n.nspname='public' and p.proname='rls_auto_enable')::text;`,
+  expect: 'ok', expectOut: '1|1' });
+add('K02', 'auto-rls', 'a newly created public table gets RLS enabled automatically', {
+  sql: `create table public.k02_guardrail_probe(x int);
+        select relrowsecurity::text from pg_class where oid='public.k02_guardrail_probe'::regclass;`,
+  expect: 'ok', expectOut: 'true' });
+add('K03', 'auto-rls', 'PUBLIC, anon and authenticated hold no EXECUTE on the event-trigger function', {
+  sql: `select coalesce(array_to_string(p.proacl::text[],' '),'(default)') from pg_proc p
+        join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='rls_auto_enable';`,
+  expect: 'ok' });  // asserted precisely by K04; this records the actual ACL in the report
+add('K04', 'auto-rls', 'no tenant role and no PUBLIC default can execute it', {
+  sql: `select (has_function_privilege('anon','public.rls_auto_enable()','EXECUTE')::text || '|' ||
+               has_function_privilege('authenticated','public.rls_auto_enable()','EXECUTE')::text);`,
+  expect: 'ok', expectOut: 'false|false' });
+add('K05', 'auto-rls', 'the guardrail still fires after EXECUTE was revoked', {
+  sql: `revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+        create table public.k05_guardrail_probe(x int);
+        select relrowsecurity::text from pg_class where oid='public.k05_guardrail_probe'::regclass;`,
+  expect: 'ok', expectOut: 'true' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

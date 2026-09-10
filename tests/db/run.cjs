@@ -11,6 +11,7 @@
  *
  *   node tests/db/run.cjs            run everything, then dispose
  *   node tests/db/run.cjs --keep     leave the cluster running for manual psql inspection
+ *   node tests/db/run.cjs --inventory <file>   write the schema inventory, skip the suite
  *
  * Requires a local PostgreSQL installation (initdb, pg_ctl, psql, createdb) on PATH, or set
  * PP_PG_BIN to its bin directory. Tested against PostgreSQL 18.3.
@@ -25,6 +26,11 @@ const path = require('node:path');
 const HERE = __dirname;
 const REPO = path.resolve(HERE, '..', '..');
 const KEEP = process.argv.includes('--keep');
+// --inventory <file> builds the cluster from the migrations, writes the canonical schema
+// inventory and disposes, skipping the security suite. tools/schema-parity.cjs uses this to
+// prove the committed migrations reproduce production.
+const INVENTORY_AT = (() => { const i = process.argv.indexOf('--inventory'); return i === -1 ? null : process.argv[i + 1]; })();
+if (process.argv.includes('--inventory') && !INVENTORY_AT) { console.error('--inventory needs an output path'); process.exit(2); }
 const EXE = process.platform === 'win32' ? '.exe' : '';
 
 function findBin() {
@@ -157,6 +163,20 @@ async function main() {
 
   step('replay the real migration history');
   child('replay.cjs', 'migration replay');
+
+  if (INVENTORY_AT) {
+    step('capture schema inventory');
+    const out = execFileSync(env.PP_DB_PSQL, [...conn, '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1',
+      '-f', path.join(HERE, 'inventory.sql')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const inventory = JSON.parse(out.trim());
+    fs.mkdirSync(path.dirname(path.resolve(INVENTORY_AT)), { recursive: true });
+    fs.writeFileSync(INVENTORY_AT, JSON.stringify(inventory, null, 2) + String.fromCharCode(10), 'utf8');
+    console.log('wrote ' + inventory.total + ' objects to ' + INVENTORY_AT);
+    step('dispose');
+    stopCluster(); removeCluster(); dataDir = null;
+    console.log('cluster stopped and deleted');
+    return;
+  }
 
   step('load synthetic fixtures');
   execFileSync(env.PP_DB_PSQL, [...conn, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '--single-transaction',

@@ -326,7 +326,7 @@ test('production allowlist, worker and smoke checks cover the composition storag
 
 test('the executable database harness is present, self-contained and cannot reach a real server',()=>{
   const dir=path.join(__dirname,'db'),read=name=>fs.readFileSync(path.join(dir,name),'utf8');
-  for(const name of ['run.cjs','replay.cjs','security-tests.cjs','00-preamble.sql','05-post-identity-seed.sql','10-fixtures.sql','README.md'])
+  for(const name of ['run.cjs','replay.cjs','security-tests.cjs','00-preamble.sql','05-post-identity-seed.sql','10-fixtures.sql','README.md','inventory.sql'])
     assert.ok(fs.existsSync(path.join(dir,name)),'missing tests/db/'+name);
   // The main glob is tests/*.test.cjs, so the harness must not be picked up by the default suite.
   for(const name of fs.readdirSync(dir))assert.ok(!name.endsWith('.test.cjs'),'tests/db/'+name+' would join the default suite');
