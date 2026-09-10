@@ -212,3 +212,52 @@ test('no reference cohort ships, and the reason is written down', () => {
   assert.match(doc, /definitional equivalence/i);
   assert.match(doc, /no cohort is loaded/i);
 });
+
+test('the loaded-cohort registry cannot acquire a percentile nobody earned', async () => {
+  const { validateReferenceCohort } = await import('../js/reference-cohort.mjs');
+  const source = fs.readFileSync(path.join(__dirname, '../js/reference-cohorts.js'), 'utf8');
+  // Evaluate the registry the way the browser does: a classic script, no imports.
+  const scope = {};
+  new Function(source + ';this.REFERENCE_COHORTS=REFERENCE_COHORTS;this.summary=referenceCohortSummary;this.forMetric=referenceCohortForMetric;').call(scope);
+
+  // The honest current state.
+  assert.deepEqual(scope.REFERENCE_COHORTS, [], 'a cohort appeared in the registry');
+  const summary = scope.summary();
+  assert.equal(summary.loaded, 0);
+  assert.deepEqual(summary.usableMetrics, []);
+  assert.match(summary.reason, /have not been shown to measure the same thing/);
+  assert.equal(scope.forMetric('wingspan'), null);
+
+  // If a cohort is ever added, it must satisfy the contract, and only metrics whose equivalence
+  // was actually established may surface. This is the guard that makes the registry safe to edit.
+  for (const cohort of scope.REFERENCE_COHORTS) {
+    const validated = validateReferenceCohort(cohort);
+    for (const metric of validated.metrics) {
+      if (metric.equivalence.status !== 'established') {
+        assert.equal(scope.forMetric(metric.key), null, metric.key + ' surfaced without established equivalence');
+      } else {
+        assert.ok(metric.equivalence.evidence, metric.key + ' claims equivalence with no evidence');
+        assert.ok(metric.equivalence.comparedTo, metric.key + ' claims equivalence against nothing');
+      }
+    }
+  }
+});
+
+test('Body Insights shows the missing reference instead of hiding it', () => {
+  const insights = fs.readFileSync(path.join(__dirname, '../js/body-insights.js'), 'utf8');
+  // The page must read the registry rather than hard-coding a state that can go stale.
+  assert.match(insights, /referenceCohortSummary/);
+  assert.match(insights, /refSummary/);
+  // Guarded like staturePercentile, so a missing registry script degrades instead of throwing.
+  assert.match(insights, /typeof referenceCohortSummary==='function'/);
+  // The explanation renders with the body measurements, and the card renders in growth context.
+  assert.match(insights, /bi-no-reference/);
+  assert.match(insights, /Population reference/);
+  // It must never invent a number: the card shows a count of referenced metrics, or an em dash.
+  assert.match(insights, /refSummary&&refSummary\.usableMetrics\.length\?refSummary\.usableMetrics\.length:'—'/);
+
+  // The registry is loaded before the page that reads it, and cached for offline.
+  assert.match(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8'),
+    /reference-cohorts\.js"><\/script>\s*<script src="\/js\/body-outputs\.js/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8'), /'\/js\/reference-cohorts\.js'/);
+});

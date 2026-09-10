@@ -79,6 +79,13 @@ function biMarkup(athlete, input, date, baseline){
   const predicted=typeof midParentalHeight==='function'?midParentalHeight(athlete.mother_height_in,athlete.father_height_in,athlete.sex_at_birth):null;
   const maturityBatch=typeof maturityInputBatch==='function'?maturityInputBatch(selectedRows):null;
   const maturity=maturityBatch&&typeof maturityOffsetEstimate==='function'?maturityOffsetEstimate({sex:athlete.sex_at_birth,birthdate:athlete.birthdate,measuredOn:maturityBatch.measuredOn,heightIn:maturityBatch.height.value,sittingHeightIn:maturityBatch.sitting_height.value,weightLb:maturityBatch.weight.value}):null;
+  // Population references for body lengths come from the loaded-cohort registry, which is
+  // deliberately empty: no published cohort has established definitional equivalence with a
+  // pose-derived estimate. Guarded the same way staturePercentile is, so the page still renders
+  // if the registry script is absent.
+  const refSummary=typeof referenceCohortSummary==='function'?referenceCohortSummary():null;
+  const refNote=refSummary&&!refSummary.usableMetrics.length
+    ?`<p class="bi-muted bi-no-reference">${esc(refSummary.reason)}</p>`:'';
   const reference=height && height.unit==='in' && typeof staturePercentile==='function' && typeof ageMonthsAt==='function'
     ? staturePercentile(Number(height.value),ageMonthsAt(athlete.birthdate,height.measured_on),athlete.sex_at_birth):null;
   const percentile=reference?.pct;
@@ -86,11 +93,12 @@ function biMarkup(athlete, input, date, baseline){
     <header class="bi-hero"><div><span class="bi-eyebrow">PARENT PLAYBOOK / BODY INSIGHTS</span><h1>A clearer view of progress.</h1><p>${esc(athlete.first_name||'Your athlete')}'s measurements, movement and growth in one place.</p><div class="bi-actions"><button class="btn amber" id="biScan">New assessment</button><button class="btn ghost" id="biExport" ${rows.length?'':'disabled'}>Export records</button></div></div><div class="bi-summary"><strong>${now.size}</strong><span>recorded metrics</span><strong>${dates.length}</strong><span>recording dates</span></div></header>
     <div class="bi-controls"><label>View readings through<select id="biDate" ${dates.length?'':'disabled'}>${dates.map(d=>`<option ${d===date?'selected':''}>${d}</option>`).join('')}</select></label><label>Compare with<select id="biBaseline"><option value="">No comparison</option>${dates.filter(d=>d<date).map(d=>`<option ${d===baseline?'selected':''}>${d}</option>`).join('')}</select></label></div>
     <p class="bi-muted">Each card shows the latest reading on or before the selected date. Comparison uses the same units and recorded method; matching methods alone does not guarantee equivalent conditions.</p>
-    <section><div class="bi-section-head"><h2>Body measurements</h2><span>Lengths & proportions</span></div>${body.length?`<div class="bi-grid">${body.map(card).join('')}</div>`:'<div class="bi-empty">Start with a measured height, then take a four-photo assessment to estimate body lengths.</div>'}</section>
+    <section><div class="bi-section-head"><h2>Body measurements</h2><span>Lengths & proportions</span></div>${body.length?`${refNote}<div class="bi-grid">${body.map(card).join('')}</div>`:'<div class="bi-empty">Start with a measured height, then take a four-photo assessment to estimate body lengths.</div>'}</section>
     ${biSidePairs(rows,date)}
     ${biOutputDefinitions([...now.values()])}
     <section><div class="bi-section-head"><h2>Growth context</h2><span>Based on recorded height and family inputs</span></div><div class="bi-grid">
       <article class="bi-metric"><div class="bi-eyebrow">Height reference</div><strong>${Number.isFinite(percentile)?ordinalPct(percentile):'—'}</strong><p class="bi-muted">${Number.isFinite(percentile)?'CDC stature percentile for age and sex.':'Needs height in inches, date of birth and supported reference inputs.'}</p></article>
+      <article class="bi-metric"><div class="bi-eyebrow">Population reference</div><strong>${refSummary&&refSummary.usableMetrics.length?refSummary.usableMetrics.length:'—'}</strong><p class="bi-muted">${refSummary&&refSummary.usableMetrics.length?esc('Body measurements with a population comparison. Height uses '+refSummary.statureReference+'.'):esc(refSummary?refSummary.reason:'Population references are unavailable in this build.')}</p></article>
       <article class="bi-metric"><div class="bi-eyebrow">Recorded growth rate</div><strong>${growth?Number(growth.inPerYear.toFixed(1))+' in/yr':'—'}</strong><p class="bi-muted">${growth?'Annualized change between height readings; not predicted PHV.':'Needs height readings sufficiently far apart.'}</p></article>
       <article class="bi-metric"><div class="bi-eyebrow">Adult-height estimate</div><strong>${predicted?Math.round(predicted.lo)+'–'+Math.round(predicted.hi)+' in':'—'}</strong><p class="bi-muted">${predicted?'Mid-parental range; not a scan-derived prediction.':'Add parental heights and sex in Growth to calculate a range.'}</p></article>
       <article class="bi-metric"><div class="bi-eyebrow">Estimated maturity offset</div><strong>${maturity?(maturity.offsetYears>0?'+':'')+maturity.offsetYears.toFixed(1)+' yr':'—'}</strong><p class="bi-muted">${maturity?'Manual same-session measurements; ±1 year minimum uncertainty. Context only, not puberty diagnosis or training prescription.':'Ages 8–16: add a same-session standing height, sitting height and body mass in Growth.'}</p></article>

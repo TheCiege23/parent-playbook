@@ -75,6 +75,24 @@ For each metric, in this order:
 Step 3 is the expensive one. It needs subjects, a trained measurer and a protocol — it is a research
 activity, not an engineering task, and no amount of code substitutes for it.
 
+## What the parent actually sees
+
+Body Insights reads the registry rather than hard-coding a state that can go stale
+(`js/reference-cohorts.js`, loaded before `js/body-insights.js`).
+
+With the registry empty, the Body measurements section carries one explanatory line — not a
+warning, because nothing is wrong — and the Growth context gains a **Population reference** card
+showing an em dash and the reason. Body-length cards show their value and nothing else. The
+**Height reference** card continues to show a real CDC stature percentile beside it, which is the
+contrast worth having: one number has an established reference and says so, the others do not and
+say that too.
+
+The wiring is live, not a fixed message. Adding a cohort whose metric has an established
+equivalence makes the card show a count, removes the explanatory line, and surfaces only the
+metrics that cleared the gate — verified in a browser by pushing a probe cohort into the registry
+and re-rendering: a metric marked `established` surfaced, one marked `not_established` in the same
+cohort did not.
+
 ## Cross-check on the statistics
 
 The machinery itself is verified even though nothing uses it yet. `tests/reference-cohort.test.cjs`
