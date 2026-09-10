@@ -47,7 +47,7 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Service-worker release: **`pp-v86` deployed to production on 2026-09-10** (`railway up`, service `parent-playbook`, environment `production`). Repository and production now match.
 - Railway deployment: 22d90350-50d4-4d43-bd96-5025661ce110 (SUCCESS, 2026-09-10). Project a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2, service caf9bbfb-1084-422b-913a-2b90d004410f, environment production. The service source is pinned to branch `main`, so pushing a feature branch does not deploy; the live site was published with `railway up` from the working directory.
 - Full JavaScript suite: **263/263 passing** — `node --test "tests/*.test.cjs"`
-- Executable database tests: **151/151 passing** — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
+- Executable database tests: **154/154 passing** — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
 - Migration replay into a disposable cluster: **76 of 77 applied**; only `20260812174514_enable_cron_and_net.sql` fails, because pg_cron and pg_net binaries are unavailable outside Supabase
 - Production smoke: **25/25** — `node tools/deployment-smoke.cjs https://playbookbp.com/`.
 - Supabase migration **committed to the live project on 2026-09-10** (`xqvqjkdxykowwpcmyudz`, Postgres 17.6), after three rollback-only rehearsals. Applied in one transaction that also recorded `supabase_migrations.schema_migrations` at version `20260910190000`, matching the repository filename, so a later `supabase db push` sees it as applied. All seven function body md5s match the local cluster byte for byte. `company_composition_providers` and `company_composition_results` both exist, both have RLS enabled, both hold **zero rows**, `anon` has no privilege on either and is denied through the public API, and `authenticated` holds exactly `SELECT` on the registry and CRUD on results. Supabase security advisors report **no new findings** attributable to this migration.
@@ -75,7 +75,17 @@ There is no licensed body-composition model, real composition output or independ
    the mechanism, not about this job. Check `cron.job_run_details` for `jobid` 11 after 03:50 UTC and
    confirm a `succeeded` row. Note that `company-reference-assessment-retention` has also never run,
    for the same benign reason: it was scheduled after its own daily slot had already passed.
-2. **Decide what to do about the pre-existing excess table privileges.** Supabase grants `ALL` on every new `public` table to `anon` and `authenticated`, which includes `TRUNCATE`, `TRIGGER` and `REFERENCES`. `TRUNCATE` is not subject to row-level security. Verified on the live project: `company_body_assessments`, `company_reference_assessments`, `athletes`, `measurements`, `biometric_consents`, `access_log` and `teams` all carry it for both roles. PostgREST exposes no TRUNCATE verb, so this is a latent excess privilege rather than a directly reachable one through the documented API — but it defeats every RLS policy on those tables for anything that can execute arbitrary SQL as those roles. The composition migration now revokes it for its own two tables; the sibling tables were **not** changed, because that is a committing production change nobody has authorized.
+2. **Close the last grant residual.** `20260910200000` revoked TRUNCATE, TRIGGER, REFERENCES and
+   MAINTAIN from anon and authenticated on all 53 public tables, and tightened default privileges
+   for the `postgres` owner so new tables do not re-inherit them. `supabase_admin`'s defaults are
+   **unchanged** — the migration runs as `postgres`, which is not a member of that role, so the
+   statement was skipped by design rather than failing. Migrations create tables as `postgres`, so
+   the practical path is covered; a table created by `supabase_admin` would still inherit the excess
+   grants. Closing it needs a connection with supabase_admin membership.
+
+   Separately, and deliberately NOT changed: `anon` still holds INSERT/UPDATE/DELETE on most public
+   tables. That is Supabase's default with row-level security as the boundary, it is what the
+   application relies on, and narrowing it is a much larger decision than this one.
 
 ## Deploy and migration ordering
 
