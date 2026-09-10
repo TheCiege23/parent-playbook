@@ -50,7 +50,7 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Executable database tests: **151/151 passing** — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
 - Migration replay into a disposable cluster: **76 of 77 applied**; only `20260812174514_enable_cron_and_net.sql` fails, because pg_cron and pg_net binaries are unavailable outside Supabase
 - Production smoke: **25/25** — `node tools/deployment-smoke.cjs https://playbookbp.com/`.
-- Rollback-only application to the live Supabase project (`xqvqjkdxykowwpcmyudz`, Postgres 17.6): **passed on 2026-09-10**. The exact repository file was applied inside `begin … rollback`, all seven function body md5s matched the local cluster byte for byte, and a post-run check confirmed both tables absent, zero new functions, no composition cron job, the two pre-existing cron jobs intact and no open transaction. Nothing was committed.
+- Supabase migration **committed to the live project on 2026-09-10** (`xqvqjkdxykowwpcmyudz`, Postgres 17.6), after three rollback-only rehearsals. Applied in one transaction that also recorded `supabase_migrations.schema_migrations` at version `20260910190000`, matching the repository filename, so a later `supabase db push` sees it as applied. All seven function body md5s match the local cluster byte for byte. `company_composition_providers` and `company_composition_results` both exist, both have RLS enabled, both hold **zero rows**, `anon` has no privilege on either and is denied through the public API, and `authenticated` holds exactly `SELECT` on the registry and CRUD on results. Supabase security advisors report **no new findings** attributable to this migration.
 - Weighted parity: 37.75/100, reported as 37.75% or 38% rounded
 - SDK ZIP: `tools/sdk-releases/parent-playbook-sdk-0.13.0-friday-final-v7.zip`, SHA-256 `62F6EDFBCFD73E8770E0BFD6054F1A041C13D74F5D41FB7C9E7713E4D881251E`. **This archive is stale by three files** and was not rebuilt. `node tools/sdk-bundle.cjs <dest>` now reproduces a 41-payload-file candidate; the archived one has 38.
 
@@ -64,23 +64,27 @@ An organization-scoped composition storage and history layer is implemented: `js
 
 Provider eligibility is enforced in the database: `public.company_composition_providers` is a platform-written registry, results carry a composite foreign key to it, and a BEFORE trigger proves the registration was unrevoked, unexpired and covered the outputs when the result was saved. An organization account cannot register its own provider.
 
-There is no licensed body-composition model, real composition output or independent validation dataset. The UI must keep showing "Provider not configured" and generate zero composition values. FM05 remains stage 0. The migration has never been applied to Supabase.
+There is no licensed body-composition model, real composition output or independent validation dataset. The UI must keep showing "Provider not configured" and generate zero composition values. FM05 remains stage 0. The schema now exists in production but **the provider registry is empty**, so no composition result can be stored by anyone until a provider is registered — and registration is a platform operation that no organization account can perform.
 
 ## Next implementation targets, in order
 
-1. **Commit the migration to Supabase, then prove the retention cron actually fires.** The rollback-only run proved the SQL applies and is correct; it cannot prove the nightly sweep runs, because a rolled-back `cron.schedule()` leaves no job. That needs a committed schedule and an observed execution in `cron.job_run_details`.
-
+1. **Observe the retention cron actually firing.** The job is registered and active (`jobid` 11,
+   `50 3 * * *`, `select private.sweep_company_composition_retention();`) but has never run: it was
+   created at 17:34 UTC and is first due at 03:50 UTC. pg_cron demonstrably works in this project —
+   `company-body-assessment-retention` ran at 03:35 UTC on 2026-09-10 — but that is evidence about
+   the mechanism, not about this job. Check `cron.job_run_details` for `jobid` 11 after 03:50 UTC and
+   confirm a `succeeded` row. Note that `company-reference-assessment-retention` has also never run,
+   for the same benign reason: it was scheduled after its own daily slot had already passed.
 2. **Decide what to do about the pre-existing excess table privileges.** Supabase grants `ALL` on every new `public` table to `anon` and `authenticated`, which includes `TRUNCATE`, `TRIGGER` and `REFERENCES`. `TRUNCATE` is not subject to row-level security. Verified on the live project: `company_body_assessments`, `company_reference_assessments`, `athletes`, `measurements`, `biometric_consents`, `access_log` and `teams` all carry it for both roles. PostgREST exposes no TRUNCATE verb, so this is a latent excess privilege rather than a directly reachable one through the documented API — but it defeats every RLS policy on those tables for anything that can execute arbitrary SQL as those roles. The composition migration now revokes it for its own two tables; the sibling tables were **not** changed, because that is a committing production change nobody has authorized.
 
 ## Deploy and migration ordering
 
-The site deploy and the database migration are separate steps, and the site shipped first. As of
-2026-09-10 production serves the Step 4 history panel while `company_composition_results` and
-`company_composition_providers` **do not exist** in the database, because the migration was only
-ever applied rollback-only. The panel handles this deliberately: a missing-table error from
-PostgREST is rendered as "Composition storage is not provisioned in this environment yet, so
-there is nothing to list. No stored composition results." rather than as a raw schema-cache
-error. Verified in a browser against a simulated `PGRST205` before the deploy.
+The site deploy and the database migration are separate steps, and on 2026-09-10 the site shipped
+first, leaving production serving a history panel whose tables did not exist for about forty
+minutes. Both are live now and consistent. The panel still carries the unprovisioned-environment
+fallback it was given for that window: a missing-table error is rendered as "Composition storage
+is not provisioned in this environment yet, so there is nothing to list." That fallback is worth
+keeping for any environment where the schema has not been applied.
 
 The default state a visitor sees is unchanged and correct: "Provider not configured" and "No
 stored composition results." Nothing regressed; the smoke is 25/25.
