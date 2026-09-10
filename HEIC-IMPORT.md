@@ -11,7 +11,7 @@ The SDK, parent capture flow and local reconstruction lab can now accept HEIC or
 - `tools/sdk-demo.mjs`: HEIC previews after permission; reviewing or scanning original HEIC files also works through the SDK.
 - `tools/reconstruction/silhouette-lab.js`: imports HEIC before bitmap/segmentation; Clear aborts conversion.
 
-The three new local import assets are included in service-worker cache version `pp-v61`. Local server allowlists include them. The optional external decoder is not part of the offline precache; first HEIC import needs a connection unless the decoder is already cached by the browser. No production deployment occurred.
+The three new local import assets have been in the service-worker precache since cache version `pp-v61`. Local server allowlists include them. The optional external decoder is not part of the offline precache; first HEIC import needs a connection unless the decoder is already cached by the browser. No production deployment occurred.
 
 ## Decoder provenance
 

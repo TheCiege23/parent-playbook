@@ -1,0 +1,95 @@
+// Scans a built buyer package for content that must never leave this repository.
+//
+// The bundle manifest in sdk-verify.cjs answers "are these the files we meant to
+// ship, unmodified". It cannot answer "should any of them have been shipped at
+// all" — a file listed in sdk-files.cjs passes verification by definition. This
+// is the second question, and it is the one that matters before a package is
+// handed to somebody outside the project.
+//
+//   node tools/package-scan.cjs <bundle-directory> [--json]
+//
+// Exits non-zero on any finding. Every rule below exists because the thing it
+// looks for would be a real disclosure, not because it is tidy.
+const fs=require('node:fs'),path=require('node:path');
+
+// Image/video/geometry containers. A buyer package is source and documentation;
+// there is no legitimate reason for a photograph or a mesh to be inside one.
+const BINARY_EXT=/\.(png|jpe?g|gif|webp|bmp|tiff?|heic|heif|avif|mp4|mov|webm|avi|ply|obj|stl|glb|gltf|fbx|dae|pcd|npy|npz)$/i;
+// Leading bytes, for a file that carries an image regardless of what it is named.
+const MAGIC=[['PNG',Buffer.from([0x89,0x50,0x4e,0x47])],['JPEG',Buffer.from([0xff,0xd8,0xff])],
+  ['GIF',Buffer.from('GIF8')],['BMP',Buffer.from('BM')],['ZIP/office',Buffer.from([0x50,0x4b,0x03,0x04])]];
+// ISO-BMFF (HEIC, MP4) puts its brand at offset 4, not 0.
+const FTYP=Buffer.from('ftyp');
+
+const SECRETS=[
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----/,'private key block'],
+  [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,'JWT'],
+  [/\bsk_(live|test)_[A-Za-z0-9]{16,}/,'Stripe secret key'],
+  [/\bAKIA[0-9A-Z]{16}\b/,'AWS access key id'],
+  [/\bghp_[A-Za-z0-9]{30,}\b/,'GitHub token'],
+  [/\b(password|passwd|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*['"][^'"\s]{8,}['"]/i,'assigned credential'],
+  [/postgres(ql)?:\/\/[^\s'"]*:[^\s'"@]+@/,'database URL with password'],
+];
+
+// Identifiers that belong to real, live records or to a project this package has
+// no business referencing. These are exact strings, not heuristics.
+const LIVE=[
+  ['friday-adult-reference-001','live adult-reference subject'],
+  ['friday-reference-001','live assessment reference'],
+  ['Bergenfield','live organization name'],
+  ['ksgrcdpinvqfwxdirzyg','unrelated Supabase project'],
+];
+
+// Raw observation payloads: the arrays a scan produces, not the code that makes them.
+const CAPTURE=[
+  [/"(landmarks|worldLandmarks|vertices|contours|maskData|silhouette)"\s*:\s*\[\s*[-\d[{]/,'serialized capture geometry'],
+];
+
+function walk(dir,base,out){
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    const full=path.join(dir,entry.name),rel=base?base+'/'+entry.name:entry.name;
+    if(entry.isSymbolicLink())out.push({rel,full,symlink:true});
+    else if(entry.isDirectory())walk(full,rel,out);
+    else out.push({rel,full,symlink:false});
+  }
+  return out;
+}
+
+function scan(dir){
+  if(!fs.existsSync(dir))throw new Error('No such package directory: '+dir);
+  const findings=[],files=walk(dir,'',[]);
+  for(const file of files){
+    const add=(rule,detail)=>findings.push({file:file.rel,rule,detail});
+    if(file.symlink){add('symlink','packages must be self-contained');continue;}
+    // A dot-prefixed segment anywhere in the path: .env, .git, .npmrc, .DS_Store.
+    const dotted=file.rel.split('/').find(s=>s.startsWith('.'));
+    if(dotted)add('dotfile',dotted);
+    if(BINARY_EXT.test(file.rel))add('binary asset','extension');
+    const bytes=fs.readFileSync(file.full);
+    for(const [name,sig] of MAGIC)if(bytes.subarray(0,sig.length).equals(sig))add('binary asset',name+' header');
+    if(bytes.length>=12&&bytes.subarray(4,8).equals(FTYP))add('binary asset','ISO-BMFF (HEIC/MP4) header');
+    // Text rules only apply to text. A NUL byte in the first 4KB means it is not.
+    if(bytes.subarray(0,4096).includes(0))continue;
+    const text=bytes.toString('utf8');
+    for(const [re,name] of SECRETS)if(re.test(text))add('secret',name);
+    for(const [needle,name] of LIVE)if(text.includes(needle))add('live identifier',name+' ('+needle+')');
+    for(const [re,name] of CAPTURE)if(re.test(text))add('capture data',name);
+  }
+  return {directory:path.resolve(dir),scanned:files.length,ok:findings.length===0,findings};
+}
+
+if(require.main===module){
+  try{
+    const args=process.argv.slice(2),json=args.includes('--json'),dir=args.find(a=>!a.startsWith('--'));
+    if(!dir)throw new Error('Usage: node tools/package-scan.cjs <bundle-directory> [--json]');
+    const result=scan(dir);
+    if(json)console.log(JSON.stringify(result,null,2));
+    else{
+      console.log('scanned '+result.scanned+' files in '+result.directory);
+      for(const f of result.findings)console.log('  FAIL  '+f.file+'  ['+f.rule+'] '+f.detail);
+      console.log(result.ok?'clean: no excluded content found':result.findings.length+' finding(s)');
+    }
+    if(!result.ok)process.exitCode=1;
+  }catch(error){console.error(error.message);process.exitCode=1;}
+}
+module.exports={scan};
