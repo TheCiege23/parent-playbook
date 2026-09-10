@@ -546,6 +546,17 @@ add('I03', 'table-privileges', 'authenticated holds exactly CRUD on results, wit
 add('I04', 'table-privileges', 'authenticated holds exactly SELECT on the provider registry', {
   sql: grantsFor('company_composition_providers','authenticated'), expect: 'ok', expectOut: 'SELECT' });
 
+// =========================================================== J. schema-wide least privilege
+// TRUNCATE is not subject to row-level security, so a tenant role holding it on ANY table in
+// public defeats every policy on that table. Supabase grants it by default on every new table.
+// These check the whole schema, not just the composition tables.
+add('J01', 'least-privilege', 'no public table grants TRUNCATE, TRIGGER or REFERENCES to anon or authenticated', {
+  sql: `select count(*)::text from pg_class c join pg_namespace n on n.oid=c.relnamespace cross join unnest(array['anon','authenticated']) as g(role) cross join unnest(array['TRUNCATE','TRIGGER','REFERENCES']) as pr(priv) where n.nspname='public' and c.relkind in ('r','p') and has_table_privilege(g.role, c.oid, pr.priv);`, expect: 'ok', expectOut: '0' });
+add('J02', 'least-privilege', 'SELECT still reaches authenticated on every public table', {
+  sql: `select count(*)::text from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') and has_table_privilege('authenticated', c.oid, 'SELECT');`, expect: 'ok' });  // non-zero and error-free is the assertion: CRUD must survive
+add('J03', 'least-privilege', 'default privileges no longer hand DDL-adjacent rights to tenant roles', {
+  sql: `select count(*)::text from pg_default_acl d join pg_namespace n on n.oid=d.defaclnamespace cross join unnest(d.defaclacl) as a(item) where n.nspname='public' and d.defaclobjtype='r' and (a.item::text like 'anon=%' or a.item::text like 'authenticated=%') and split_part(split_part(a.item::text,'/',1),'=',2) ~ '[Dxtm]';`, expect: 'ok', expectOut: '0' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
