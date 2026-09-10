@@ -102,6 +102,28 @@ stored composition results." Nothing regressed; the smoke is 25/25.
 For the next increment: apply the database migration before, or in the same window as, any deploy
 that reads from it.
 
+## Reproducibility and operating posture
+
+Two claims are now testable rather than asserted.
+
+**The migrations reproduce production.** `node tools/schema-parity.cjs --capture <out>` builds a
+throwaway cluster from `supabase/migrations/` alone and emits a canonical inventory; the same
+`tests/db/inventory.sql` runs against the live project. On 2026-09-10 all nine object kinds matched
+exactly — 1306 objects. See `tools/schema-evidence/README.md`. This is the database half of the
+acquisition constraint: an acquirer can stand the schema up from the repository alone.
+
+It found one object that existed in production and in no migration: `public.rls_auto_enable()` and
+its `ensure_rls` event trigger, which enables RLS on every new public table. A restore would have
+silently lost that guardrail. Captured in `20260910210000`.
+
+**Production posture is asserted, not eyeballed.** `tests/db/posture.sql` asks eight read-only
+questions and `node tools/operations-check.cjs --verify <snapshot>` asserts every answer, exiting
+non-zero on any failure. Latest snapshot `tools/ops-evidence/posture-2026-09-10.json`: 8/8 pass.
+Each check exists because something went wrong or could have — excess TRUNCATE grants, the missing
+guardrail, a retention sweep that succeeds over zero rows, the composition gate opening without a
+model. `--allow <check>` records a waiver, and still prints it as a failure so a waiver cannot
+quietly become normal.
+
 ## Real-data boundary
 
 The live Bergenfield Bears organization has one real adult record: subject `friday-adult-reference-001`, assessment `friday-reference-001`, 25 outputs, 74-inch supplied height, 14.4-second processing, retained through October 10, 2026. Do not read, modify or delete it without explicit user authorization in the current session. Do not upload the user's photos or create another personal record for testing. Synthetic fixtures are allowed in automated tests and must be labelled synthetic.
