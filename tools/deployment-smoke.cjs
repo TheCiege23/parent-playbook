@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const EXPECTED_CACHE = 'pp-v86';
+const EXPECTED_CACHE = 'pp-v87';
 const required = [
   ['/', /Parent Playbook/i],
   ['/sw.js', new RegExp(`const CACHE = ['"]${EXPECTED_CACHE}['"]`)],
@@ -23,6 +23,8 @@ const required = [
   ['/js/body-composition-validation.mjs', /descriptive_not_qualified/],
   ['/js/body-composition-record.mjs', /PP_COMPANY_COMPOSITION_RESULT_V1/],
   ['/js/body-composition-supabase.mjs', /company_composition_results/],
+  ['/js/reference-cohorts.js', /const REFERENCE_COHORTS = \[\];/],
+  ['/js/reference-cohort.mjs', /EQUIVALENCE_NOT_ESTABLISHED/],
   ['/sdk-demo.mjs', /createBodyScanner/],
 ];
 const forbidden = [
