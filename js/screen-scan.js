@@ -19,8 +19,14 @@ async function screenScan(){
     .order('measured_on', { ascending:false }).limit(6);
 
   $("#screen").innerHTML = H`
-    ${topBar('Body scan & jump measurement')}
+    ${topBar('Body & movement assessments')}
     <div class="app-pad" style="padding-top:6px">
+
+      <div class="card app-pad" style="margin-bottom:14px;background:#0b2429;color:#f5faf8">
+        <h2 style="font-size:24px;margin:0 0 8px">Your body insights</h2>
+        <p style="font-size:14px;line-height:1.6;color:#c2d9d7">Bring measurements, movement results and growth together. Compare recording dates and export your records.</p>
+        <button class="btn amber" id="scanInsights">Open Body Insights →</button>
+      </div>
 
       <div class="card app-pad">
         <div class="navrow" id="scanBody" role="button" tabindex="0">
@@ -58,8 +64,8 @@ async function screenScan(){
         <div class="navrow" id="scanSprint" role="button" tabindex="0">
           <div class="gi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></div>
           <div class="gt"><b>Time ${esc(a.first_name)}'s sprint</b>
-            <span>A stopwatch, not a camera — pick a distance, tap to start and stop. No camera or permission
-              needed for this one.</span></div><i>›</i></div>
+            <span>Choose a stopwatch or calibrated video. Video uses a stationary camera and marked
+              start and finish lines to estimate time and speed.</span></div><i>›</i></div>
       </div>
 
       <p class="muted-note" style="margin-top:10px">The scans above each ask your permission first — a signed,
@@ -82,6 +88,7 @@ async function screenScan(){
           <span>Percentile, growth spurt, predicted height and every measurement together.</span></div><i>›</i></div>
     </div>`;
   bindTop();
+  $("#scanInsights").onclick=()=>renderApp('insights');
   { const b=$("#scanBody");
     if(b){ const open=()=>openBodyScan(a);
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }

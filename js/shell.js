@@ -1,6 +1,6 @@
 // `account` is a route, not a tab — it has no nav button and lives one level under
 // Profile. It's in this list so the hash router and the Back button still handle it.
-const APP_TABS=['week','growth','scan','journey','profile','account','activity'];
+const APP_TABS=['week','growth','scan','insights','journey','profile','account','activity'];
 // Whether this guardian can WRITE for the active athlete. RLS is the real gate —
 // private.can_edit_athlete() only passes owner and co_parent — but the UI has to agree,
 // or family view is a screen full of controls that silently fail.
@@ -53,7 +53,7 @@ async function renderApp(tab, fromPop){
   if(state.role==='coach') return renderCoachView();
   // Family view has no Growth or Scan tab: goals, measurements and starting a scan are
   // things a parent DOES, and an empty read-only version of them is just a locked door.
-  if(!state.canEdit && (tab==='growth' || tab==='scan')) tab='week';
+  if(!state.canEdit && (tab==='growth' || tab==='scan' || tab==='insights')) tab='week';
   // Keep the URL and the Back button in sync. Without this, Back exits the app
   // entirely — badly wrong in an installed PWA. Hash-based because this deploys as
   // static files with no rewrites, so /growth would 404 on refresh but #growth won't.
@@ -85,6 +85,7 @@ async function renderApp(tab, fromPop){
     if(tab==='week') await screenWeek();
     else if(tab==='growth') await screenGrowth();
     else if(tab==='scan') await screenScan();
+    else if(tab==='insights') await screenBodyInsights();
     else if(tab==='journey') await screenJourney();
     else if(tab==='account') await screenAccount();
     else if(tab==='activity') await screenActivity();
@@ -101,6 +102,7 @@ function screenError(tab){
 }
 function navBtn(id,label,path){ return H`<button data-t="${id}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>${label}</button>`; }
 function bindNav(active){
+  if(active==='insights') active='scan';
   // Account & settings sits under Profile, so Profile stays lit while you're in it.
   if(active==='account') active='profile';
   // The activity screen owns the whole viewport and has its own sticky action, so the

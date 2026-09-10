@@ -21,6 +21,13 @@ don't hoist across separate `<script>` tags).
 | `js/shell.js` | App frame: router, bottom nav, top bar | `APP_TABS`, `renderApp`, `navBtn`, `topBar` |
 | `js/screen-week.js` | Weekly plan screen | `screenWeek` |
 | `js/screen-growth.js` | The active goal, its evidencing metric, trend bars | `screenGrowth`, `GOAL_METRIC`, `SUGGEST_METRICS`, `trendBars` |
+| `js/body-insights.js` | Measurement snapshots, method-aware comparison, growth context and JSON export; route `#insights` under Scan | `screenBodyInsights`, `biSnapshot`, `biComparison`, `biMarkup` |
+| `js/scan-record.js` | Body assessment provenance serialized into existing measurement notes, stable retry IDs, consent check on save | `buildScanRecord`, `readScanRecord`, `saveScanRecord`, `scanCompatibility` |
+| `js/assessment-report.js` | Self-contained printable HTML report and CSV export, with selected-date and method-aware comparisons | `assessmentReport`, `assessmentCSV`, `assessmentDownload` |
+| `js/photo-quality.js` | Provisional photo review heuristics and a provider review hook; no landmarks persisted | `checkPhotoPose`, `reviewPosePhoto`, `photoCheckSummary` |
+| `js/scan-camera.js` | Optional live body-capture preview, full-frame JPEG capture and camera lifecycle cleanup | `createScanCamera`, `stopScanCameras` |
+| `js/photo-identity.js` | Transient exact-file reuse checks before review and final four-view measurement; no digests persisted | `duplicatePhotoView`, `requireDistinctPhotos` |
+| `js/body-outputs.js` | Versioned photo-output definitions, eight front-view bilateral joint estimates and same-assessment side comparisons | `BODY_OUTPUTS`, `estimateFrontSegments`, `compareBodySides` |
 | `js/screen-profile.js` | The athlete, Coach's Corner, who can see them | `screenProfile` |
 | `js/account.js` | Account & settings route + its sheets | `screenAccount`, `openSeasonState`, `openExportEverything`, `openChangePassword`, `openRenameHousehold` |
 | `js/screen-activity.js` | Activity as a route + the three media states | `openActivity`, `screenActivity` |
@@ -210,3 +217,26 @@ Two things to keep in mind if you touch it:
 - New screen → add `js/screen-x.js`, wire a nav item in `shell.js`, add one `<script>` in `index.html` (before `init.js`, which is before `landing.js`).
 - New modal/action → add to `sheets.js` (or split it if it grows past ~250 lines).
 - Never add load-time code to a feature module; if something must run at startup, call it from `init.js`.
+# Organization body assessments (local September 9 increment)
+
+`js/org-insights.js` is a separate read-only organization screen mounted from `openOrgRoster`. It does not change `state.active` or enter the parent editing shell. All queries use the signed-in Supabase client, explicitly check `teams.created_by`, page memberships and measurement records, and restrict measurement batches to visible roster athletes. Root-mount and actor guards prevent stale results/exports after navigation or account changes. Exports reload access and omit raw measurement notes and family/media fields. Snapshots select one latest assessment per athlete; metadata/value conflicts reject the assessment rather than mixing values.
+
+`20260909120000_allow_org_admin_membership_reads.sql` adds a team-scoped SELECT policy via a private, stable SECURITY DEFINER helper with an empty search path. It avoids recursion through `teams_read` and does not use an athlete-wide admin predicate, which would reveal memberships in other teams. Existing family write policies remain unchanged. `tests/org-membership-rls.sql` runs only in an empty disposable PostgreSQL database, rolls back its fixtures, and tests both read boundaries and denied admin writes. It has passed locally; full-schema staging and deployment remain outstanding.
+
+## Main scan: temporary 3D surface
+
+`js/body-scan.js` optionally invokes `js/surface-review.mjs` after successful length inference and before clearing captured frames. The v3 release covers temporary processing; the per-scan option defaults off. A dedicated `js/surface-worker.js` segments the four photos and intersects their manually reviewed silhouettes with canonical `js/visual-hull.js`. The research lab extends the same worker rather than maintaining a separate geometry algorithm. No surface data enters `buildScanRecord` or Supabase. The result viewer clears geometry on dismissal/save/account change; review termination clears masks, canvases and worker resources. See `MAIN-SCAN-3D.md` for scope and verification limits.
+
+## ADR: Portable company assessment storage boundary
+
+**Status:** Accepted for the 0.9.0 local SDK preview. Production company integration remains pending.
+
+**Context and constraints:** Parent Playbook already saves photo-derived scalar measurements as versioned rows in `measurements`, protected by its Supabase authentication, consent refresh, row-level security and retention behavior. A buyer may use a different identity provider and database. The portable SDK must not embed Parent Playbook credentials, assume the buyer's schema, store captures automatically or create a second application data silo. Friday's live demonstration still needs a reviewable save/reopen/export/delete lifecycle.
+
+**Options considered:** Reusing Parent Playbook's Supabase client in the package would create a fast working database demo, but would couple the buyer to this project's credentials and schema. Adding a second public Supabase table would make the demo look persistent, but would leave ownership and authorization design unresolved. A host adapter with a strict portable record takes slightly more integration work while keeping the data contract independent of the eventual company stack.
+
+**Decision:** `js/body-sdk-record.mjs` owns scalar record preparation and client lifecycle guards. The host supplies authenticated session, authorization, write, read and delete callbacks. Every action is scoped to exact organization, subject and assessment IDs; returned data is revalidated and allowlisted before release. Stable caller-supplied assessment IDs support retry-safe upserts. Parent Playbook continues using its existing measurement-row path. The SDK demo uses a clearly labeled in-memory adapter only to rehearse the contract.
+
+**Consequences:** Buyers can map one record contract to their own authorized API without receiving Parent Playbook database credentials. The package cannot claim production persistence or real company authentication until a host adapter is implemented and tested against that environment. Server-side authorization, audit logs, retention jobs, backup deletion and data-subject workflows remain the host's responsibility.
+
+**Next actions:** Implement the first production adapter after the buyer identifies its identity provider, subject identifier and storage API. Verify tenant isolation, retry behavior, export logging, retention and deletion in staging. Keep surface geometry out of this scalar record unless a separate explicit geometry policy and store are approved.

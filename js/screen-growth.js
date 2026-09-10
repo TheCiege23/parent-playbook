@@ -140,6 +140,7 @@ async function screenGrowth(){
   $("#screen").innerHTML = H`
     ${topBar(`Progress${sinceLabel?` · since ${sinceLabel}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
+      <button class="btn ghost" id="growthInsights" style="margin-bottom:14px;width:100%">Body Insights · compare measurements & export →</button>
 
       <div class="ghero">
         <div class="k">Working toward</div>
@@ -189,6 +190,7 @@ async function screenGrowth(){
       ${age!=null&&age<13?`<p class="muted-note" style="margin-top:10px">No weigh-ins suggested for under-13s. Ask your pediatrician before tracking weight.</p>`:''}`}
 
       <div style="display:flex;justify-content:space-between;align-items:center">
+        ${maturityOffsetPrompt(mat,a)}
         ${growthPrompt(mat)}
 
       <div class="sec-title">Goals</div>
@@ -249,9 +251,11 @@ async function screenGrowth(){
       ${(sess||[]).length?`<p class="muted-note" style="margin-top:16px">${sess.length} session${sess.length===1?'':'s'} logged, most recently ${esc(fmtDate(sess[0].done_on))}.</p>`:''}
     </div>`;
   bindTop();
+  $("#growthInsights").onclick=()=>renderApp('insights');
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#growAsk"); clickableCard(b,()=>openGrowthInputs(grow||{}, primary||null)); }
+  { const b=$("#phvEstimate"); clickableCard(b,()=>openMaturityInputs({...(grow||{}),birthdate:(grow&&grow.birthdate)||a.birthdate},meas||[])); }
   // `a` is the athlete this screen is rendering — the subject of the scan, and the row
   // measurements will be written against.
   { const s=$("#growToScan");

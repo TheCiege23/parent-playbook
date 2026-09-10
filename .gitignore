@@ -19,3 +19,10 @@ Thumbs.db
 
 # supabase cli scratch (machine-specific link state)
 supabase/.temp/
+
+# Local reconstruction experiments may contain private body geometry and captures.
+tools/reconstruction/runs/
+__pycache__/
+
+# Generated company SDK handoff packages; source remains in js/ and tools/.
+tools/sdk-releases/

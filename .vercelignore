@@ -25,3 +25,6 @@ emails/*
 # tooling
 .claude/
 .env*
+tests/
+tools/
+__pycache__/

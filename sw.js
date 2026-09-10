@@ -1,10 +1,13 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v51';
+const CACHE = 'pp-v85';
 // /privacy, /terms, /datadeletion, /coaches and /organizations are standalone pages, not
 // part of the SPA. Precached so an offline navigation to them serves the real page
 // instead of the index.html fallback.
-const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coaches', '/organizations', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
-  '/img/brownpig-logo-ondark.png','/js/landing.js',
+const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coaches', '/organizations', '/friday-demo', '/company-persistence-demo', '/company-composition-demo', '/company-sdk-demo', '/sdk-demo.mjs', '/company-persistence-demo.mjs', '/company-composition-demo.mjs', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
+  '/js/org-insights.js','/js/body-sdk.mjs','/js/body-sdk-surface.mjs','/js/body-sdk-record.mjs','/js/body-sdk-report.mjs','/js/body-sdk-supabase.mjs','/js/body-sdk-reference-supabase.mjs','/js/body-sdk-reference-import.mjs','/js/body-sdk-reference-history.mjs','/js/body-composition-contract.mjs','/js/body-composition-validation.mjs','/js/body-surface-report.mjs','/js/body-surface-repeat.mjs','/js/surface-section.js','/js/body-section-worker.js','/js/mesh-section.js',
+  '/js/surface-review.mjs','/js/surface-worker.js','/js/visual-hull.js',
+  '/js/photo-import.mjs','/js/photo-import-worker.js','/js/heic-decode.js',
+  '/img/brownpig-logo-ondark.png','/js/landing.js','/css/body-insights.css','/js/body-outputs.js','/js/body-insights.js','/js/scan-record.js','/js/assessment-report.js','/js/photo-quality.js','/js/scan-camera.js','/js/photo-identity.js',
   '/js/monitoring.js','/js/core.js','/js/offline.js','/js/background.js','/js/reference.js','/js/auth.js','/js/onboarding.js',
   '/js/program.js','/js/shell.js','/js/screen-week.js','/js/week-rail.js','/js/cdc-stature.js','/js/maturity.js','/js/pop-warner.js','/js/screen-growth.js','/js/screen-scan.js','/js/screen-coach.js','/js/screen-profile.js','/js/screen-edit.js','/js/screen-activity.js',
   '/js/trainer-onboarding.js','/js/admin.js','/js/admin-drills.js','/js/marketplace.js','/js/camps.js','/js/trainer-services.js',

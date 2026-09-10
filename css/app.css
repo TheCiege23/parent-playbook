@@ -850,6 +850,17 @@
   /* Capture. A viewfinder, not a photo booth. */
   .bs-view{position:relative;background:var(--pine-900);border-radius:18px;overflow:hidden;
     aspect-ratio:3/4;display:grid;place-items:center;margin:12px 0}
+  .bs-live-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#071310}
+  .bs-live-video[hidden]{display:none}
+  #bsLiveView{width:min(100%,30dvh,315px);margin:12px auto}
+  .bs-camera-instruction{font-size:12px;line-height:1.4;text-align:center;margin:12px 0;color:var(--ink)}
+  .bs-camera-controls{display:grid;grid-template-columns:1fr 68px 1fr;align-items:center;gap:10px;margin-top:12px}
+  .bs-camera-controls .btn{min-width:0;padding:12px 8px;font-size:12px;white-space:normal}
+  .bs-camera-controls .bs-shutter{margin:0}
+  .has-live-camera .bs-sil{position:relative;z-index:1;opacity:.6;pointer-events:none}
+  .has-live-camera .brk,.has-live-camera .bs-hint{z-index:2;pointer-events:none}
+  #bsLiveView .bs-hint{white-space:normal;border-radius:12px;width:88%}
+  .bs-shutter:disabled{opacity:.45;cursor:wait}
   .bs-view .brk{position:absolute;width:26px;height:26px;border:2px solid rgba(239,163,59,.75)}
   .bs-view .brk.tl{top:14px;left:14px;border-right:none;border-bottom:none;border-radius:6px 0 0 0}
   .bs-view .brk.tr{top:14px;right:14px;border-left:none;border-bottom:none;border-radius:0 6px 0 0}

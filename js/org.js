@@ -195,6 +195,7 @@ async function openOrgRoster(teamId){
     </div>
     <h1 style="font-size:22px;margin:0 0 2px">${esc(team.name)}</h1>
     <p style="color:var(--muted);font-size:13px;margin:0 0 14px">${esc(sportName(team.sport_key))}${team.level?' · '+esc(team.level):''} · ${rows.length} on roster</p>
+    <button class="btn ghost" id="orgBodyInsights" style="margin-bottom:16px">Body assessment dashboard</button>
 
     <div class="card app-pad" style="margin-bottom:16px">
       <div class="mrow"><span>Join code</span><b style="letter-spacing:.06em;font-family:ui-monospace,monospace">${esc(team.join_code||'—')}</b></div>
@@ -228,6 +229,7 @@ async function openOrgRoster(teamId){
   </div>`;
   $("#orgBack").onclick=openMyOrg;
   $("#orgDone2").onclick=()=>renderApp('account');
+  $("#orgBodyInsights").onclick=()=>openOrgBodyInsights(teamId);
   root.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>openOrgAthleteDetail(b.dataset.a, athletes, sports, meas, coachesByAthlete));
 }
 

@@ -34,6 +34,7 @@
 <!-- landing.css first: it scopes the app's fixed photo layers behind body.in-app -->
 <link rel="stylesheet" href="/css/landing.css" />
 <link rel="stylesheet" href="/css/app.css" />
+<link rel="stylesheet" href="/css/body-insights.css" />
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -80,7 +81,7 @@
 (function(){try{
   var m=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
   var h=location.hash||'',s=location.search||'';
-  var link=/^#(app|week|growth|journey|profile|account|activity)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
+  var link=/^#(app|week|growth|scan|insights|journey|profile|account|activity)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
   var sess=false;
   for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
     if(k&&k.indexOf('sb-')===0&&k.indexOf('-auth-token')!==-1&&localStorage.getItem(k)){sess=true;break;}}
@@ -611,6 +612,10 @@
 <script src="/js/pop-warner.js"></script>
 <script src="/js/screen-growth.js"></script>
 <script src="/js/screen-scan.js"></script>
+<script src="/js/body-outputs.js"></script>
+<script src="/js/body-insights.js"></script>
+<script src="/js/scan-record.js"></script>
+<script src="/js/assessment-report.js"></script>
 <script src="/js/screen-coach.js"></script>
 <script src="/js/screen-profile.js"></script>
 <script src="/js/screen-edit.js"></script>
@@ -624,12 +629,16 @@
 <script src="/js/journey.js"></script>
 <script src="/js/sheets.js"></script>
 <script src="/js/org.js"></script>
+<script src="/js/org-insights.js"></script>
 <script src="/js/log-game.js"></script>
 <script src="/js/account.js"></script>
+<script src="/js/scan-camera.js"></script>
+<script src="/js/photo-identity.js"></script>
 <script src="/js/body-scan.js"></script>
 <!-- AFTER body-scan.js, not before: this calls registerBodyProvider() as it loads, and
      that function is defined there. Nothing heavy runs here — MediaPipe itself is
      dynamic-imported on the first scan, so a parent who never scans never fetches it. -->
+<script src="/js/photo-quality.js"></script>
 <script src="/js/pose-measure.js"></script>
 <!-- jump-measure.js is referenced by jump-scan.js's UI flow; jump-scan.js also reads
      pose-measure.js's shared MediaPipe constants and P/dist/mid helpers directly, so

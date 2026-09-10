@@ -1,0 +1,340 @@
+{
+  "scope": "FITMATCH sports-science parity plus acquisition operation; parent/marketplace expansion is secondary",
+  "updated": "2026-09-10",
+  "method": "Weighted engineering estimate. Stage 0 = no applicable output; 0.25 = partial implementation; 0.5 = core local workflow integrated with automated checks; 0.75 = demonstrated on intended devices and deployed infrastructure; 1 = agreed feature coverage and supporting acceptance evidence. A local workflow can still have additional feature gaps. Stage assignments are engineering judgments, not measured probabilities or accuracy scores.",
+  "categories": [
+    {
+      "id": "FM01",
+      "name": "Guided four-view capture",
+      "weight": 10,
+      "stage": 0.5,
+      "evidence": "Live preview/static guide, shutter/fallback, lifecycle cleanup, provisional photo checks, consent refresh, distinct-file enforcement and processing-time provenance tested locally. Synthetic browser capture/reuse rejection verified; physical-device performance and thresholds unvalidated."
+    },
+    {
+      "id": "FM02",
+      "name": "Personalized 3D body",
+      "weight": 20,
+      "stage": 0.25,
+      "evidence": "SDK 0.13.0 generated an accepted, temporary rotatable surface from one authorized real adult four-photo set after an explicitly selected bounded cleanup removed 14 detached lower-region voxels (0.29%). The adjustment is constrained, recorded and never fills or joins geometry. Main app/SDK integration and automated topology checks pass. Anatomical accuracy, repeatability, intended-device and population validation remain unproven, so this is partial implementation only."
+    },
+    {
+      "id": "FM03",
+      "name": "25+ anthropometrics",
+      "weight": 15,
+      "stage": 0.5,
+      "evidence": "A versioned local workflow now returns up to 25 defined length and landmark-distance estimates, including 18 bilateral proxies. One real adult four-photo set returned all 25. Metric equivalence, physical accuracy, repeatability and population validation remain unproven."
+    },
+    {
+      "id": "FM04",
+      "name": "Circumferences",
+      "weight": 10,
+      "stage": 0.25,
+      "evidence": "SDK 0.13.0 derives shoulder-midpoint, torso-midpoint and hip-midpoint plane heights from four pose views and records view-to-view spread without exposing landmarks. On the authorized adult surface, all three clothed-surface perimeters computed with exact plane, geometry and contour-selection provenance. The hip plane had three contours; exactly one contained the hip-centered reconstruction axis, so the other two were excluded without summing or choosing by size. A scalar-only three-plane repeat comparison is implemented and tested, but has no second real capture. These are experimental surface sections, not FITMATCH-equivalent anatomical circumferences. Tape accuracy, repeatability, intended-device and population validation remain untested."
+    },
+    {
+      "id": "FM05",
+      "name": "Body composition",
+      "weight": 15,
+      "stage": 0,
+      "evidence": "A deployed provider integration gate now validates deployment rights, DEXA training provenance, independent DEXA validation metadata, exact provider/model binding, five supported scalar outputs, uncertainty disclosure and coded DEXA comparison rows. It returns participant-aware descriptive bias, MAE, RMSE and maximum error and excludes row identifiers from aggregate export. No licensed model, real composition output or validation dataset is configured, so FM05 remains at stage 0."
+    },
+    {
+      "id": "FM06",
+      "name": "PHV and maturity offset",
+      "weight": 7,
+      "stage": 0.5,
+      "evidence": "A versioned local Mirwald 2002 combined-sample workflow computes maturity offset and estimated age at PHV from one coherent manual standing-height, sitting-height and body-mass session for ages 8–16. Parent Growth/Body Insights and authorized individual organization views are integrated; roster export and ranking are excluded. A minimum ±1-year uncertainty and individual/population limits are displayed. Intended-device, independent-reference and buyer acceptance remain unverified."
+    },
+    {
+      "id": "FM07",
+      "name": "Predicted adult height",
+      "weight": 3,
+      "stage": 0.5,
+      "evidence": "Integrated mid-parental range and growth context. Competitor equivalence unproven."
+    },
+    {
+      "id": "FM08",
+      "name": "Static asymmetry",
+      "weight": 3,
+      "stage": 0.5,
+      "evidence": "Four provisional left/right segment pairs integrated into capture, records, dashboard and reports with tests. Same-assessment comparisons only. Anatomical accuracy, side orientation and repeatability unvalidated; no injury prediction."
+    },
+    {
+      "id": "FM09",
+      "name": "History and reference comparisons",
+      "weight": 5,
+      "stage": 0.5,
+      "evidence": "Integrated parent history and stature references plus a company repeat-assessment utility. The company comparator reauthorizes two records, requires the same organization, adult reference, SDK, engine, model and unit, and reports signed descriptive changes only for shared scalar outputs. It is deployed in the signed-in portal and correctly remains inactive with the current single real record. A second independent real capture, whole-body reference cohorts and device validation remain."
+    },
+    {
+      "id": "FM10",
+      "name": "Body-insights portal",
+      "weight": 4,
+      "stage": 0.75,
+      "evidence": "Parent and read-only organization body dashboards, assessment detail and filtered exports are deployed. Organization membership policy is applied to the live ParentPlaybook Supabase project. In the user's signed-in Windows Chrome session, Bergenfield Bears loaded its one-athlete roster plus the separate organization-owned adult history; the stored real adult reference opened all 25 scalar outputs through fresh tenant checks and completed an authorized JSON export with zero browser warnings or errors. FM10 has deployed intended-desktop evidence. A generated avatar, intended-phone portal check and broader buyer acceptance remain."
+    },
+    {
+      "id": "FM11",
+      "name": "Integration and portable results",
+      "weight": 4,
+      "stage": 0.75,
+      "evidence": "Versioned measurements/exports, same-origin browser SDK and experimental OBJ/method portability are implemented. The production company SDK demo processed the authorized 74-inch adult four-photo set in the user's Windows Chrome twice: all four capture checks passed, all 25 outputs returned, and the in-memory company host contract saved the scalar assessment. The latest scan completed in 14.4 seconds, freshly reauthorized export, and created a 25-output company JSON file whose parsed payload had zero forbidden photo/landmark/geometry keys. A separate organization-scoped adult-reference adapter, strict importer and no-athlete-FK migration are deployed. The authorized adult record is stored in live Supabase under Bergenfield Bears and can reopen/export through fresh tenant checks. On pp-v83, the main signed-in organization dashboard listed this record in an adult history separate from its one child roster entry, opened all 25 scalar outputs and completed authorized JSON export with zero browser warnings or errors. Production deletion, buyer-host deployment, intended-phone and restore acceptance remain. The portable handoff now includes the same fail-closed repeat-assessment and CSV utility."
+    },
+    {
+      "id": "FM12",
+      "name": "Data protection and operation",
+      "weight": 3,
+      "stage": 0.75,
+      "evidence": "Consent and retention flows, payload allowlisting, tenant RLS, mutation audit triggers and scheduled deletion jobs are deployed in the live ParentPlaybook Supabase project. The separate adult-reference table is also deployed with organization-admin RLS, strict scalar-only validation, null athlete audit linkage and its own retention sweep. A rollback-only authenticated-role transaction verified roster-linked save/read/delete, cross-account denial and audit events with zero retained fixtures. One authorized adult reference is now persisted under Bergenfield Bears with retention through October 10, 2026; fresh-session reopen and export passed. Backup deletion, restore, buyer handover and operating evidence remain."
+    },
+    {
+      "id": "FM13",
+      "name": "Product presentation",
+      "weight": 1,
+      "stage": 0.5,
+      "evidence": "Body-insights UI, six editable slides and a self-contained presentation evidence brief are prepared. A dedicated buyer Demo Room is deployed at /friday-demo with direct links to the production SDK, signed-in adult persistence, composition validation gate, parent Body Insights, movement video and organization tools, plus an eight-minute run of show and visible claim boundary. Deployment 18af9078-3b56-4503-9d21-a1b0ee8c0e35 passed 22/22 production route/privacy checks against cache pp-v85; the final seven-step Demo Room, live composition room and signed-in Bergenfield Bears dashboard rendered with zero browser errors. Native PowerPoint and full spoken rehearsal remain."
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-09-09",
+      "earned_points": 16,
+      "note": "Baseline before automatic photo review. FM01 at partial implementation (0.25)."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 18.5,
+      "note": "Photo review and final four-view enforcement integrated and tested. FM01 advances to local workflow (0.5). No scientific validation credit."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Provisional bilateral output/comparison workflow integrated and tested. FM08 advances to local workflow (0.5); expanded anthropometrics remain partial. No scientific validation credit."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Calibrated geometry and reference reporting tested end to end on synthetic meshes. No actual reconstructed-body evidence, so FM02/FM04 and the total remain unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Live camera preview and shutter integrated, lifecycle tested, browser verified using synthetic video. FM01 remains at the local workflow stage pending intended-device/deployment acceptance."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Exact-file reuse rejection and processing-time records integrated and tested. Existing local-workflow stages remain unchanged until device/deployment or real reconstruction evidence is available."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Local silhouette lab now generates and exports experimental geometry. Real single-image segmentation passed in browser; actual four-view body and accuracy evidence remain missing. FM02/FM04 and total remain unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Photo/reference preparation and independent tape comparison integrated into the lab. Analytical perimeter verified in the browser worker; no real-body measurement evidence yet, so completion remains unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Photo/mask overlays and mandatory manual view review added to the local lab. Real public-image overlay checked, preview cleanup tested; four-view body evidence still missing. Total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Organization body assessment dashboard, read-only results and filtered exports added. Team membership SELECT fix passed isolated PostgreSQL checks; UI tested with synthetic records. FM10/FM11 remain at local-workflow stage; deployment and scientific evidence still pending."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Local experimental OBJ/method reopening added with file/geometry checks, fixed scale and fresh reference comparisons. Synthetic browser round trip verified; no real-human mesh evidence. Existing local-workflow stages and total stay unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Self-hostable browser SDK and company demo added with worker lifecycle, versioned results and local photo processing. Real single-image model review passed in browser; complete SDK orchestration tested with synthetic landmarks. No real four-photo SDK or buyer deployment acceptance; FM11 and overall total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Repeat-scan comparison of experimental file pairs added with method/scale compatibility, copied-geometry rejection, per-level scalar differences and portable reports. Analytical boxes verified through the browser worker and ten automated checks pass. No paired human reconstruction or accuracy evidence; FM02/FM04 and total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Two steps completed: multi-scan independent-reference reporting and a presentation evidence page connected to the fixed parity rubric. Geometry errors, duplicate rejection, method grouping and evidence export/lifecycle are tested. Synthetic browser results do not establish human reconstruction or accuracy; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Actual operator photos tested after local HEIC-to-PNG conversion: side and back views pass model checks; front fails frame-edge with feet cropped. Added per-view SDK errors, format guidance and previews. No complete accepted four-view measurement or reconstruction; parity unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Direct on-device HEIC import added to SDK 0.2.0, parent capture and reconstruction lab. Four actual originals converted in browser with correct upright previews; framing rejection remains enforced. Consent, cancellation, native cleanup and sequence/size limits tested. Physical-phone deployment and complete accepted scan still pending; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Main parent scan now integrates optional four-view silhouette review and a temporary 3D result under updated consent. 145 JS checks and synthetic main-app browser flow pass. Real-person reconstruction evidence and accepted core capabilities remain missing; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.3.0 integrates opt-in experimental geometry with the main app silhouette review/worker, fresh host permission, cancellation and a separate result contract. Company demo previews geometry and exports lengths only. 153 JS tests and synthetic browser integration pass; no real-person accuracy or deployed host evidence, so stages unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.4.0 adds operator-selected section perimeter/width/depth and optional tape error, shared intersection core, exact-source fingerprint, visual contour/plane and separate scalar export. 161 JS tests and synthetic browser arithmetic/rejection checks pass. No anatomical location inference or real-person accuracy evidence; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.5.0 adds up to 12 distinct locations from one surface to curated JSON and printable HTML reports, with source/duplicate checks and lifecycle cleanup. 166 JS tests pass; synthetic browser flow verified two retained locations and removal. Locations are not independent accuracy trials. No accepted real-person evidence or deployment; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "Portable SDK 0.5.0 source/demo package now builds from an explicit allowlist with checksum verification and integration/dependency notes. 170 JS tests pass, including separate-directory hosting, all SDK routes and corruption rejection. Model assets remain external; no buyer deployment or real-person acceptance. FM11 stage and overall total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "New real adult four-JPEG SDK run passed every capture check and returned all 13 provisional length outputs using user-supplied height. All four silhouette overlays were reviewed, but 3D reconstruction rejected a disconnected surface. Lengths were recovered via explicit skip. No accepted mesh, independent accuracy references, repeat captures or physical-device deployment; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.6.0 adds bounded connectivity diagnostics, region-specific recovery guidance and explicit rejected outcomes with preserved length results and separate scalar exports. Actual photos show a detached near-foot region at resolution 64; increasing resolution does not fix it. 177 JS tests and actual browser recovery flow pass. No accepted real-person mesh or accuracy evidence; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.7.0 adds normalized opposite-view silhouette overlays and foot close-ups to the shared review, with live alignment updates and cleanup. 179 JS tests pass. Sixteen small one-view center shifts on real photos did not resolve connectivity; no automatic adjustment or geometry repair was adopted. No accepted mesh or accuracy evidence; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.8.0 adds readable measurement results, display-unit conversion, same-assessment side pairs and curated printable reports. 184 JS tests pass. Friday forecast documented separately as conditional scenarios, not earned credit. Real 3D acceptance, physical reference accuracy and company deployment remain incomplete; total unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 20,
+      "note": "SDK 0.9.0 adds a portable scalar assessment record plus host-controlled save, reopen, authorized export and delete operations. A clearly labeled in-memory company rehearsal and 190 JS tests verify allowlisting, stable retry IDs, fresh session/access checks and tenant mismatch rejection. Real company identity/database integration and deployment remain incomplete, so FM11/FM12 and the total stay unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 23.75,
+      "note": "Provider 1.3.0 and SDK 0.10.0 expand the versioned dictionary to 25 explicit length and landmark-distance outputs. All 25 returned from the authorized adult four-photo reference set and survived the company save/reopen allowlist. 190 JS tests pass. FM03 advances to core local workflow (0.5); no FITMATCH-equivalent definition, physical accuracy, repeatability, girth or composition claim is earned."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 27.25,
+      "note": "A separate manual Mirwald 2002 maturity-offset and estimated-PHV-age workflow is integrated for ages 8–16 with exact same-session input provenance, parent and authorized individual organization views, minimum ±1-year uncertainty, no roster ranking/export, and 198 passing JavaScript tests. FM06 advances to core local workflow (0.5). Intended-device use, individual accuracy, population generalizability and buyer acceptance remain unverified."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 32.25,
+      "note": "SDK 0.12.0 produced the first accepted real-person experimental surface from the authorized adult four-photo set. Strict reconstruction found 4,770 main voxels plus a 14-voxel lower artifact; an explicit bounded option removed only that 0.29% fragment, disclosed the adjustment and did not fill or join geometry. All 25 length outputs also returned. FM02 advances to partial implementation (0.25). Shape accuracy, repeatability, anatomical equivalence, intended-device and buyer-host acceptance remain unverified."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 32.25,
+      "note": "The company assessment contract now preserves optional allowlisted surface-processing provenance, validates it against the generated outcome and cleanup bounds, and excludes geometry and capture data. Save/reopen/export tests cover the real adjustment shape. This improves acquisition auditability but does not add capability or acceptance credit."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 34.75,
+      "note": "SDK 0.13.0 adds four-view pose-inferred shoulder, torso-midpoint and hip plane guides with view-spread provenance. The authorized adult replay generated 25 length outputs and the accepted 3D surface, then computed experimental clothed-surface perimeters of 117.5 cm at the 156.9 cm shoulder-midpoint plane and 164.5 cm at the 128.1 cm torso-midpoint plane. The 98.8 cm hip plane exposed three contours and was rejected rather than silently selecting or summing body parts. FM04 advances to partial implementation (0.25). No anatomical-girth equivalence, tape accuracy or repeatability is claimed."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 34.75,
+      "note": "A strict pose-section rule now selects a contour only when exactly one closed contour contains the hip-centered reconstruction axis. On the authorized replay, the 98.8 cm hip plane contained three contours and exactly one central contour; its experimental surface perimeter was 123.3 cm. Shoulder and torso-midpoint remained 117.5 and 164.5 cm. Selection count and protocol are preserved in scalar reports. No contours are summed or chosen by size. This closes a workflow gap but adds no accuracy or acceptance credit; FM04 remains partial implementation."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 34.75,
+      "note": "The company SDK demo now keeps a scalar snapshot of all three pose-guided sections and compares it with a new independently captured surface. It requires different geometry fingerprints and matching protocol, height and resolution; reports plane and perimeter changes together; and excludes photos, landmarks, contours, meshes and tape values. Five new workflow and validation checks bring the suite to 212. No second real capture was supplied, so this adds repeatability readiness but no FM04 acceptance credit."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 34.75,
+      "note": "A production-oriented Supabase adapter now implements the portable company save/reopen/export/delete contract. Its migration scopes rows to team admins and rostered athletes, requires active biometric consent and bounded retention, rejects payload keys associated with photos or geometry, audits mutations and schedules deletion. Four adapter/migration tests bring the suite to 216. The migration is not applied and no real authenticated storage or restore run exists, so FM11 remains at the core local-workflow stage and total credit is unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 35.5,
+      "note": "The ParentPlaybook Supabase project now has the organization membership, sitting-height and company assessment migrations. Live rollback-only RLS acceptance verified authenticated save/read/delete, cross-account denial and insert/delete audit events with zero retained fixtures. Two policy defects found by that test were corrected in follow-up migrations: policy-helper EXECUTE access and false forbidden-key matches inside surfaceStatus/surfaceProcessing. FM12 advances to deployed-infrastructure evidence (0.75). FM11 remains at 0.5 until buyer-origin SDK deployment, signed-in UI and intended-device acceptance."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 35.5,
+      "note": "The existing organization athlete view now imports the latest versioned parent assessment into the deployed company record through the real Supabase adapter, using a minimal scoped consent-reference RPC. It lists copy status and supports refresh, freshly authorized JSON export and deletion while excluding source notes, photos and geometry. Three new tests bring the JavaScript inventory to 219; the live rollback-only transaction also verifies scoped-consent access and denial. A synthetic browser view passed, but no real signed-in UI or buyer-origin device run exists, so FM11 and the total remain unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 35.5,
+      "note": "Railway deployment ce2d9e26-7720-4512-8bde-8d5b0bed1cc5 reached SUCCESS/RUNNING and playbookbp.com now serves the organization company-copy UI plus its SDK persistence modules under service-worker cache pp-v72. A 10-check production smoke run verified the required assets and confirmed BODY-SDK.md, Supabase migrations and .env.local remain unavailable. Real signed-in organization, intended-device, buyer-host and restore acceptance remain, so FM11 and the total stay unchanged."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 36.5,
+      "note": "Production deployment 52650afa-e0f1-493d-8bc4-6629b6847e05 served the standalone company SDK demo and passed 12/12 public-asset and private-route smoke checks. On the user's Windows Chrome, the authorized adult four-photo set passed all capture checks and returned 25/25 provisional outputs in 8.2 seconds; the in-memory company contract then saved and reopened the allowlisted scalar record. Separately, a real signed-in administrator joined the Bergenfield Bears roster and the production organization dashboard showed the one-athlete no-assessment state without console warnings. FM11 advances to deployed/intended-device evidence (0.75). Buyer-host deployment, persistent browser export/delete, intended-phone and restore acceptance remain."
+    },
+    {
+      "date": "2026-09-09",
+      "earned_points": 36.5,
+      "note": "Company JSON export now attaches its temporary download link to the document before clicking and removes it immediately afterward for more reliable Chrome delivery. Deployment e473611b-b7e6-4561-91f8-f37ddbb90073 reached SUCCESS/RUNNING; a 12/12 production smoke passed against cache pp-v74. The refreshed 30-file Friday SDK handoff verified and all 219 JavaScript checks passed. A second production browser upload/export rehearsal was blocked by the Chrome file chooser, so no additional acceptance credit is assigned."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 36.5,
+      "note": "Deployment b76ca8b4-fd43-4d50-835f-9e8652eb713a reached SUCCESS and passed 12/12 production checks against cache pp-v75. The authorized 74-inch adult set again passed all four capture checks, returned 25/25 provisional outputs in 14.4 seconds, and saved through the in-memory company contract. A fresh authorization prepared a direct download link; Chrome created body-assessment-friday-reference-001 (1).json. Parsed verification confirmed PP_COMPANY_BODY_ASSESSMENT_V1, 25/25 scalar outputs and zero forbidden photo, landmark, geometry, mesh, mask or contour keys. The refreshed 30-file SDK handoff and manifest verified; its final ZIP SHA-256 is 3F976412B0A66E10A1E674061E8C459305079CFC4C9A0FC42980E9BC0185A9F2. Production-backed signed-in organization export/delete, buyer-host deployment, intended-phone and restore acceptance remain, so FM11 stays at 0.75 and total credit is unchanged."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 36.75,
+      "note": "The dedicated Friday Demo Room is deployed at /friday-demo on production deployment 9d604dcb-6dc0-4bb0-93ee-148170e8f7b4, and 13/13 public-route/private-file checks pass against cache pp-v76. It connects the FITMATCH-style photo SDK, company record lifecycle, parent Body Insights, movement video and organization tools in one eight-minute run of show with a visible claim boundary. Desktop and 390x844 Chrome layouts, every link target and zero console issues were verified. FM13 advances from partial implementation to core presentation workflow (0.5), adding 0.25 weighted points. Native PowerPoint and a complete spoken rehearsal remain."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 36.75,
+      "note": "A separate organization-owned adult-reference persistence path is deployed without an athlete foreign key. Supabase migration 20260910033000 is applied; Railway deployment 43126450-2747-4cf0-96de-64202d28815d passed 17/17 checks against pp-v81. In signed-in Windows Chrome, Bergenfield Bears was resolved and the downloaded adult export locally revalidated as 25 outputs at 74 inches with 14.4-second recorded processing and no photo/geometry fields. The 35-file-plus-manifest buyer SDK ZIP verified. No personal record has been persisted, so no additional acceptance credit is assigned."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 36.75,
+      "note": "After explicit approval, the signed-in pp-v81 adult-reference workflow saved the authorized 25-output record to Bergenfield Bears in live Supabase without a child athlete link. Fresh-session reopen passed, a freshly authorized browser export created body-assessment-friday-reference-001 (2).json, and parsing confirmed 25 measurements, surfaceProcessing null and zero exact photo, landmark, mask, contour, geometry, mesh or fingerprint keys. Retention is October 10, 2026. Production deletion, buyer-host, intended-phone and restore evidence remain, so FM11/FM12 stages and total credit stay unchanged."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 36.75,
+      "note": "Deployment 43126450-2747-4cf0-96de-64202d28815d passed 17/17 production checks against cache pp-v81. The persistence page now versions its controller URL, automatically selects the sole administered organization and separates save readiness from read/export readiness. After a clean Chrome reload with no JSON selected and no attestation, Bergenfield Bears selected automatically and the saved 25-output adult record reopened through fresh tenant checks using only subject and assessment references. No new parity stage is assigned because buyer-host, intended-phone, deletion and restore acceptance remain."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 37.75,
+      "note": "Deployment 5f137161-f93b-4859-a515-5e1f5b9cc949 passed 17/17 production checks against cache pp-v82. The signed-in Bergenfield Bears body dashboard now presents organization-owned adult reference history in a separate section outside the child roster, loads metadata without record payloads, and rechecks tenant access before opening or exporting. The stored 25-output, 74-inch adult record opened and exported in Chrome with zero warnings or errors. The full suite passes 226 checks. FM10 advances from core local workflow (0.5) to deployed intended-desktop evidence (0.75), adding one weighted point. Buyer-host, intended-phone, deletion, restore, generated-avatar and scientific-validation work remain."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 37.75,
+      "note": "Deployment 2f3127d8-2a8f-48b8-89aa-ea44f11fa45a passed 18/18 production checks against cache pp-v83. The signed-in company dashboard now has a fail-closed same-subject repeat-assessment comparison and scalar-only CSV export. Bergenfield Bears correctly shows No second record yet for its one authorized adult assessment instead of inventing a trend; the record still reopened with 25 outputs and zero browser warnings or errors. The portable 36-file SDK payload includes the same comparison utility, and 230 JavaScript checks pass. FM09 stays at core workflow until a second independent real assessment exists."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 37.75,
+      "note": "Deployment 8496cedd-39d2-4063-b619-181b33decbe3 passed 22/22 production route/privacy checks against cache pp-v84. A new company validation room and organization-dashboard card require a documented composition provider manifest, exact scalar estimate binding, uncertainty disclosure and independently referenced coded DEXA observations before displaying composition values. The live room and Bergenfield Bears dashboard rendered the unconfigured boundary with zero browser errors. The 38-payload buyer SDK handoff verifies and all 239 JavaScript checks pass. No model, real composition output or validation dataset is configured, so FM05 and total weighted completion remain unchanged."
+    },
+    {
+      "date": "2026-09-10",
+      "earned_points": 37.75,
+      "note": "Final presentation deployment 18af9078-3b56-4503-9d21-a1b0ee8c0e35 passed 22/22 production checks against cache pp-v85. The Demo Room now has a dated-neutral seven-step sequence and includes the composition gate in its eight-minute run of show. Production browser inspection confirmed the updated sequence and zero console errors. This is presentation polish and does not change a parity stage."
+    }
+  ]
+}

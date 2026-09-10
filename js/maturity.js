@@ -17,6 +17,7 @@
 const MATURITY_SOURCES = {
   mph:  'Tanner mid-parental height',
   rae:  'Relative age effect',
+  offset: 'Mirwald et al. 2002 combined-sample maturity-offset equation',
 };
 
 // ---- 1. Predicted adult height -----------------------------------------------
@@ -141,7 +142,49 @@ function growthVelocity(rows){
 const SPURT_IN_PER_YEAR = 3.0;
 function inGrowthSpurt(vel){ return !!(vel && vel.inPerYear >= SPURT_IN_PER_YEAR); }
 
-// ---- 5. Assemble -------------------------------------------------------------
+// ---- 5. Estimated maturity offset ------------------------------------------
+// Mirwald et al., Med Sci Sports Exerc. 2002;34(4):689-694,
+// DOI 10.1097/00005768-200204000-00020. These are the paper's recommended
+// combined-sample equations. Units are centimeters, kilograms and decimal years.
+// Later independent validation found meaningful bias for early/late maturers and
+// limited individual utility, so the UI carries a ±1-year band and never uses this
+// value to rank a child, diagnose puberty or prescribe training load.
+function decimalAge(birthdate, measuredOn){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(birthdate||'')||!/^\d{4}-\d{2}-\d{2}$/.test(measuredOn||''))return null;
+  const born=new Date(birthdate+'T00:00:00Z'),measured=new Date(measuredOn+'T00:00:00Z');
+  if(!Number.isFinite(born.getTime())||!Number.isFinite(measured.getTime())||born.toISOString().slice(0,10)!==birthdate||measured.toISOString().slice(0,10)!==measuredOn||measured<=born)return null;
+  return (measured-born)/(365.2425*86400000);
+}
+function maturityOffsetEstimate({sex,birthdate,measuredOn,heightIn,sittingHeightIn,weightLb}={}){
+  const age=decimalAge(birthdate,measuredOn),height=Number(heightIn)*2.54,sitting=Number(sittingHeightIn)*2.54,mass=Number(weightLb)*.45359237;
+  if(!['male','female'].includes(sex)||!Number.isFinite(age)||age<8||age>16||![height,sitting,mass].every(Number.isFinite)||height<100||height>215||sitting<45||sitting>=height||mass<20||mass>180)return null;
+  const leg=height-sitting,ratio=mass/height*100;
+  if(leg<40||leg>125||sitting/height<.4||sitting/height>.65)return null;
+  const offset=sex==='male'
+    ? -9.236+.0002708*(leg*sitting)-.001663*(age*leg)+.007216*(age*sitting)+.02292*ratio
+    : -9.376+.0001882*(leg*sitting)+.0022*(age*leg)+.005841*(age*sitting)-.002658*(age*mass)+.07693*ratio;
+  if(!Number.isFinite(offset)||offset< -6||offset>6)return null;
+  const ageAtPhv=age-offset;
+  return {protocol:'mirwald-maturity-offset-v1',method:'mirwald-combined-2002',measuredOn,sex,
+    ageYears:Math.round(age*100)/100,offsetYears:Math.round(offset*100)/100,ageAtPhvYears:Math.round(ageAtPhv*100)/100,
+    uncertaintyYears:1,category:offset < -1?'estimated_pre_phv':offset > 1?'estimated_post_phv':'estimated_near_phv',
+    inputs:{heightIn:Number(heightIn),sittingHeightIn:Number(sittingHeightIn),weightLb:Number(weightLb)}};
+}
+function maturityInputBatch(rows){
+  const groups=new Map();
+  for(const row of rows||[]){
+    let note;try{note=JSON.parse(row?.note||'');}catch{continue;}
+    if(note?.schema!=='PP_MATURITY_INPUT_V1'||typeof note.batchId!=='string'||!/^[a-zA-Z0-9-]{8,80}$/.test(note.batchId)||!['height','sitting_height','weight'].includes(row.metric_key)||row.source!=='manual'||!/^\d{4}-\d{2}-\d{2}$/.test(row.measured_on||''))continue;
+    const group=groups.get(note.batchId)||{batchId:note.batchId,measuredOn:row.measured_on,createdAt:row.created_at||''};
+    if(group.measuredOn!==row.measured_on||group[row.metric_key]){group.invalid=true;}else group[row.metric_key]=row;
+    if((row.created_at||'')>group.createdAt)group.createdAt=row.created_at;
+    groups.set(note.batchId,group);
+  }
+  return [...groups.values()].filter(g=>!g.invalid&&g.height&&g.sitting_height&&g.weight)
+    .sort((a,b)=>b.measuredOn.localeCompare(a.measuredOn)||b.createdAt.localeCompare(a.createdAt))[0]||null;
+}
+
+// ---- 6. Assemble -------------------------------------------------------------
 // One call, so the UI never has to know which pieces are available. Anything that
 // cannot be computed comes back null and the card explains what is missing instead
 // of guessing.
@@ -156,6 +199,9 @@ function maturityReport(athlete, heightRows, sportRow){
                                       athlete&&athlete.father_height_in, sex);
   const pct = (predicted && isFinite(latestIn)) ? pctAdultHeight(latestIn, predicted) : null;
   const rae = relativeAge(athlete&&athlete.birthdate, sportRow&&sportRow.age_cutoff_md);
+  const batch=maturityInputBatch(heightRows);
+  const offset=batch?maturityOffsetEstimate({sex,birthdate:athlete&&athlete.birthdate,measuredOn:batch.measuredOn,
+    heightIn:batch.height.value,sittingHeightIn:batch.sitting_height.value,weightLb:batch.weight.value}):null;
 
   // Height against the CDC reference for age and sex. This is the piece that turns a
   // measurement into something a parent can act on — "48 inches" is data, "48th
@@ -164,7 +210,7 @@ function maturityReport(athlete, heightRows, sportRow){
     ? percentileTrack(heightRows, athlete && athlete.birthdate, sex) : null;
 
   return {
-    velocity: vel,
+    velocity: vel, maturityOffset:offset,
     spurt: inGrowthSpurt(vel),
     sex, predicted, pctAdult: pct, relativeAge: rae, track,
     // What the parent would have to add to unlock the rest, in the order it helps.
@@ -251,7 +297,7 @@ function raBandSVG(quartile){
 function growthCard(mat, a){
   if(!mat) return '';
   const nm = esc(a.first_name);
-  const v = mat.velocity, rae = mat.relativeAge, pred = mat.predicted, pct = mat.pctAdult;
+  const v = mat.velocity, rae = mat.relativeAge, pred = mat.predicted, pct = mat.pctAdult, offset=mat.maturityOffset;
   const tr = mat.track;
   const bits = [];
 
@@ -299,6 +345,20 @@ function growthCard(mat, a){
     bits.push(H`<div class="mt-note" style="margin-top:10px"><b>${v.inPerYear.toFixed(1)}″ a year</b> — steady.
       We'll flag it here if that speeds up, because a growth spurt is when the plan should get lighter, not
       heavier.</div>`);
+  }
+
+  if(offset){
+    const timing=offset.category==='estimated_pre_phv'
+      ? `about ${Math.abs(offset.offsetYears).toFixed(1)} years before peak height velocity`
+      : offset.category==='estimated_post_phv'
+        ? `about ${offset.offsetYears.toFixed(1)} years after peak height velocity`
+        : 'within about one year of peak height velocity';
+    bits.push(H`<div class="card app-pad" style="margin-top:10px">
+      <div class="k-mono" style="color:var(--clay-ink)">Estimated growth-spurt timing</div>
+      <h4 style="margin:8px 0">${esc(timing)}</h4>
+      <p>Anthropometric maturity-offset estimate from standing height, sitting height, body mass and age recorded together on ${esc(fmtDate(offset.measuredOn))}. The calculated offset is ${esc(offset.offsetYears.toFixed(1))} years and estimated age at peak height velocity is ${esc(offset.ageAtPhvYears.toFixed(1))}, with a displayed uncertainty band of at least ±1 year.</p>
+      <p><b>Use this as context only.</b> The equation can miss early and late maturers, does not diagnose puberty and does not change ${nm}'s training plan automatically.</p>
+    </div>`);
   }
 
   // 4. Relative age — both directions, same layout, marker flips ends.
@@ -349,6 +409,39 @@ function growthPrompt(mat){
       <div class="gt"><b>Want the growth read?</b>
         <span>Add both parents' heights and we'll show where they're at — no photos, no scans.</span></div>
       <span class="pill">Add ›</span></div></div>`;
+}
+
+function maturityOffsetPrompt(mat,a){
+  const age=ageFrom(a&&a.birthdate);
+  if(!state.canEdit||age==null||age<8||age>16)return '';
+  return H`<div class="card app-pad" id="phvEstimate" style="cursor:pointer;margin-top:12px">
+    <div class="grow" style="border:none;padding:0"><div class="gi">↗</div>
+      <div class="gt"><b>${mat&&mat.maturityOffset?'Update':'Estimate'} growth-spurt timing</b>
+        <span>Manual standing height, sitting height and body mass · no photos</span></div>
+      <span class="pill">${mat&&mat.maturityOffset?'Update':'Start'} ›</span></div></div>`;
+}
+
+function openMaturityInputs(athlete,rows,onSaved){
+  const existing=maturityInputBatch(rows),value=key=>existing?existing[key].value:'';
+  const bg=sheet(H`<h3>Estimate growth-spurt timing</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">For ages 8–16. Record all three measurements together. This uses the published Mirwald maturity-offset equation; it is not a scan or a puberty diagnosis.</p>
+    <div class="field"><label>Standing height, shoes off (inches)</label><input id="moHeight" inputmode="decimal" value="${esc(value('height'))}" placeholder="e.g. 62.5"></div>
+    <div class="field"><label>Sitting height on a hard box (inches)</label><input id="moSitting" inputmode="decimal" value="${esc(value('sitting_height'))}" placeholder="e.g. 32.0"><p class="muted-note">Sit tall against a wall; measure from the hard sitting surface to the top of the head.</p></div>
+    <div class="field"><label>Body mass (lb)</label><input id="moWeight" inputmode="decimal" value="${esc(value('weight'))}" placeholder="e.g. 105"><p class="muted-note">Used only as one input to this estimate. Do not use the result to set weight goals.</p></div>
+    <div class="err" id="moErr"></div><button class="btn amber" id="moSave">Save measurements and estimate</button>
+    <p class="muted-note">The original verification error was about 0.65–0.68 years, and later validation found substantial individual bias for early and late maturers. We display at least ±1 year and do not use the estimate to rank athletes or prescribe training.</p>`);
+  bg.querySelector('#moSave').onclick=async e=>{
+    const read=id=>Number(String(bg.querySelector(id).value||'').trim()),measuredOn=new Date().toISOString().slice(0,10);
+    const heightIn=read('#moHeight'),sittingHeightIn=read('#moSitting'),weightLb=read('#moWeight');
+    const estimate=maturityOffsetEstimate({sex:athlete&&athlete.sex_at_birth,birthdate:athlete&&athlete.birthdate,measuredOn,heightIn,sittingHeightIn,weightLb});
+    if(!estimate){bg.querySelector('#moErr').textContent='Check the profile sex at birth and enter plausible standing height, sitting height and body mass for an athlete age 8–16.';return;}
+    e.target.disabled=true;e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>';
+    const batchId=uuid(),note=JSON.stringify({schema:'PP_MATURITY_INPUT_V1',batchId,method:'parent_manual_same_session'});
+    const inserts=[['height',heightIn,'in'],['sitting_height',sittingHeightIn,'in'],['weight',weightLb,'lb']].map(([metric_key,value,unit])=>({id:uuid(),athlete_id:state.active.id,metric_key,value,unit,measured_on:measuredOn,source:'manual',created_by:state.user.id,note}));
+    const {error}=await sb.from('measurements').insert(inserts);
+    if(error){console.error(error);bg.querySelector('#moErr').textContent='Could not save the measurements. '+(error.message||'');e.target.disabled=false;e.target.textContent='Save measurements and estimate';return;}
+    bg.remove();if(typeof onSaved==='function')onSaved();else renderApp('growth');
+  };
 }
 
 // The only thing this feature ever asks for: the two parents' own adult heights, the

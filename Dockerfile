@@ -18,7 +18,8 @@ FROM caddy:2-alpine
 WORKDIR /srv
 
 # Pages
-COPY index.html 404.html privacy.html terms.html datadeletion.html coaches.html organizations.html ./
+COPY index.html 404.html privacy.html terms.html datadeletion.html coaches.html organizations.html friday-demo.html company-persistence-demo.html company-composition-demo.html ./
+COPY tools/sdk-demo.html ./company-sdk-demo.html
 
 # Root assets and PWA plumbing
 COPY icon.svg og.png manifest.webmanifest sw.js sitemap.xml llms.txt ./
@@ -28,6 +29,9 @@ COPY css/   ./css/
 COPY js/    ./js/
 COPY assets/ ./assets/
 COPY img/   ./img/
+COPY tools/sdk-demo.mjs ./sdk-demo.mjs
+COPY tools/company-persistence-demo.mjs ./company-persistence-demo.mjs
+COPY tools/company-composition-demo.mjs ./company-composition-demo.mjs
 
 # The ONE email template that is fetched over HTTP at runtime. The others are
 # pasted into the Supabase dashboard by hand and have no reason to be public.
@@ -41,7 +45,7 @@ RUN set -eu; \
     for bad in AUDIT.md ARCHITECTURE.md README.md LAUNCH-READINESS.md AUDIT-WALKTHROUGH.md supabase .env .claude; do \
       if [ -e "/srv/$bad" ]; then echo "REFUSING TO SHIP: /srv/$bad is private"; exit 1; fi; \
     done; \
-    for good in index.html 404.html sw.js manifest.webmanifest css/app.css js/maturity.js emails/invite.html; do \
+    for good in index.html 404.html friday-demo.html company-persistence-demo.html company-composition-demo.html company-sdk-demo.html sdk-demo.mjs company-persistence-demo.mjs company-composition-demo.mjs sw.js manifest.webmanifest css/app.css js/maturity.js emails/invite.html; do \
       if [ ! -e "/srv/$good" ]; then echo "MISSING: /srv/$good"; exit 1; fi; \
     done; \
     echo "asset allowlist verified"

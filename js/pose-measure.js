@@ -1,60 +1,9 @@
-// ===================================================================
-//  POSE MEASURE — the engine that was missing, running on the phone
-// ===================================================================
-// For most of this product's life the scan had a hole in the middle of it: capture,
-// consent, retention and a viewer, wrapped around nothing that could turn a photograph
-// into a number. The reason was never squeamishness. It was that estimating GIRTHS —
-// chest, waist, hip — from photographs means fitting a parametric body model, and the
-// standard one (SMPL) is not licensed for commercial use. Anything hand-rolled in its
-// place would be a confident number about a child's body with nothing behind it.
-//
-// That reasoning still holds, and this file still produces no girth. What it does
-// produce is the other half, which turns out to be the half youth sport actually uses:
-//
-//     LENGTHS BETWEEN JOINTS THE MODEL CAN SEE.
-//
-// Wingspan and standing reach are what a combine measures. Shoulder width relative to
-// stature (biacromial/stature) is a documented maturation index. Leg length as a share
-// of height is the sitting-height ratio, which is the single most useful growth signal
-// in the whole file — legs lengthen FIRST in the pre-pubertal spurt, so a leg share
-// that is climbing is a spurt already underway, months before the height curve bends.
-//
-// This is geometry, not estimation. Two detected joints, the distance between them,
-// scaled by a height someone actually measured with a tape.
-//
-// ---------------------------------------------------------------------------
-//  WHERE THE ERROR LIVES, STATED PLAINLY
-// ---------------------------------------------------------------------------
-// MediaPipe returns world landmarks in metres, but at a scale it inferred rather than
-// measured, so everything is normalised against the athlete's KNOWN height. Building
-// that known height out of detected joints needs one thing the model cannot see: the
-// top of the skull. There is no head-top landmark — the highest points are the ears
-// and eyes. So the crown is reconstructed from the subject's own head breadth
-// (HEAD_ABOVE_EAR below), which is better than a population constant but is still the
-// one modelled quantity in the chain.
-//
-// The consequence is worth being exact about, because it decides how the result is
-// presented:
-//
-//   * The crown estimate enters as a SCALE factor. If it is 3% off, every absolute
-//     length is 3% off — all of them, in the same direction.
-//   * Which means RATIOS between segments are unaffected. Ape index, leg share,
-//     shoulder share: the error divides out completely.
-//   * And it means TRENDS are unaffected, because the same method makes the same
-//     error on every scan.
-//
-// So the ratios are the product and the absolutes are the supporting cast. The result
-// screen is ordered that way on purpose, and the copy says "close, and comparable to
-// your last scan" rather than implying tape-measure truth.
-//
-// ---------------------------------------------------------------------------
-//  WHY ON-DEVICE IS THE STRONGER POSITION, NOT THE CHEAPER ONE
-// ---------------------------------------------------------------------------
-// MediaPipe runs as WebAssembly in this tab. The model file is downloaded; the frames
-// are not uploaded. So the promise the consent screen has always made — the photos
-// never leave the phone — stops being a policy the server is trusted to honour and
-// becomes a fact about where the code runs. For a feature whose subject is a child,
-// that is worth more than the extra measurements a vendor would return.
+// On-device photo length estimates from MediaPipe landmarks, scaled to recorded height.
+// Joint detection, inferred depth, estimated crown/hand dimensions and camera conditions
+// all contribute error. Repeat scans do not guarantee the same error, and ratios are
+// not exempt from landmark or scaling uncertainty. No anatomical girths, body
+// composition or predicted growth-spurt timing are produced by this provider.
+// Photo quality gates are provisional heuristics, not calibrated accuracy tests.
 
 // Pinned. A floating version means a model that silently changes what it returns
 // between one scan and the next, which for a trend line is the same as lying.
@@ -105,6 +54,8 @@ const ENVELOPE = {
   wingspan:       [0.88, 1.14],
   standing_reach: [1.15, 1.45],
   shoulder_width: [0.15, 0.30],
+  hip_width:      [0.08, 0.30],
+  ear_width:      [0.04, 0.18],
   torso_length:   [0.20, 0.42],
   leg_length:     [0.36, 0.60],
 };
@@ -122,9 +73,11 @@ async function loadPoseLandmarker(onProgress){
   const vision = await import(MP_BUNDLE);
   const fileset = await vision.FilesetResolver.forVisionTasks(MP_WASM);
   MP_CACHE = await vision.PoseLandmarker.createFromOptions(fileset, {
+    // Dedicated SDK workers have no document from which to create a GPU canvas.
+    ...(typeof document === 'undefined' && typeof OffscreenCanvas === 'function' ? {canvas: new OffscreenCanvas(1, 1)} : {}),
     baseOptions: { modelAssetPath: MP_MODEL, delegate: 'GPU' },
     runningMode: 'IMAGE',
-    numPoses: 1,
+    numPoses: 2, // detect a second person so capture review can reject an ambiguous frame
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,
     outputSegmentationMasks: false,
@@ -148,7 +101,7 @@ function wmean(samples){
   return sw > 0 ? { value: sv / sw, weight: sw, n: samples.length } : null;
 }
 
-// Coefficient of variation across frames — the honest confidence signal. Four views of
+// Coefficient of variation across frames: one uncalibrated quality indicator. Four views of
 // the same body should agree on how long its femur is. When they don't, something in
 // the capture was wrong (moved between shots, camera nudged, loose clothing) and the
 // average of four disagreeing numbers is not better than one good one.
@@ -188,8 +141,8 @@ function frameSegments(world, norm, lateral){
     if(isFinite(value) && value > 0 && weight > 0) out[key] = { v:value, w:weight };
   };
 
-  // --- limb segments: averaged left/right within the frame, because a person is
-  // --- symmetrical and two independent estimates of a femur beat one.
+  // Limb segments are averaged within the frame. This does not establish anatomical
+  // symmetry and must not be used as a bilateral asymmetry measurement.
   const pair = (key, aL, bL, aR, bR) => {
     const s = [];
     if(ok(aL, bL)) s.push({ v:dist(L(aL), L(bL)), w:w(aL, bL) });
@@ -232,6 +185,7 @@ function frameSegments(world, norm, lateral){
   // --- too narrow. Weighting them low is not enough; they are excluded.
   if(lateral){
     if(ok(P.SHO_L, P.SHO_R)) put('biacromial',   dist(L(P.SHO_L), L(P.SHO_R)), w(P.SHO_L, P.SHO_R));
+    if(ok(P.HIP_L, P.HIP_R)) put('hip_breadth',  dist(L(P.HIP_L), L(P.HIP_R)), w(P.HIP_L, P.HIP_R));
     if(ok(P.EAR_L, P.EAR_R)) put('head_breadth', dist(L(P.EAR_L), L(P.EAR_R)), w(P.EAR_L, P.EAR_R));
   }
   return out;
@@ -248,14 +202,18 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   if(!isFinite(H) || H < 30 || H > 90)
     throw new Error('needs_height');
 
-  const landmarker = await loadPoseLandmarker(onProgress);
-
   // front and back see the body across; left and right see it edge-on.
   const LATERAL = { front:true, back:true, left:false, right:false };
-  const keys = Object.keys(frames).filter(k => frames[k]);
+  const keys = ['front','right','back','left'];
+  if(keys.some(k=>!frames?.[k])) throw new Error('needs_four_views');
+  const photoIdentity=await requireDistinctPhotos(frames);
+  const landmarker = await loadPoseLandmarker(onProgress);
   const perFrame = {};       // segment -> [{v,w}]
   const seen = [];
   const missed = [];
+  const captureChecks = [];
+  let frontPose=null;
+  let detectionError = null;
 
   for(let i = 0; i < keys.length; i++){
     const k = keys[i];
@@ -264,9 +222,13 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
     try{
       bmp = await createImageBitmap(frames[k]);
       const res = landmarker.detect(bmp);
+      const check=checkPhotoPose(res,k);
+      captureChecks.push(photoCheckSummary(check));
+      if(!check.accepted){ missed.push(k); continue; }
       const world = res && res.worldLandmarks && res.worldLandmarks[0];
       const norm  = res && res.landmarks && res.landmarks[0];
       if(!world || !norm){ missed.push(k); continue; }
+      if(k==='front') frontPose={world,norm};
 
       const segs = frameSegments(world, norm, !!LATERAL[k]);
       for(const [name, s] of Object.entries(segs)){
@@ -275,13 +237,15 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
       seen.push(k);
     }catch(e){
       console.warn('pose detect failed on ' + k, e);
+      detectionError = detectionError || e;
       missed.push(k);
     }finally{
       try{ bmp && bmp.close && bmp.close(); }catch(_){}
     }
   }
 
-  if(seen.length < 2) throw new Error('no_pose');
+  if(detectionError) throw detectionError;
+  if(missed.length){const error=new Error('capture_quality');error.captureChecks=captureChecks;throw error;}
 
   if(onProgress) onProgress('Working out the measurements…');
 
@@ -293,7 +257,7 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   const upper = need('upper_arm'), fore = need('forearm');
   const neckHead = need('neck_head'), headBreadth = need('head_breadth');
   const ankle = need('ankle_rise') || 0;      // a missing ankle rise is a small loss, not a failure
-  const biacromial = need('biacromial');
+  const biacromial = need('biacromial'), hipBreadth=need('hip_breadth');
 
   if(thigh == null || shank == null || torso == null || neckHead == null)
     throw new Error('incomplete');
@@ -322,12 +286,12 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   m.leg_length   = legIn;
   m.torso_length = torsoIn;
   if(biacromial != null) m.shoulder_width = biacromial * k;
+  if(hipBreadth != null) m.hip_width = hipBreadth * k;
+  if(headBreadth != null) m.ear_width = headBreadth * k;
   if(armIn != null && m.shoulder_width != null)
     // Wingspan decomposed rather than measured: the capture poses have the arms DOWN,
-    // by design, because an arms-out pose ruins the silhouette guidance the rest of the
-    // flow depends on. Shoulder breadth plus two arms plus two hands is the standard
-    // anthropometric decomposition and is more accurate than a fingertip-to-fingertip
-    // estimate off a single frontal photo anyway.
+    // by design. This decomposition uses estimated hand length and is not a directly
+    // measured fingertip span. Its accuracy has not been established.
     m.wingspan = m.shoulder_width + 2 * armIn + 2 * handIn;
   if(armIn != null)
     m.standing_reach = shoulderHeightIn + armIn + handIn;
@@ -335,13 +299,15 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   // ---- say what never got computed, and why -------------------------------------
   // Distinct from `rejected` below: rejected covers a number that WAS computed and then
   // thrown out for being implausible. This covers a number that was never computed at
-  // all because a prerequisite landmark never came through clearly in any frame — the
-  // consent screen promises five things, and a parent who gets three of them with no
-  // explanation reads it as the app being unreliable rather than the sleeve it actually
-  // was.
+  // all because a prerequisite landmark never came through clearly in any frame.
+  // Report the missing output and observed reason without guessing why it failed.
   const skipped = [];
   if(biacromial == null)
     skipped.push({ key:'shoulder_width', reason:"shoulders weren't clearly visible in the front or back photo" });
+  if(hipBreadth == null)
+    skipped.push({ key:'hip_width', reason:"hips weren't clearly visible in the front or back photo" });
+  if(headBreadth == null)
+    skipped.push({ key:'ear_width', reason:"ear landmarks weren't clearly visible in the front or back photo" });
   if(armIn == null){
     skipped.push({ key:'standing_reach', reason:"an arm wasn't clearly visible in any photo" });
     skipped.push({ key:'wingspan', reason:"an arm wasn't clearly visible in any photo" });
@@ -378,6 +344,11 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
   // precision claim the method cannot support.
   const metrics = {};
   for(const [key, val] of Object.entries(m)) metrics[key] = Math.round(val * 10) / 10;
+  // Front-only side estimates avoid blending identities across side/back views.
+  // Landmarks remain local to this function and are never part of the returned record.
+  const sides=estimateFrontSegments(frontPose?.world,frontPose?.norm,H,statureModel);
+  Object.assign(metrics,sides.metrics);
+  skipped.push(...sides.skipped);
 
   return {
     metrics,
@@ -386,13 +357,12 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
     // Everything the result screen needs to explain itself, and everything a future
     // debugging session needs to understand a number someone disputes.
     detail: {
-      framesUsed: seen, framesMissed: missed, rejected, skipped,
+      framesUsed: seen, framesMissed: missed, rejected, skipped, captureChecks,photoIdentity,
+      outputDictionary:BODY_OUTPUT_VERSION,sideMethod:'front-joint-proxy-v2',
       disagreement: Math.round(disagreement * 1000) / 1000,
       crownFrom: headBreadth != null ? 'head_breadth' : 'neck_fallback',
     },
-    // The scale-free numbers. These are the ones that survive the crown estimate, and
-    // the ones worth a parent's attention, so they travel separately rather than being
-    // recomputed from the rounded values above.
+    // Descriptive proportions. These still carry landmark and scaling uncertainty.
     ratios: {
       ape:      metrics.wingspan != null ? metrics.wingspan / H : null,
       legShare: legIn / H,
@@ -412,19 +382,22 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
 if(typeof registerBodyProvider === 'function'){
   registerBodyProvider({
     id: 'ondevice-pose',
+    version: '1.3.0',
+    model: 'mediapipe-pose-full-float16-v1/tasks-vision-' + MP_VERSION,
+    defaultUnit: 'in',
     label: 'On-device measurement',
     notice: 'Runs entirely on this phone. The photos are never uploaded — only the '
           + 'measuring model is downloaded, the first time you scan.',
     // What this engine can and cannot produce, so the consent screen can be specific
     // instead of promising a body scan and delivering five lengths.
-    produces: ['Wingspan', 'Standing reach', 'Shoulder width', 'Torso length', 'Leg length'],
+    produces: ['Wingspan', 'Standing reach', 'shoulder, hip and ear-landmark widths', 'Torso length', 'Leg length', 'Left and right upper arm, forearm, thigh, lower leg, arm path, leg path, shoulder-to-hip, ankle-to-heel and foot-landmark estimates'],
     // Leg and torso length only need the hip-to-ankle and hip-to-shoulder chain, which
-    // every one of the four poses provides — they come back from every scan. The other
-    // three additionally need a clearly visible arm or both shoulders, which a sleeve or
-    // a tight crop can lose (see the `skipped` detail above), so they can't be promised
-    // the same way.
-    guaranteed: ['Torso length', 'Leg length'],
+    // can be visible in any of the four poses. The other
+    // three additionally need a clearly visible arm or both shoulders. All outputs
+    // depend on passing capture and plausibility checks.
+    guaranteed: [], // no output is guaranteed: landmarks and plausibility checks can reject a scan
     excludes: 'No chest, waist or hip measurement, and nothing about body composition.',
+    reviewFrame: reviewPosePhoto,
     async measure({ frames, heightIn, onProgress }){
       return measureFromFrames({ frames, heightIn, onProgress });
     },

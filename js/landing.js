@@ -45,7 +45,7 @@
   // /#journey while signed in fell through to hasStoredSession(), and enterApp then
   // REPLACED the hash with '#app' — so #journey and #profile both silently landed on
   // the week screen. Deep links to a tab are the most natural thing to paste.
-  var APP_HASHES = ['#app','#week','#growth','#journey','#profile','#account','#activity'];
+  var APP_HASHES = ['#app','#week','#growth','#scan','#insights','#journey','#profile','#account','#activity'];
   function isAppLink(){
     var h = location.hash || '', s = location.search || '';
     return APP_HASHES.indexOf(h) !== -1
