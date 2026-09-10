@@ -124,6 +124,28 @@ guardrail, a retention sweep that succeeds over zero rows, the composition gate 
 model. `--allow <check>` records a waiver, and still prints it as a failure so a waiver cannot
 quietly become normal.
 
+## Buyer handover package
+
+`node tools/sdk-bundle.cjs <dest>` now produces **129 files**, up from 41. The old package shipped
+three `company_*` migrations that reference `public.teams`, `public.athletes`, `auth.users` and six
+`private.*` helpers created by earlier migrations. **All three failed on a fresh database** — proved
+on 2026-09-10 with `node tests/db/run.cjs --migrations-from <bundle>/supabase/migrations`. An
+acquirer could not stand the schema up at all.
+
+The package now ships every migration in order, the verification tooling (`schema-parity`,
+`operations-check`, the `tests/db` harness) and `HANDOVER.md`: a standing-up runbook plus a
+dependency and license inventory. Verified end to end — the package alone reproduces the production
+schema exactly, all nine object kinds, 1306 objects.
+
+Two license obligations in `HANDOVER.md` need a decision before commercial distribution, and neither
+is an engineering question: the **MediaPipe pose model weights carry Google's own terms, separate
+from the Apache-2.0 code licence**, and **libheif is LGPL-3.0**, reached transitively through
+`heic-to` for optional HEIC import. There are zero npm dependencies; everything else is fetched from
+a CDN at runtime, so the package is not offline-capable.
+
+The live adult-reference record's identifiers no longer appear anywhere in the package. They were
+prefilled defaults in two demo pages and are now neutral placeholders.
+
 ## Real-data boundary
 
 The live Bergenfield Bears organization has one real adult record: subject `friday-adult-reference-001`, assessment `friday-reference-001`, 25 outputs, 74-inch supplied height, 14.4-second processing, retained through October 10, 2026. Do not read, modify or delete it without explicit user authorization in the current session. Do not upload the user's photos or create another personal record for testing. Synthetic fixtures are allowed in automated tests and must be labelled synthetic.

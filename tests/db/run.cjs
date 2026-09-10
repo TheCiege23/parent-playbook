@@ -12,6 +12,7 @@
  *   node tests/db/run.cjs            run everything, then dispose
  *   node tests/db/run.cjs --keep     leave the cluster running for manual psql inspection
  *   node tests/db/run.cjs --inventory <file>   write the schema inventory, skip the suite
+ *   node tests/db/run.cjs --migrations-from <dir>   replay a different migration set
  *
  * Requires a local PostgreSQL installation (initdb, pg_ctl, psql, createdb) on PATH, or set
  * PP_PG_BIN to its bin directory. Tested against PostgreSQL 18.3.
@@ -30,6 +31,10 @@ const KEEP = process.argv.includes('--keep');
 // inventory and disposes, skipping the security suite. tools/schema-parity.cjs uses this to
 // prove the committed migrations reproduce production.
 const INVENTORY_AT = (() => { const i = process.argv.indexOf('--inventory'); return i === -1 ? null : process.argv[i + 1]; })();
+// --migrations-from <dir> replays a different migration set than the repository's. The buyer
+// handover package uses it to prove that the package alone reproduces the production schema.
+const MIGRATIONS_FROM = (() => { const i = process.argv.indexOf('--migrations-from'); return i === -1 ? null : process.argv[i + 1]; })();
+if (process.argv.includes('--migrations-from') && !MIGRATIONS_FROM) { console.error('--migrations-from needs a directory'); process.exit(2); }
 if (process.argv.includes('--inventory') && !INVENTORY_AT) { console.error('--inventory needs an output path'); process.exit(2); }
 const EXE = process.platform === 'win32' ? '.exe' : '';
 
@@ -156,6 +161,7 @@ async function main() {
 
   const conn = ['-h', '127.0.0.1', '-p', String(port), '-U', user, '-d', database];
   const env = { ...process.env, PP_DB_PSQL: bin('psql'), PP_DB_CONN: JSON.stringify(conn), PP_DB_OUT: os.tmpdir() };
+  if (MIGRATIONS_FROM) env.PP_DB_MIGRATIONS = path.resolve(MIGRATIONS_FROM);
   const child = (script, label) => {
     const result = spawnSync(process.execPath, [path.join(HERE, script)], { env, encoding: 'utf8', stdio: 'inherit' });
     if (result.status !== 0) throw new Error(label + ' failed (exit ' + result.status + ')');

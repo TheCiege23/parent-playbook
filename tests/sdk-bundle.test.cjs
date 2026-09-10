@@ -10,7 +10,7 @@ function fixture(t){
   return {output,result:buildBundle(output)};
 }
 test('portable bundle includes only allowlisted source, matched imports and an intact manifest',t=>{
-  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,41);
+  const {output,result}=fixture(t);assert.equal(result.ok,true);assert.equal(result.fileCount,129);
   const manifest=JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
   assert.deepEqual(manifest.files.map(x=>x.path),BUNDLE_FILES);
   assert.equal(manifest.sdkVersion,'0.13.0');
@@ -22,6 +22,20 @@ test('portable bundle includes only allowlisted source, matched imports and an i
     }
   }
   assert.match(fs.readFileSync(path.join(output,'README.md'),'utf8'),/not a fully offline engine/);
+  // The package previously shipped three company_* migrations that reference public.teams,
+  // public.athletes, auth.users and six private.* helpers created by earlier ones. All three
+  // failed on a fresh database, so an acquirer could not stand the schema up at all.
+  const shipped=fs.readdirSync(path.join(output,'supabase/migrations')).filter(n=>n.endsWith('.sql'));
+  const inRepo=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(n=>n.endsWith('.sql'));
+  assert.deepEqual(shipped.sort(),inRepo.sort(),'the package must ship every migration, in order');
+  // And the tooling an acquirer needs to verify what they were handed.
+  for(const tool of ['tools/schema-parity.cjs','tools/operations-check.cjs','tools/sdk-verify.cjs',
+    'tests/db/run.cjs','tests/db/inventory.sql','tests/db/posture.sql','HANDOVER.md'])
+    assert.ok(fs.existsSync(path.join(output,tool)),'missing from the package: '+tool);
+  // The license inventory has to name the two obligations that need a decision.
+  const handover=fs.readFileSync(path.join(output,'HANDOVER.md'),'utf8');
+  for(const token of ['LGPL-3.0','Google model terms','zero npm dependencies','No body-composition model'])
+    assert.ok(handover.includes(token),'HANDOVER.md must disclose: '+token);
 });
 test('bundle verification detects changed and missing payload files',t=>{
   const {output}=fixture(t);

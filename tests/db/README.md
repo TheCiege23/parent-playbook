@@ -39,8 +39,9 @@ port the OS hands out, and deletes it afterwards. `replay.cjs` and `security-tes
 unless `run.cjs` supplies `PP_DB_PSQL` and `PP_DB_CONN`, and the teardown refuses to delete anything
 outside the temp root.
 
-Every fixture in `10-fixtures.sql` is synthetic and labelled as such. The live Bergenfield Bears adult
-record (`friday-adult-reference-001` / `friday-reference-001`) is never referenced, read or recreated.
+Every fixture in `10-fixtures.sql` is synthetic and labelled as such. The live production
+adult-reference record is never referenced, read or recreated. Its identifiers are deliberately not
+named in any file that ships in the buyer package.
 
 ## What runs
 

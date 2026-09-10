@@ -1,8 +1,8 @@
 -- SYNTHETIC fixtures for the isolated composition security tests.
 -- Every identifier below is invented for testing. No production record, no real person,
 -- no capture data and no raw validation observation appears here.
--- The live Bergenfield Bears record (friday-adult-reference-001 / friday-reference-001)
--- is NOT referenced, read, copied or recreated.
+-- The live production adult-reference record is NOT referenced, read, copied or recreated.
+-- Its identifiers are deliberately not named here: this file ships in the buyer package.
 
 -- ---- synthetic accounts
 insert into auth.users(id, email) values

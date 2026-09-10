@@ -15,7 +15,8 @@ function harnessContext() {
 }
 const { psql: PSQL, conn: CONN } = harnessContext();
 const REPO = path.resolve(__dirname, '..', '..');
-const MIGRATIONS = path.join(REPO, 'supabase/migrations');
+// PP_DB_MIGRATIONS lets the handover package verify itself: same replay, different source.
+const MIGRATIONS = process.env.PP_DB_MIGRATIONS || path.join(REPO, 'supabase/migrations');
 const SCRATCH = __dirname;
 
 function psqlFile(file, { single = true } = {}) {
