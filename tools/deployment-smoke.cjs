@@ -26,6 +26,11 @@ const required = [
   ['/js/reference-cohorts.js', /const REFERENCE_COHORTS = \[\];/],
   ['/js/reference-cohort.mjs', /EQUIVALENCE_NOT_ESTABLISHED/],
   ['/sdk-demo.mjs', /createBodyScanner/],
+  // The PUBLIC signing key must stay reachable. A buyer verifying a signed SDK archive
+  // needs it from a route the archive cannot influence, and the repository is private, so
+  // this URL IS that route. If it ever stops serving, the instruction printed inside every
+  // archive becomes a dead end and the signature stops being checkable by anyone outside.
+  ['/SIGNING-KEY.pub.pem', /BEGIN PUBLIC KEY/],
 ];
 const forbidden = [
   // AUDIT.md is named here rather than left to the *.md rule in .dockerignore because it

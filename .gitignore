@@ -8,6 +8,11 @@ node_modules/
 *.key
 pp-sdk-signing-key*
 
+# ...except the PUBLIC half, which is the point: a buyer needs it from somewhere other
+# than the archive it verifies. This one file is published here deliberately.
+!SIGNING-KEY.pub.pem
+
+
 .env
 .env.local
 .env.*.local

@@ -12,8 +12,48 @@ Use permissioned adult reference photos for this preview. Each view can be revie
 
 Run `node tools/sdk-bundle.cjs` from the repository root. It creates `tools/sdk-releases/parent-playbook-sdk-0.13.0/` from an explicit allowlist: 26 SDK source assets, the standalone demo, verifier, package instructions and integration/dependency notes. It does not collect participant captures, saved geometry, measurements, database configuration or repository history. Generated releases are ignored by git. Existing destinations are never overwritten; pass a new destination path to build another snapshot.
 
-The current buyer handoff snapshot is `tools/sdk-releases/parent-playbook-sdk-0.13.0-friday-final-v18.zip`: 155 verified payload files plus `manifest.json`, 156 archive entries total, SHA-256 `19CD43D1A84A880A80DC22320098B681BB5D18DE6B492019817F823CFD5720DA`, 334,766 bytes, payload digest `7fa7ec99e4bb8c8eb33e55773664fbe54d740ccc79b871f0a2e723ec29d4812e`. Cut from `main` after package signing landed. **Its payload digest differs from v17’s** (`c787ef3e3e935bd008e78e45914d80edc7e5687cf02492ea46171a33cdb49e2a`): the package gained `tools/sdk-sign.cjs`, `tools/sdk-verify.cjs` learned to accept a detached signature beside the manifest, `tools/acceptance.cjs` gained a seventh check, and the generated README and manifest limitations no longer describe the manifest as unsigned. v17 and earlier are stale. **This archive is shipped UNSIGNED.** The tooling is present but no production signing key exists yet; signing it with a throwaway key would look like authenticity without being it. Generate a key outside the repository with `node tools/sdk-sign.cjs --generate-key --out <dir>`, sign with `--sign`, and publish the public key somewhere a buyer can reach independently of the archive. Evidence was taken from the extracted archive: `node tools/acceptance.cjs` reports six checks passing and one SKIP — manifest 155/155, exclusion scan clean, 107/107 contract tests, 204/204 database cases on a disposable cluster built from the package’s own 81 migrations (187 security plus a 17-case restore and deletion rehearsal), the bundled host serving modules with off-allowlist paths refused, and the signature check skipping with “this package carries no detached signature, so origin is unverified”. That SKIP is the honest answer to whether the package is authentic: unknown. The checksum is published beside the archive and the bundler replaces this line inside the packaged copy, so no archive certifies itself.
+The current buyer handoff snapshot is `tools/sdk-releases/parent-playbook-sdk-0.13.0-friday-final-v19.zip`: 155 verified payload files plus `manifest.json` and `signature.json`, 157 archive entries total, SHA-256 `CCD90D737F94FA26FC58A30E3FA56D20727C3467225617BAC9A3DBEF420B6CE6`, 336,164 bytes, payload digest `d94eacb1acb16b6343c65a3a99d452274025a9e3c4f301043c23961423a40b02`. **This is the first SIGNED release.** It carries a detached ed25519 signature over the manifest contents, made with key `0cc2d189c342212d23d250264f8ab71d`, whose public half is published in the repository as `SIGNING-KEY.pub.pem` and is deliberately NOT inside the archive — a key that arrived with the package it vouches for is not a trust anchor. Its payload digest differs from v18’s (`7fa7ec99e4bb8c8eb33e55773664fbe54d740ccc79b871f0a2e723ec29d4812e`) because `BODY-SDK.md` gained the section describing how to check the signature. v18 and earlier are stale and were unsigned. Evidence was taken from the extracted archive rather than the build directory: `node tools/acceptance.cjs` reports **seven of seven checks passing** — manifest 155/155, exclusion scan clean, 107/107 contract tests, 204/204 database cases on a disposable cluster built from the package’s own 81 migrations (187 security plus a 17-case restore and deletion rehearsal), the signature verified against the repository copy of the public key, and the bundled host serving modules with off-allowlist paths refused. The signature establishes that the manifest is ours; `tools/sdk-verify.cjs` establishes that the files match it; a reader wants both. Neither establishes measurement accuracy, and the archive still contains no provider model, composition estimate or validation dataset. The checksum is published beside the archive and the bundler replaces this line inside the packaged copy, so no archive certifies itself.
 
+### Checking that this package is ours
+
+The checksum manifest answers one question: do the files match what the manifest says? It
+cannot answer whether the manifest is ours, because anyone who modifies a file can
+recompute its hash and rewrite the entry to agree.
+
+A signed package carries `signature.json`, a detached ed25519 signature over the manifest
+contents — the SDK version and every path/sha256 pair, in bundle order. Check it with:
+
+```sh
+node tools/sdk-verify.cjs                                    # do the files match the manifest?
+node tools/sdk-sign.cjs --verify . --public-key <key.pem>    # is the manifest ours?
+```
+
+You need both. The first says the bytes are intact; the second says the list of bytes was
+signed by the key holder.
+
+**The public key is not in this package, on purpose.** Fetch it over HTTPS from:
+
+```sh
+curl -O https://playbookbp.com/SIGNING-KEY.pub.pem
+```
+
+A key that arrived inside the archive would prove nothing — whoever replaced the archive
+could replace the key beside it — so the verification tool warns you when you point it at
+one. Fetching it from the site is a route the archive cannot influence.
+
+Its fingerprint is:
+
+```
+0cc2d189c342212d23d250264f8ab71d
+```
+
+Treat the copy of that fingerprint printed here with the same suspicion: it travelled
+inside the archive. Compare it against the fingerprint published in the repository before
+relying on it. If the two disagree, this package did not come from us.
+
+An UNSIGNED package is not evidence of tampering — we have shipped unsigned builds. It
+means origin is unverified, which is what `node tools/acceptance.cjs` reports as a SKIP
+rather than a pass.
 Inside the copied release folder, run `node tools/sdk-verify.cjs`, then `node tools/sdk-demo.cjs 8774`. A different port can be supplied if needed. No npm install or access to the original repository is required. A maintained Node.js runtime is required for these scripts; browser inference still requires the external runtime assets described below. The server binds only to loopback and remains a local demonstration host.
 
 The same clearly labeled, in-memory integration demo is also published at `https://playbookbp.com/company-sdk-demo` for the Friday production-origin rehearsal. It has no ParentPlaybook account or database connection. Selected adult reference photos stay in browser memory; the page downloads its external model dependencies at runtime and clears selected inputs, previews and geometry on Clear or navigation.
