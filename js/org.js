@@ -166,7 +166,14 @@ async function openOrgRoster(teamId){
       const [a,s,m,ac]=await Promise.all([
         sb.from('athletes').select('id,first_name,birthdate').in('id',ids),
         sb.from('athlete_sports').select('athlete_id,sport_key,positions,level,is_primary').in('athlete_id',ids),
-        sb.from('measurements').select('athlete_id,metric_key,value,unit,measured_on').in('athlete_id',ids).order('measured_on',{ascending:false}),
+        // Order fully, not just by date. measured_on is a DATE and one body scan writes
+        // twenty-five rows sharing it, so ordering by date alone leaves the winner of the
+        // tie to Postgres — and the roster card showed a different one of the athlete’s
+        // twenty-five metrics between page loads. Same fault the goals query fixed in
+        // screen-week.js. created_at breaks the tie by what was actually recorded last,
+        // and id makes it total.
+        sb.from('measurements').select('id,athlete_id,metric_key,value,unit,measured_on,created_at').in('athlete_id',ids)
+          .order('measured_on',{ascending:false}).order('created_at',{ascending:false}).order('id',{ascending:false}),
         sb.from('athlete_access').select('athlete_id,guardian_id').in('athlete_id',ids).eq('role','coach').is('revoked_at',null),
       ]);
       athletes=a.data||[]; sports=s.data||[]; meas=m.data||[]; access=ac.data||[];
