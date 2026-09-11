@@ -192,7 +192,11 @@ function lgStepScore(){
     const v=c.dataset.r;
     const already=c.classList.contains('on');
     bg.querySelectorAll('#lgRes .chip').forEach(x=>x.classList.remove('on'));
-    if(already){ LG.row.result=lgDerivedResult(LG.row); }
+    // Deselecting has to actually clear the result. lgDerivedResult() returns the CURRENT
+    // result unchanged when there are no scores — and selecting a chip nulls the scores —
+    // so reassigning it here left the row recorded as a win with no chip selected and the
+    // summary line still reading "Win". Tapping Won and tapping it again to undo saved a win.
+    if(already){ LG.row.result='na'; }
     else{
       c.classList.add('on');
       LG.row.our_score=null; LG.row.their_score=null; LG.row.result=v;
