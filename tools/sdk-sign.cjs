@@ -44,8 +44,15 @@ function canonicalBytes(manifest) {
 }
 
 const readManifest = dir => JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+// Line endings are normalised before hashing. Without that the SAME key produces two
+// different fingerprints depending on how it reached the reader: a Windows checkout under
+// core.autocrlf, or an editor that saved it with CRLF, rewrites every line and therefore
+// the hash. A buyer would compute a fingerprint that did not match the published one and
+// reasonably conclude the key had been swapped — a false tamper alarm caused entirely by
+// text encoding. This repository has been bitten by exactly that in its archive checksums,
+// and a key fingerprint is a worse place for it: the alarm it raises is "this is not us".
 const fingerprint = publicKeyPem =>
-  crypto.createHash('sha256').update(publicKeyPem.trim()).digest('hex').slice(0, 32);
+  crypto.createHash('sha256').update(publicKeyPem.replace(/\r\n/g, '\n').trim()).digest('hex').slice(0, 32);
 
 function generateKey(outDir) {
   const resolved = path.resolve(outDir);
