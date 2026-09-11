@@ -15,7 +15,7 @@ const root = path.resolve(__dirname, '..');
 
 // A phone, as the collector would see one.
 const PHONE = {
-  caches: { keys: async () => ['pp-v109'] },
+  caches: { keys: async () => ['pp-v110'] },
   navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', maxTouchPoints: 5 },
   location: { origin: 'https://playbookbp.com' },
   innerWidth: 390, innerHeight: 844, devicePixelRatio: 3,

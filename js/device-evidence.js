@@ -192,8 +192,19 @@
     // rubric distinguishes intended-desktop from intended-phone evidence and both are worth
     // recording — the reader needs to know which one they are holding.
     const touch = Number(d.maxTouchPoints || 0);
-    const narrow = Number(d.viewportWidth || 0) > 0 && Number(d.viewportWidth) < 768;
-    const deviceClass = touch > 0 && narrow ? 'touch-handheld' : narrow ? 'narrow-viewport' : touch > 0 ? 'touch-wide' : 'desktop';
+    const width = Number(d.viewportWidth || 0), height = Number(d.viewportHeight || 0);
+
+    // A record that cannot say how big the screen was is not evidence about a device, and the
+    // classification below would be a guess dressed as a finding. Observed when an automation
+    // browser reported 0x0: a touch-capable environment with no dimensions was classified
+    // 'touch-wide' and verified clean, which is a claim about hardware that nothing supported.
+    if (width <= 0 || height <= 0) {
+      problems.push('No viewport was observed (' + width + 'x' + height + '), so this record does not establish what device ran it.');
+    }
+
+    const narrow = width > 0 && width < 768;
+    const deviceClass = (width <= 0 || height <= 0) ? 'unknown'
+      : touch > 0 && narrow ? 'touch-handheld' : narrow ? 'narrow-viewport' : touch > 0 ? 'touch-wide' : 'desktop';
 
     return { ok: problems.length === 0, problems, deviceClass, build: b.serviceWorkerCache, buildEvidence, outputs: r.outputCount + '/' + expected };
   }
