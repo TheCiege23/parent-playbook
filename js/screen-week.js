@@ -12,7 +12,9 @@ async function screenWeek(){
   const a=state.active; const age=ageFrom(a.birthdate);
   const weekStart=isoDay(mondayOfThisWeek()), weekEnd=dateForDayIndex(6);
   // far enough back for the streak counter; see weekStreak()
-  const histFrom=isoDay(new Date(mondayOfThisWeek().getTime()-26*7*86400000));
+  // Calendar weeks back, not epoch milliseconds: see mondayWeeksBack(). Fetching from the
+  // wrong Monday would drop the oldest week's sessions and cut the streak short.
+  const histFrom=isoDay(mondayWeeksBack(26));
   const [{data:sports},{data:goals},{data:histRows},{data:cancelRows},{data:heightRows}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     // order explicitly: goals[0] drives the big "This week's focus" headline, and

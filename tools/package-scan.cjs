@@ -67,9 +67,32 @@ function walk(dir,base,out){
   return out;
 }
 
-function scan(dir){
+// Scanning a listed subset instead of a whole directory. In the development tree the
+// question is not "is this directory clean" — it is not, it holds the whole repository —
+// but "would the files this package ships be clean". A file that is listed and absent is
+// itself a finding: a shorter scan must never read as a cleaner one.
+function listed(dir,rels){
+  const out=[],missing=[];
+  for(const rel of rels){
+    const full=path.join(dir,rel);
+    let stat;
+    try{stat=fs.lstatSync(full);}catch{missing.push(rel);continue;}
+    if(stat.isSymbolicLink())out.push({rel,full,symlink:true});
+    else if(stat.isFile())out.push({rel,full,symlink:false});
+    else missing.push(rel);
+  }
+  return {out,missing};
+}
+
+// options.only restricts the scan to those repository-relative paths. Omit it to walk
+// the whole directory, which is what a shipped bundle is checked with.
+function scan(dir,options){
   if(!fs.existsSync(dir))throw new Error('No such package directory: '+dir);
-  const findings=[],files=walk(dir,'',[]);
+  const only=options&&options.only;
+  const subset=only?listed(dir,only):null;
+  const files=subset?subset.out:walk(dir,'',[]);
+  const findings=[];
+  if(subset)for(const rel of subset.missing)findings.push({file:rel,rule:'missing',detail:'listed in the bundle file list but absent from this tree'});
   for(const file of files){
     const add=(rule,detail)=>findings.push({file:file.rel,rule,detail});
     if(file.symlink){add('symlink','packages must be self-contained');continue;}

@@ -1327,14 +1327,24 @@ function weekStreak(sessionRows, o){
   (sessionRows||[]).forEach(r=>{
     if(!r||!r.done_on) return;
     const k=isoDay(mondayOf(new Date(r.done_on+'T00:00:00')));
-    (byWeek[k]=byWeek[k]||new Set()).add(r.title);
+    // Key by DAY AND TITLE, not title alone. A week's plan can use the same title on two
+    // days — a five-year-old's speed week carries "Chase & tag games" twice — and deduping
+    // by title made those two completed days count as one. `need` counts non-rest DAYS, so
+    // the streak became unreachable: a parent who ticked off every day for months still saw
+    // zero, the exact opposite of what a week-level streak exists to say.
+    //
+    // The pair is safe to count because the database enforces
+    // UNIQUE (athlete_id, done_on, title): a day cannot contribute the same title twice, so
+    // re-ticking cannot inflate the total. Two different titles on one day still count
+    // twice, which is what keeps a rebalanced session counting.
+    (byWeek[k]=byWeek[k]||new Set()).add(r.done_on+'|'+r.title);
   });
   let streak=0;
   // start at LAST week: this week is still in progress and must never break a streak
   for(let back=1; back<=maxLookback; back++){
     const wi=weekIndex-back;
     if(wi<0) break;
-    const monday=mondayOf(new Date(mondayOfThisWeek().getTime()-back*7*86400000));
+    const monday=mondayWeeksBack(back);
     const key=isoDay(monday);
     const plan=buildProgram(age, goals, sportKey, positions, wi, schedule);
     const need=plan.days.filter(d=>d && d.t!=='rest').length;
@@ -1343,6 +1353,16 @@ function weekStreak(sessionRows, o){
     if(got>=need) streak++; else break;
   }
   return streak;
+}
+// Whole weeks back from this week's Monday, by CALENDAR days rather than epoch
+// milliseconds. Subtracting back*7*86400000 assumes every week is exactly 168 hours; the
+// week containing a spring-forward is 167, so the result landed at 23:00 the previous
+// Sunday and mondayOf() then snapped it back a further week. Every week before a DST
+// change was looked up under the wrong key, so completed weeks read as incomplete and the
+// streak broke every spring. setDate() rolls months and years and is unaffected by DST.
+function mondayWeeksBack(weeks){
+  const m=mondayOfThisWeek();
+  return new Date(m.getFullYear(), m.getMonth(), m.getDate()-weeks*7);
 }
 function mondayOf(d){
   const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
