@@ -251,12 +251,19 @@ for the first time this morning and were read directly from `cron.job_run_detail
 | 5 `biometric-retention` | 03:20 | 2026-09-11 03:20:00 | succeeded |
 | 6 `company-body-assessment-retention` | 03:35 | 2026-09-11 03:35:00 | succeeded |
 | 7 `company-reference-assessment-retention` | 03:40 | **2026-09-11 03:40:00** | succeeded |
-| 11 `company-composition-result-retention` | 03:50 | see below | — |
+| 11 `company-composition-result-retention` | 03:50 | **2026-09-11 03:50:00** | succeeded |
 
 Jobs 7 and 11 had zero runs until now, which earlier looked like a fault and was not: both
 were created after their firing time on September 10, so September 11 was their first
 opportunity. Jobs 2, 3, 5 and 6 running normally in between is what established that the
 scheduler itself was healthy while 7 and 11 sat at zero.
+
+**All four observed on one morning.** 03:20, 03:35, 03:40 and 03:50, each succeeding within
+four milliseconds. Job 11 is the composition sweep; it ran against an empty table and left it
+empty, with zero provider registrations, so the app still reports *Model not configured* and
+still produces no composition value. The two audit rows from the September 10 deletion
+rehearsal are still present, deliberately, and no composition deletion has occurred that the
+rehearsal did not cause.
 
 **What job 7 proves, and what it does not.** It is the sweep that governs the live
 adult-reference record. It ran, succeeded, and the record is untouched: one row,
