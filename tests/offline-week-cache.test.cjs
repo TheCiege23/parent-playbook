@@ -107,3 +107,32 @@ test('a missing, empty or corrupt snapshot reads as no snapshot', () => {
   store.set('pp_week_cache', JSON.stringify({ at: Date.now(), week_start: '2026-09-07' }));
   assert.equal(ctx.owReadWeek(), null, 'no days');
 });
+
+test('the cache state says why there is no usable week', () => {
+  // "Nothing was ever saved" and "what is saved is last week's" need different words on the
+  // offline screen. Since the cache became week-scoped, the second is what a parent who used
+  // the app all last week meets on Monday morning, and telling them nothing was ever saved
+  // would be false.
+  const fresh = context('2026-09-09T09:00:00');
+  assert.equal(fresh.ctx.owWeekCacheState(), 'none', 'nothing stored yet');
+
+  fresh.ctx.owSaveWeek(SNAPSHOT);
+  assert.equal(fresh.ctx.owWeekCacheState(), 'current', 'saved for the week being asked about');
+
+  // The same bytes, read in the following week.
+  const raw = fresh.store.get('pp_week_cache');
+  const later = context('2026-09-14T08:00:00');
+  later.store.set('pp_week_cache', raw);
+  assert.equal(later.ctx.owWeekCacheState(), 'stale', "saved, but it is last week's");
+  assert.equal(later.ctx.owReadWeek(), null, 'and it still must not be served');
+});
+
+test('a corrupt or version-less snapshot reads as none, not stale', () => {
+  const { ctx, store } = context('2026-09-09T09:00:00');
+  store.set('pp_week_cache', 'not json');
+  assert.equal(ctx.owWeekCacheState(), 'none');
+  store.set('pp_week_cache', JSON.stringify({ at: Date.now(), ...SNAPSHOT }));   // no week_start
+  assert.equal(ctx.owWeekCacheState(), 'stale', 'a real snapshot from an older build is stale, not absent');
+  store.set('pp_week_cache', JSON.stringify({ at: Date.now(), week_start: '2026-09-07' }));  // no days
+  assert.equal(ctx.owWeekCacheState(), 'none', 'a snapshot with no plan in it is not a plan');
+});
