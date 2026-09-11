@@ -44,7 +44,7 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Adult persistence: https://playbookbp.com/company-persistence-demo
 - Composition gate: https://playbookbp.com/company-composition-demo
 - Git: branch `composition-storage-and-provider-registry` pushed to origin at `32c1c29`, on top of baseline `54a19fe` which finally tracks the 139 previously-uncommitted files production was already serving. `main` is unmoved at `7bb724d`. The repository is private.
-- Service-worker release: **`pp-v95` deployed to production on 2026-09-11** (`railway up`, deployment `ecae7278-f17a-4e96-863d-48205faa78e6`). Production smoke 27/27, `ok: true`, read after letting the rollout settle. Verified against the deployed file: `js/photo-quality.js` is byte-identical to the repository, and the production copy gives the same direction verdict for a facing athlete in square, portrait and landscape photos while still flagging a genuinely turned one in all three.
+- Service-worker release: **`pp-v96` deployed to production on 2026-09-11** (`railway up`, deployment `f9d56f95-661d-4d82-90cf-f6f5aa97a949`). Production smoke 27/27, `ok: true`, read after the rollout settled. Verified against the deployed file: `js/offline.js` is byte-identical to the repository, carries `owWeekStart()`, refuses a snapshot from another week, and no longer contains the eight-day rule.
 - Railway deployment: 22d90350-50d4-4d43-bd96-5025661ce110 (SUCCESS, 2026-09-10). Project a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2, service caf9bbfb-1084-422b-913a-2b90d004410f, environment production. The service source is pinned to branch `main`, so pushing a feature branch does not deploy; the live site was published with `railway up` from the working directory.
 - Full JavaScript suite: **276/276 passing** — `node --test "tests/*.test.cjs"`
 - Executable database tests: **154/154 passing** — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
@@ -240,6 +240,36 @@ The real adult-reference record was not touched and was confirmed intact afterwa
 The retention jobs for adult-reference assessments (`jobid` 7, 03:40 UTC) and composition results
 (`jobid` 11, 03:50 UTC) have never fired: cron is healthy and other jobs ran, but both were created
 after their window on September 10. First firing is 03:40 and 03:50 UTC on September 11.
+
+## Retention jobs observed firing — September 11, 2026
+
+The scheduled sweeps had never been watched running in production. Both new ones fired
+for the first time this morning and were read directly from `cron.job_run_details`.
+
+| Job | Schedule (UTC) | First observed run | Status |
+| --- | --- | --- | --- |
+| 5 `biometric-retention` | 03:20 | 2026-09-11 03:20:00 | succeeded |
+| 6 `company-body-assessment-retention` | 03:35 | 2026-09-11 03:35:00 | succeeded |
+| 7 `company-reference-assessment-retention` | 03:40 | **2026-09-11 03:40:00** | succeeded |
+| 11 `company-composition-result-retention` | 03:50 | see below | — |
+
+Jobs 7 and 11 had zero runs until now, which earlier looked like a fault and was not: both
+were created after their firing time on September 10, so September 11 was their first
+opportunity. Jobs 2, 3, 5 and 6 running normally in between is what established that the
+scheduler itself was healthy while 7 and 11 sat at zero.
+
+**What job 7 proves, and what it does not.** It is the sweep that governs the live
+adult-reference record. It ran, succeeded, and the record is untouched: one row,
+`friday-adult-reference-001` / `friday-reference-001`, 25 outputs, retention 2026-10-10,
+`created_at` still equal to `updated_at`, and zero reference-deletion audit rows. So the
+sweep executes on schedule in production and keeps a record that is still inside its
+window — which is the half of retention that had never been observed live.
+
+It does NOT show a scheduled deletion actually removing an expired row in production,
+because nothing in production is expired. That path is covered by `tests/db/restore-deletion.cjs`
+cases D05 and D06, which sweep an expired record and require the deletion to be audited,
+and by the September 10 production deletion rehearsal. Watching a real expiry would mean
+waiting until 2026-10-10 or back-dating a live record, and neither is worth doing for it.
 
 ## Standing limitations
 
