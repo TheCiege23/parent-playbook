@@ -32,4 +32,31 @@ function buildBundle(destination){
   return {directory:output,...check};
 }
 if(require.main===module){try{console.log(JSON.stringify(buildBundle(process.argv[2]),null,2));}catch(error){console.error(error.message);process.exitCode=1;}}
-module.exports={buildBundle};
+// One hash over the whole payload: every path and the digest of its contents, in bundle
+// order. Published beside the archive so a reader — or a test — can tell a stale recorded
+// checksum from a current one WITHOUT rebuilding and re-zipping.
+//
+// The ZIP's own SHA-256 cannot answer that question. Compress-Archive stamps timestamps, so
+// zipping identical files twice gives two different hashes; the archive checksum proves a
+// received file is intact but says nothing about whether the payload has moved on. This
+// does, and it is what caught the v10 record going stale after three bundled tools changed
+// under it with nothing flagging the published hash as wrong.
+//
+// It builds through buildBundle() into a temp directory rather than re-deriving the file
+// bytes, because two of them are transformed on the way in — README.md is generated, and
+// BODY-SDK.md has its self-describing snapshot line replaced. A second implementation of
+// those transformations would be free to drift from the real one, which is the failure this
+// is meant to detect rather than reproduce.
+function bundleDigest(){
+  const os=require('node:os');
+  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pp-bundle-digest-'));
+  try{
+    const dir=path.join(tmp,'pkg');
+    buildBundle(dir);
+    const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
+    // createdAt is deliberately not in the hash: it changes every build and describes when
+    // the package was made, not what is in it.
+    return digest(Buffer.from(manifest.files.map(f=>f.path+' '+f.sha256).join('\n')));
+  }finally{ fs.rmSync(tmp,{recursive:true,force:true}); }
+}
+module.exports={buildBundle,bundleDigest};

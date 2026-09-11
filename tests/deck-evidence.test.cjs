@@ -157,3 +157,22 @@ test('the deck cites the JavaScript suite size the repository actually has', () 
   assert.ok(deck.includes(`${declared}/${declared}`),
     `the deck should cite ${declared}/${declared} for the JavaScript suite; it grew without the deck being updated`);
 });
+
+test('the recorded archive still describes the payload that would be built today', () => {
+  // The gap this closes. The published SHA-256 is of the ZIP, and a ZIP is not
+  // byte-reproducible — Compress-Archive stamps timestamps, so zipping identical files twice
+  // gives two different hashes. That checksum proves a received archive is intact; it cannot
+  // say whether the payload has moved on since it was recorded. Nothing did, and the v10
+  // record went stale when three bundled tools changed under it.
+  //
+  // bundleDigest() hashes every shipped path and its contents through the real bundler, so
+  // this fails the moment a bundled file changes without the archive being rebuilt and its
+  // record updated.
+  const { bundleDigest } = require('../tools/sdk-bundle.cjs');
+  const guide = read('BODY-SDK.md');
+  const recorded = (guide.match(/payload digest `([0-9a-f]{64})`/) || [])[1];
+  assert.ok(recorded, 'BODY-SDK.md should record the payload digest beside the archive checksum');
+  assert.strictEqual(bundleDigest(), recorded,
+    'a bundled file changed since the archive was recorded: rebuild the archive, re-run ' +
+    'tools/acceptance.cjs against the extracted copy, and update the recorded checksum and digest');
+});
