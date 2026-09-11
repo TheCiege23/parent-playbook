@@ -40,9 +40,9 @@ test('the deck cites the service-worker version the smoke check expects', () => 
 });
 
 test('the deck cites the weighted parity score the rubric produces', () => {
-  assert.strictEqual(weighted, 37.75, 'rubric total changed; the deck and this test both need review');
-  assert.ok(deck.includes('37.75%'), 'the deck should state the weighted score');
-  assert.ok(deck.includes('38% rounded'), 'the deck should state the rounded score');
+  assert.strictEqual(weighted, 42.75, 'rubric total changed; the deck and this test both need review');
+  assert.ok(deck.includes('42.75%'), 'the deck should state the weighted score');
+  assert.ok(deck.includes('43% rounded'), 'the deck should state the rounded score');
   // A deck that quietly claims a category is accepted is the failure this guards.
   const accepted = parity.categories.filter(c => c.stage === 1).length;
   assert.strictEqual(accepted, 0);

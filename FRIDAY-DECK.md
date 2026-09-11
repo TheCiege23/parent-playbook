@@ -14,11 +14,11 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v106`, 28/28 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 431/431 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 440/440 |
 | Database suite | `node tests/db/run.cjs` | 204/204 on a disposable cluster built from the real migrations: 187 security cases plus a 17-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 6/6 checks: manifest 154/154, exclusions clean, contracts 107/107, database 204/204, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
-| Weighted parity | `node tools/parity-progress.cjs` | 37.75%, 38% rounded, 0 of 13 categories fully accepted |
+| Weighted parity | `node tools/parity-progress.cjs` | 42.75%, 43% rounded, 0 of 13 categories fully accepted |
 
 ---
 
@@ -43,7 +43,7 @@ records and the SDK are live; composition is gated off and produces nothing.
 ## Slide 2 — Capability against FIT:MATCH, stated plainly
 
 Thirteen weighted categories, scored on a fixed rubric in `tools/parity-progress.json`.
-**37.75% weighted, 38% rounded. Zero of thirteen categories are fully accepted.**
+**42.75% weighted, 43% rounded. Zero of thirteen categories are fully accepted.**
 
 | Stage | Meaning | Categories |
 | --- | --- | --- |
