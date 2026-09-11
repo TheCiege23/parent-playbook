@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 function setup(){
   const c=vm.createContext({console});
   vm.runInContext(`function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}`,c);
-  for(const file of ['body-outputs','scan-record','body-insights','assessment-report'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
+  for(const file of ['dates','body-outputs','scan-record','body-insights','assessment-report'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
   return c;
 }
 const row=(value,date='2026-09-09',extra={})=>({id:'m',athlete_id:'a',metric_key:'wingspan',value,unit:'in',source:'photo',measured_on:date,...extra});

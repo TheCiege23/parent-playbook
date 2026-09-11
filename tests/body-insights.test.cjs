@@ -7,7 +7,7 @@ const base=path.resolve(__dirname,'..');
 function context(extra={}){
   const ctx=vm.createContext({console,Number,Map,Set,Date,Blob,JSON,setTimeout,...extra});
   vm.runInContext(`function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}`,ctx);
-  for(const file of ['body-outputs.js','cdc-stature.js','maturity.js','scan-record.js','body-insights.js','assessment-report.js']) vm.runInContext(fs.readFileSync(path.join(base,'js',file),'utf8'),ctx);
+  for(const file of ['dates.js','body-outputs.js','cdc-stature.js','maturity.js','scan-record.js','body-insights.js','assessment-report.js']) vm.runInContext(fs.readFileSync(path.join(base,'js',file),'utf8'),ctx);
   return ctx;
 }
 const r=(date,value,extra={})=>({id:date,metric_key:'wingspan',value,unit:'in',source:'photo',measured_on:date,...extra});

@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-function setup(extra={}){let id=0;const c=vm.createContext({uuid:()=>`id-${++id}`,console,...extra});vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/scan-record.js'),'utf8'),c);return c;}
+function setup(extra={}){let id=0;const c=vm.createContext({uuid:()=>`id-${++id}`,console,...extra});for(const f of ['dates','scan-record'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+f+'.js'),'utf8'),c);return c;}
 const input=()=>({metrics:{wingspan:60,leg_length:28},confidence:.72,detail:{framesUsed:['front','back'],framesMissed:['left'],rejected:['torso_length'],frames:['PRIVATE'],meshUrl:'PRIVATE'},frames:'PRIVATE',meshUrl:'PRIVATE'});
 const ctx=()=>({athleteId:'athlete-a',actorId:'parent-a',consentId:'consent-a',capturedAt:'2026-09-09T15:00:00Z',engine:{id:'pose',version:'1',model:'full-v1'},height:{value:59,measured_on:'2026-09-01',source:'manual'},defaultUnit:'in'});
 test('record snapshots athlete, height, result and allowed provenance without retaining captures',()=>{

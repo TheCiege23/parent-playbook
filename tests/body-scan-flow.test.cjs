@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 function setup(){
   let id=0;const observed={};
   const c=vm.createContext({console:{...console,error:error=>{observed.loggedError=error}},uuid:()=>`uuid-${++id}`,state:{user:{id:'parent'},active:{id:'a'}},ageFrom:()=>12,H:(s,...v)=>s.reduce((a,x,i)=>a+x+(v[i]??''),''),sheet:()=>({querySelector:()=>({}),remove(){}}),URL:{revokeObjectURL(){}}});
-  for(const file of ['scan-record','body-scan'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
+  for(const file of ['dates','scan-record','body-scan'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
   c.observed=observed;
   vm.runInContext(`
     bsMarkActive=()=>{};

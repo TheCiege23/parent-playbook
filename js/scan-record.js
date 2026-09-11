@@ -30,7 +30,12 @@ function buildScanRecord(result, context){
   const rows=Object.entries(result.metrics||{}).map(([key,value])=>{
     const unit=result.units?.[key] || context.defaultUnit;
     if(!key || scanFinite(value)===null || value<=0 || !unit) throw new Error('Invalid measurement or missing unit');
-    return {id:uuid(),athlete_id:context.athleteId,metric_key:key,value,unit,source:'photo',measured_on:capturedAt.slice(0,10),created_by:context.actorId,note};
+    // measured_on is a plain calendar DATE, and capturedAt is a UTC instant. Slicing it
+    // stamped a body scan taken at 8pm west of UTC with tomorrow: a future reading, which
+    // biSnapshot then filters out of its own day. The jump, sprint and speed scans already
+    // stamp todayISO(), so this also had the flagship 25-output scan disagreeing with the
+    // other three about what day it was.
+    return {id:uuid(),athlete_id:context.athleteId,metric_key:key,value,unit,source:'photo',measured_on:localDay(new Date(capturedAt)),created_by:context.actorId,note};
   });
   if(!rows.length) throw new Error('No measurements to save');
   return JSON.parse(JSON.stringify({meta,rows})); // detach from mutable provider/global state
