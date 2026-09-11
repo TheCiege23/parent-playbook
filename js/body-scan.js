@@ -1032,7 +1032,7 @@ async function bsSaveEvidence(result,record,btn){
     const produced=Object.keys(result.metrics||{});
     const evidence=DeviceEvidence.buildDeviceEvidence({
       recordedAt:new Date().toISOString(),
-      build:{serviceWorkerCache:seen.serviceWorkerCache,origin:seen.origin},
+      build:{serviceWorkerCache:seen.serviceWorkerCache,origin:seen.origin,buildSource:seen.buildSource},
       device:{userAgent:seen.userAgent,viewportWidth:seen.viewportWidth,viewportHeight:seen.viewportHeight,
         pixelRatio:seen.pixelRatio,standalone:seen.standalone,maxTouchPoints:seen.maxTouchPoints},
       run:{workflowVersion:SCAN_POLICY_VERSION,

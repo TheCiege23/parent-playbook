@@ -20,7 +20,7 @@
 <label>Adult subject reference <input id="companySubject" type="text" value="adult-reference-001" maxlength="180"></label>
 <label>Consent reference <input id="companyConsent" type="text" value="demo-consent-001" maxlength="180"></label>
 <label>Stable assessment ID <input id="companyAssessmentId" type="text" value="example-assessment-001" maxlength="180"></label>
-<button id="companySave" disabled>Save current assessment</button><button id="companyReopen">Reopen saved assessment</button><button id="companyExport">Prepare authorized export</button><a id="companyExportDownload" href="#" download hidden>Download prepared authorized record</a><button id="companyDelete">Delete saved assessment</button>
+<button id="deviceEvidence" hidden disabled>Save session evidence</button><button id="companySave" disabled>Save current assessment</button><button id="companyReopen">Reopen saved assessment</button><button id="companyExport">Prepare authorized export</button><a id="companyExportDownload" href="#" download hidden>Download prepared authorized record</a><button id="companyDelete">Delete saved assessment</button>
 <p id="companyStatus" role="status" aria-live="polite">Run a scan to save it, or reopen a record already saved during this page session.</p><pre id="companyRecord">No company record open.</pre>
 <p>Every operation refreshes the simulated session and access decision. The portable record contains only allowlisted scalar outputs and provenance. A production adapter must repeat these rules at its server or database boundary.</p></section>
 <section id="surfaceOutcome" hidden><h2>3D processing outcome</h2><p>This records whether reconstruction succeeded, was rejected, was unavailable, or was skipped, including any bounded lower-region artifact removal. The length assessment remains separate. Connectivity diagnostics are not an accuracy score.</p><button id="surfaceOutcomeDownload" disabled>Download 3D processing outcome</button><pre id="surfaceOutcomeResult"></pre></section>
@@ -43,4 +43,5 @@
 <p>Two scans can agree and still share the same error. This comparison reports plane and surface-perimeter changes without assigning an accuracy threshold.</p></section>
 <section><h2>Portable result</h2><p>The result contains versioned measurements and definitions. It contains no photos, landmarks or file digests. A host company decides how to save it under its own access and retention rules.</p><button id="download" disabled>Download result JSON</button><pre id="result">No result yet.</pre></section>
 <details><summary>Developer runtime check</summary><p>This downloads Google's public pose sample to test the real SDK worker. It is not a standing scan or measurement validation. It does not fill the four photo slots.</p><button id="sample">Review public pose sample</button></details>
+<script src="/js/device-evidence.js"></script>
 <script type="module" src="/sdk-demo.mjs"></script></main></html>

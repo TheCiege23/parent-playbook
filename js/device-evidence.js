@@ -41,7 +41,7 @@
   // than dropping quietly: silently discarding it would let a caller believe something was
   // recorded that was not.
   const SHAPE = {
-    build: { serviceWorkerCache: 'string', origin: 'string' },
+    build: { serviceWorkerCache: 'string', origin: 'string', buildSource: 'string' },
     device: { userAgent: 'string', viewportWidth: 'integer', viewportHeight: 'integer', pixelRatio: 'number', standalone: 'boolean', maxTouchPoints: 'integer' },
     run: { workflowVersion: 'string', engineId: 'string', engineVersion: 'string', engineModel: 'string', processingMs: 'number', outputCount: 'integer', expectedOutputs: 'integer', missingOutputKeys: 'string[]', heightSupplied: 'boolean' },
   };
@@ -103,15 +103,33 @@
   async function collectDeviceEvidence(env) {
     const g = env || root;
     const caches = g.caches, nav = g.navigator || {}, win = g;
-    let serviceWorkerCache = 'unknown';
+    let serviceWorkerCache = 'unknown', buildSource = 'none';
+    // Preferred: the cache the service worker actually installed. That is evidence the
+    // browser RAN this build, not merely that the server offers it.
     if (caches && typeof caches.keys === 'function') {
-      const names = await caches.keys();
-      const match = (names || []).filter(n => /^pp-v\d+$/.test(n)).sort();
-      if (match.length === 1) serviceWorkerCache = match[0];
-      else if (match.length > 1) serviceWorkerCache = match[match.length - 1];
+      try {
+        const names = await caches.keys();
+        const match = (names || []).filter(n => /^pp-v\d+$/.test(n)).sort();
+        if (match.length) { serviceWorkerCache = match[match.length - 1]; buildSource = 'service-worker-cache'; }
+      } catch (e) { /* a browser may refuse the cache API; fall through */ }
+    }
+    // Fallback: ask the origin what it is serving. Weaker — it says what the server offers
+    // now, not what this session ran — but a page with no service worker of its own (the
+    // company SDK demo, or a browser that has never loaded the app) would otherwise record
+    // 'unknown' and fail verification for a reason that has nothing to do with the session.
+    // buildSource carries the difference so a reader is never misled about which it is.
+    if (serviceWorkerCache === 'unknown' && typeof g.fetch === 'function') {
+      try {
+        const response = await g.fetch('/sw.js', { cache: 'no-store' });
+        if (response && response.ok) {
+          const declared = (await response.text()).match(/const CACHE\s*=\s*'(pp-v\d+)'/);
+          if (declared) { serviceWorkerCache = declared[1]; buildSource = 'served-sw.js'; }
+        }
+      } catch (e) { /* offline, or no such file; stays unknown */ }
     }
     return {
       serviceWorkerCache,
+      buildSource,
       origin: (g.location && g.location.origin) || 'unknown',
       userAgent: nav.userAgent || 'unknown',
       viewportWidth: Math.round(win.innerWidth || 0),
@@ -155,7 +173,12 @@
     if (o.expectedCache && b.serviceWorkerCache !== o.expectedCache) {
       problems.push('Build is ' + b.serviceWorkerCache + ', expected ' + o.expectedCache + '.');
     }
-    if (b.serviceWorkerCache === 'unknown') problems.push('No service-worker cache was observed, so the build is unverified.');
+    if (b.serviceWorkerCache === 'unknown') problems.push('No build could be established, so this record does not say which release ran.');
+    // Not a problem, but the reader has to know which of the two it is: a cache name proves
+    // the browser ran that build; a served sw.js only proves the origin offers it now.
+    const buildEvidence = b.buildSource === 'service-worker-cache' ? 'observed in the browser cache'
+      : b.buildSource === 'served-sw.js' ? 'read from the origin, not observed in this session'
+      : 'not established';
     if (o.expectedOrigin && b.origin !== o.expectedOrigin) problems.push('Origin is ' + b.origin + ', expected ' + o.expectedOrigin + '.');
 
     const expected = Number.isInteger(o.expectedOutputs) ? o.expectedOutputs : EXPECTED_OUTPUTS;
@@ -172,7 +195,7 @@
     const narrow = Number(d.viewportWidth || 0) > 0 && Number(d.viewportWidth) < 768;
     const deviceClass = touch > 0 && narrow ? 'touch-handheld' : narrow ? 'narrow-viewport' : touch > 0 ? 'touch-wide' : 'desktop';
 
-    return { ok: problems.length === 0, problems, deviceClass, build: b.serviceWorkerCache, outputs: r.outputCount + '/' + expected };
+    return { ok: problems.length === 0, problems, deviceClass, build: b.serviceWorkerCache, buildEvidence, outputs: r.outputCount + '/' + expected };
   }
 
   const api = { SCHEMA, EXPECTED_OUTPUTS, buildDeviceEvidence, collectDeviceEvidence, runFromSummary, verifyDeviceEvidence };

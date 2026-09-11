@@ -1,7 +1,7 @@
 import {createBodyScanner,renderSurfacePreview} from '/js/body-sdk.mjs';
 import {createSurfaceReport,surfaceReportHTML} from '/js/body-surface-report.mjs';
 import {createPoseRepeatSnapshot,createPoseRepeatReport,poseRepeatReportHTML} from '/js/body-surface-repeat.mjs';
-import {measurementSummaryHTML,measurementReportHTML,measurementReportStyles} from '/js/body-sdk-report.mjs';
+import {measurementSummaryHTML,measurementReportHTML,measurementReportStyles,summarizeMeasurementResult} from '/js/body-sdk-report.mjs';
 import {createCompanyAssessmentStore} from '/js/body-sdk-record.mjs';
 const scanner = createBodyScanner(), views = ['front', 'right', 'back', 'left'];
 const $ = id => document.getElementById(id);
@@ -208,6 +208,7 @@ async function perform(view) {
       if(combined&&output.surfaceFailure)$('status').textContent+=' '+output.surfaceFailure.message+' Your length estimates are still available.';
       renderMeasurementDashboard();
       $('companySave').disabled=false;
+      if(evidenceEnabled()&&globalThis.DeviceEvidence&&$('deviceEvidence')){$('deviceEvidence').hidden=false;$('deviceEvidence').disabled=false;}
     }
     $('result').textContent = JSON.stringify(view?output:result, null, 2);
   } catch (error) {
@@ -220,6 +221,59 @@ async function perform(view) {
   }
   finally { if (run === generation) {controller = null; setBusy(false);} }
 }
+// ---- device-session evidence --------------------------------------------------------
+// Records HOW a run happened — which build served the page, what device ran it, how long it
+// took, how many of the defined outputs came back — and never WHAT it measured. Opt in with
+// ?evidence=1; a company evaluating the SDK has no use for it and should not meet a control
+// that exists so we can evidence our own capability claims.
+//
+// This demo is the surface the authorized adult reference set actually runs through, which
+// is why the control has to exist here and not only in the parent application.
+function evidenceEnabled(){
+  try{ return new URLSearchParams(location.search).get('evidence')==='1'; }catch(e){ return false; }
+}
+// Bound only if the control is in this DOM. A host that trims the page, or a test harness
+// that builds a minimal one, must not fail to load the whole demo module over a button that
+// exists for our own evidence capture.
+if($('deviceEvidence')) $('deviceEvidence').onclick = async () => {
+  const button=$('deviceEvidence'), label=button.textContent;
+  // Two different causes, told apart: a build without the module can do nothing, whereas a
+  // build with no scan yet just needs a scan. One message for both sends the reader looking
+  // in the wrong place.
+  if(!globalThis.DeviceEvidence){ $('status').textContent='Session evidence is unavailable on this build.'; return; }
+  if(!result){ $('status').textContent='Run a four-photo scan first; there is nothing to record yet.'; return; }
+  button.disabled=true; button.textContent='Collecting…';
+  try{
+    const DE=globalThis.DeviceEvidence;
+    const seen=await DE.collectDeviceEvidence();
+    // runFromSummary reduces a result to counts and provenance. summarizeMeasurementResult
+    // is what computes missingOutputs, so the count of what did NOT come back is the SDK's
+    // own answer rather than something recomputed here.
+    const summary=summarizeMeasurementResult({schema:'PP_BODY_SDK_RESULT_V1',sdkVersion:result.sdkVersion,
+      createdAt:result.createdAt||new Date().toISOString(),status:'provisional',outputDictionary:'body-outputs-v2',
+      heightIn:result.heightIn,processingMs:result.processingMs,engine:result.engine,
+      measurements:(result.measurements||[]).map(m=>({key:m.key,value:m.value,unit:'in',definition:m.definition}))},
+      {unit:'in',surfaceStatus:surfaceResult?.surfaceStatus||'not_requested'});
+    const evidence=DE.buildDeviceEvidence({
+      recordedAt:new Date().toISOString(),
+      build:{serviceWorkerCache:seen.serviceWorkerCache,origin:seen.origin,buildSource:seen.buildSource},
+      device:{userAgent:seen.userAgent,viewportWidth:seen.viewportWidth,viewportHeight:seen.viewportHeight,
+        pixelRatio:seen.pixelRatio,standalone:seen.standalone,maxTouchPoints:seen.maxTouchPoints},
+      run:DE.runFromSummary(summary),
+      note:'Company SDK demo, four-photo scan.',
+    });
+    const name='device-session-'+evidence.build.serviceWorkerCache+'-'
+      +evidence.recordedAt.slice(0,19).replace(/[:T-]/g,'')+'.json';
+    const url=URL.createObjectURL(new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    $('status').textContent='Session evidence saved as '+name+'. It contains no measurement, height or identifier.';
+  }catch(error){
+    console.error(error);
+    $('status').textContent='Could not build session evidence: '+(error&&error.message||error);
+  }
+  button.disabled=false; button.textContent=label;
+};
 $('scan').onclick = () => perform();
 function reportOptions(){return {unit:$('measurementUnit').value||'in',surfaceStatus:surfaceResult?.surfaceStatus||'not_requested'};}
 function renderMeasurementDashboard(){

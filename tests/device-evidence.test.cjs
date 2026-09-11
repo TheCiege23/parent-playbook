@@ -22,7 +22,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const DE = require(path.join(root, 'js', 'device-evidence.js'));
 
-const okBuild = () => ({ serviceWorkerCache: 'pp-v106', origin: 'https://playbookbp.com' });
+const okBuild = () => ({ serviceWorkerCache: 'pp-v106', origin: 'https://playbookbp.com', buildSource: 'service-worker-cache' });
 const okDevice = () => ({
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
   viewportWidth: 390, viewportHeight: 844, pixelRatio: 3, standalone: true, maxTouchPoints: 5,
@@ -65,11 +65,26 @@ test('a record from an older deployment is caught', () => {
   assert.ok(result.problems.some(p => /pp-v83.*expected pp-v106/.test(p)), result.problems.join('; '));
 });
 
-test('an unobserved build is a problem, not a pass', () => {
-  const record = DE.buildDeviceEvidence(okInput({ build: { ...okBuild(), serviceWorkerCache: 'unknown' } }));
+test('an unestablished build is a problem, not a pass', () => {
+  const record = DE.buildDeviceEvidence(okInput({ build: { ...okBuild(), serviceWorkerCache: 'unknown', buildSource: 'none' } }));
   const result = DE.verifyDeviceEvidence(record, {});
   assert.equal(result.ok, false);
-  assert.ok(result.problems.some(p => /build is unverified/.test(p)), result.problems.join('; '));
+  assert.ok(result.problems.some(p => /does not say which release ran/.test(p)), result.problems.join('; '));
+  assert.equal(result.buildEvidence, 'not established');
+});
+
+test('an observed build and a reported one are not the same claim', () => {
+  // A cache name proves the browser RAN that build. A version read from the origin's sw.js
+  // proves only that the origin offers it now — which is genuinely weaker, and a reader
+  // deciding how much a session is worth needs to be able to tell them apart.
+  const observed = DE.buildDeviceEvidence(okInput());
+  assert.equal(DE.verifyDeviceEvidence(observed, { expectedCache: 'pp-v106' }).buildEvidence,
+    'observed in the browser cache');
+
+  const reported = DE.buildDeviceEvidence(okInput({ build: { ...okBuild(), buildSource: 'served-sw.js' } }));
+  const verdict = DE.verifyDeviceEvidence(reported, { expectedCache: 'pp-v106' });
+  assert.equal(verdict.buildEvidence, 'read from the origin, not observed in this session');
+  assert.equal(verdict.ok, true, 'weaker provenance is still a valid record, not a failure');
 });
 
 test('a partial run cannot read as a complete one', () => {
@@ -135,6 +150,7 @@ test('the collector reads the build from the cache name, not from a caller', () 
   };
   return DE.collectDeviceEvidence(env).then(c => {
     assert.equal(c.serviceWorkerCache, 'pp-v106');
+    assert.equal(c.buildSource, 'service-worker-cache', 'a cache hit is the strong source');
     assert.equal(c.origin, 'https://playbookbp.com');
     assert.equal(c.viewportWidth, 390);
     assert.equal(c.maxTouchPoints, 5);
@@ -142,9 +158,48 @@ test('the collector reads the build from the cache name, not from a caller', () 
   });
 });
 
-test('a page with no cache API reports an unknown build instead of guessing', () => {
+test('a page with no cache and no sw.js reports an unestablished build rather than guessing', () => {
   return DE.collectDeviceEvidence({ navigator: {}, location: { origin: 'https://x.test' }, innerWidth: 0, innerHeight: 0 })
-    .then(c => assert.equal(c.serviceWorkerCache, 'unknown'));
+    .then(c => {
+      assert.equal(c.serviceWorkerCache, 'unknown');
+      assert.equal(c.buildSource, 'none');
+    });
+});
+
+test('a page with no service worker falls back to the version the origin serves', () => {
+  // The company SDK demo has no worker of its own. Without this it recorded 'unknown' and
+  // failed verification for a reason that had nothing to do with the session.
+  const env = {
+    caches: { keys: async () => [] },
+    navigator: { userAgent: 'UA', maxTouchPoints: 0 },
+    location: { origin: 'https://playbookbp.com' },
+    innerWidth: 1512, innerHeight: 945, devicePixelRatio: 2,
+    fetch: async (url) => {
+      assert.equal(url, '/sw.js');
+      return { ok: true, text: async () => "const CACHE = 'pp-v108';" };
+    },
+  };
+  return DE.collectDeviceEvidence(env).then(c => {
+    assert.equal(c.serviceWorkerCache, 'pp-v108');
+    assert.equal(c.buildSource, 'served-sw.js', 'and it must say the source was weaker');
+  });
+});
+
+test('a failing or nonsense sw.js leaves the build unestablished', () => {
+  const base = {
+    caches: { keys: async () => [] },
+    navigator: {}, location: { origin: 'https://x.test' }, innerWidth: 0, innerHeight: 0,
+  };
+  const cases = [
+    ['a 404', async () => ({ ok: false, text: async () => '' })],
+    ['a file with no CACHE line', async () => ({ ok: true, text: async () => 'console.log(1)' })],
+    ['a throwing fetch', async () => { throw new Error('offline'); }],
+  ];
+  return Promise.all(cases.map(([what, fetchImpl]) =>
+    DE.collectDeviceEvidence({ ...base, fetch: fetchImpl }).then(c => {
+      assert.equal(c.serviceWorkerCache, 'unknown', what + ' must not establish a build');
+      assert.equal(c.buildSource, 'none', what);
+    })));
 });
 
 test('a result summary reduces to counts, and the summary itself is not retained', () => {
