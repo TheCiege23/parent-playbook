@@ -22,6 +22,14 @@ const args = process.argv.slice(2);
 const JSON_OUT = args.includes('--json');
 const has = flag => args.includes(flag);
 
+// A shipped bundle carries manifest.json; the development tree does not. The two are
+// asked different questions and conflating them is what made these checks fail here:
+// verifyBundle rejects every file it does not expect, so the repository — which holds
+// far more than a bundle ships — can never satisfy it, manifest or no manifest. What
+// the tree can answer is whether the files a bundle WOULD ship are complete and clean.
+const isBundle = fs.existsSync(path.join(root, 'manifest.json'));
+const bundleFiles = () => require(path.join(root, 'tools/sdk-files.cjs')).BUNDLE_FILES;
+
 const results = [];
 const record = (id, status, detail, extra) => {
   results.push({ id, status, detail, ...(extra || {}) });
@@ -44,6 +52,21 @@ function checkManifest() {
   let verify;
   try { verify = require(path.join(root, 'tools/sdk-verify.cjs')); }
   catch (e) { return record('manifest', 'fail', 'tools/sdk-verify.cjs did not load: ' + e.message); }
+  if (!isBundle) {
+    // No manifest exists until tools/sdk-bundle.cjs writes one, so there are no checksums
+    // to verify. That is a SKIP, not a PASS — but the file list itself is still checkable,
+    // and a list naming a file that does not exist would ship a short bundle, so that fails.
+    let files;
+    try { files = bundleFiles(); }
+    catch (e) { return record('manifest', 'fail', 'tools/sdk-files.cjs did not load: ' + e.message); }
+    const missing = files.filter(f => !fs.existsSync(path.join(root, f)));
+    if (missing.length) return record('manifest', 'fail',
+      `${missing.length} of ${files.length} files listed in tools/sdk-files.cjs are absent: `
+      + missing.slice(0, 3).join(', '), { missing });
+    return record('manifest', 'skip',
+      `development tree: no manifest.json to verify, checksums are written at packaging time; `
+      + `all ${files.length} files listed in tools/sdk-files.cjs are present`, { fileCount: files.length });
+  }
   const check = verify.verifyBundle(root);
   if (!check.ok) return record('manifest', 'fail', check.errors.slice(0, 3).join('; '), { errors: check.errors });
   return record('manifest', 'pass',
@@ -55,7 +78,13 @@ function checkExclusions() {
   let scan;
   try { scan = require(path.join(root, 'tools/package-scan.cjs')); }
   catch (e) { return record('exclusions', 'fail', 'tools/package-scan.cjs did not load: ' + e.message); }
-  const result = scan.scan(root);
+  let result;
+  if (isBundle) result = scan.scan(root);
+  else {
+    // Scan what would ship, not the repository around it.
+    try { result = scan.scan(root, { only: bundleFiles() }); }
+    catch (e) { return record('exclusions', 'fail', 'tools/sdk-files.cjs did not load: ' + e.message); }
+  }
   if (!result.ok) {
     const first = result.findings.slice(0, 3).map(f => `${f.file} [${f.rule}]`).join('; ');
     return record('exclusions', 'fail', `${result.findings.length} finding(s): ${first}`, { findings: result.findings });
@@ -65,7 +94,8 @@ function checkExclusions() {
   // would be the same kind of false green this tool exists to prevent.
   const rules = 'images, capture geometry and credentials'
     + (result.liveIdentifiersChecked ? ', and live record identifiers' : '');
-  return record('exclusions', 'pass', `${result.scanned} files carry no ${rules}`
+  return record('exclusions', 'pass',
+    `${result.scanned} ${isBundle ? 'files' : 'files this package would ship'} carry no ${rules}`
     + (result.liveIdentifiersChecked ? '' : ' (the live-identifier rule needs an operator-supplied list and did not run here)'),
     { liveIdentifiersChecked: result.liveIdentifiersChecked });
 }
