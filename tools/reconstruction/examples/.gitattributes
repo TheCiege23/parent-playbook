@@ -1,0 +1,2 @@
+# Preserve the exact bytes referenced by the checked-in synthetic protocol.
+synthetic-cube.obj text eol=lf

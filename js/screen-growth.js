@@ -51,8 +51,32 @@ function fmtMeasure(key, value, unit){
 // Taller ALWAYS means better. On a lower-is-better metric the scale is inverted —
 // without that, a kid whose 40 went 8.6 → 7.9 sees his best time drawn as the
 // shortest bar, which reads as getting worse. That is the whole screen backwards.
+// Two readings are only a trend if they measured the same thing the same way. The teach
+// card under these bars says "same test, same conditions"; this is what makes that true
+// rather than advice. A vertical recorded in inches and later in centimetres, or a dash
+// hand-timed and later app-timed, or a sprint on grass and later on track, are different
+// quantities — charting them together produces a confident arrow pointing at nothing.
+//
+// Deliberately strict about nulls: a reading with no recorded conditions is not assumed
+// to match one that has them. Body scans already work this way via scanCompatibility();
+// this is the same rule for measurements a parent enters.
+function sameMeasure(v){ const s=String(v??'').trim().toLowerCase(); return s; }
+function movementComparable(a, b){
+  if(!a || !b) return false;
+  return a.metric_key===b.metric_key
+    && sameMeasure(a.unit)===sameMeasure(b.unit)
+    && sameMeasure(a.source)===sameMeasure(b.source)
+    && sameMeasure(a.conditions)===sameMeasure(b.conditions);
+}
+// The readings from `list` that can honestly sit on one chart with the most recent one.
+function comparableRun(list){
+  if(!list || !list.length) return [];
+  const latest=list[0];
+  return list.filter(m=>movementComparable(m,latest) && Number.isFinite(Number(m.value)));
+}
+
 function trendBars(list, lowerIsBetter){
-  const pts=list.slice(0,5).reverse().map(m=>Number(m.value)).filter(n=>Number.isFinite(n));
+  const pts=comparableRun(list).slice(0,5).reverse().map(m=>Number(m.value));
   if(pts.length<2) return '';                     // one reading is not a trend
   const min=Math.min(...pts), max=Math.max(...pts), span=(max-min)||1;
   return `<div class="bars">${pts.map((v,i)=>{
@@ -114,7 +138,10 @@ async function screenGrowth(){
     heroBody = H`<p class="gh-empty">No active goal yet. Pick one and the week starts building around it — and this screen starts tracking whether it's working.</p>
       <button class="btn sm amber" id="heroGoal">Choose a goal</button>`;
   } else if(leadList && leadList.length){
-    const latest=leadList[0], prev=leadList[1];
+    const latest=leadList[0];
+    // Same rule as the trend bars below: the hero number is the one a parent reads first,
+    // so it must not claim an improvement over a reading taken a different way.
+    const prev=comparableRun(leadList)[1];
     const mm=metricMeta(leadKey)||{};
     let delta='';
     if(prev){
@@ -140,6 +167,7 @@ async function screenGrowth(){
   $("#screen").innerHTML = H`
     ${topBar(`Progress${sinceLabel?` · since ${sinceLabel}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
+      <button class="btn ghost" id="growthInsights" style="margin-bottom:14px;width:100%">Body Insights · compare measurements & export →</button>
 
       <div class="ghero">
         <div class="k">Working toward</div>
@@ -154,21 +182,28 @@ async function screenGrowth(){
       </div>
       <div class="card app-pad">
         ${metricKeys.map(k=>{
-          const list=byMetric[k], latest=list[0], prev=list[1], mm=metricMeta(k)||{};
+          const list=byMetric[k], latest=list[0], mm=metricMeta(k)||{};
+          // Compare against the most recent reading taken the same way, not simply the
+          // row before it. If there is no comparable one, say so instead of an arrow.
+          const run=comparableRun(list), prev=run[1];
           let chip='';
           if(prev){
             const cur=Number(latest.value), prv=Number(prev.value);
             const better = mm.lower_is_better ? cur<prv : cur>prv;
             const diff=Math.round(Math.abs(cur-prv)*100)/100;
             chip=`<span class="pill ${better?'good':'flat'}">${better?'▲ better':'▼'} ${diff}${mm.unit?' '+esc(mm.unit):''}</span>`;
+          } else if(list.length>1){
+            chip=`<span class="pill flat">measured differently · not compared</span>`;
           }
           const bars=trendBars(list, !!mm.lower_is_better);
-          const oldest=list[Math.min(list.length,5)-1];
+          const oldest=run[Math.min(run.length,5)-1]||latest;
           return H`<div class="mtrend">
             <div class="mt-h"><b>${esc(metricName(k))}</b>${chip}
               <span class="mt-v">${esc(fmtMeasure(k,latest.value,latest.unit||mm.unit))}</span></div>
             ${bars?H`${bars}<div class="mt-x"><span>${esc(new Date(oldest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span><span>${esc(new Date(latest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span></div>`
-                 :`<div class="mt-x"><span>One reading — measure again in a few weeks to see a trend</span></div>`}
+                 :`<div class="mt-x"><span>${run.length>1?'':(list.length>1
+                     ? 'Earlier readings used a different unit, timing method or conditions — measure the same way again to see a trend'
+                     : 'One reading — measure again in a few weeks to see a trend')}</span></div>`}
           </div>`;
         }).join('')}
       </div>
@@ -189,6 +224,7 @@ async function screenGrowth(){
       ${age!=null&&age<13?`<p class="muted-note" style="margin-top:10px">No weigh-ins suggested for under-13s. Ask your pediatrician before tracking weight.</p>`:''}`}
 
       <div style="display:flex;justify-content:space-between;align-items:center">
+        ${maturityOffsetPrompt(mat,a)}
         ${growthPrompt(mat)}
 
       <div class="sec-title">Goals</div>
@@ -249,9 +285,11 @@ async function screenGrowth(){
       ${(sess||[]).length?`<p class="muted-note" style="margin-top:16px">${sess.length} session${sess.length===1?'':'s'} logged, most recently ${esc(fmtDate(sess[0].done_on))}.</p>`:''}
     </div>`;
   bindTop();
+  $("#growthInsights").onclick=()=>renderApp('insights');
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#growAsk"); clickableCard(b,()=>openGrowthInputs(grow||{}, primary||null)); }
+  { const b=$("#phvEstimate"); clickableCard(b,()=>openMaturityInputs({...(grow||{}),birthdate:(grow&&grow.birthdate)||a.birthdate},meas||[])); }
   // `a` is the athlete this screen is rendering — the subject of the scan, and the row
   // measurements will be written against.
   { const s=$("#growToScan");

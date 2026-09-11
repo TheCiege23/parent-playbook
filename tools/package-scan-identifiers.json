@@ -1,0 +1,9 @@
+{
+  "_comment": "Site-specific strings that must never leave this repository inside a package. NOT bundled: shipping this file would publish exactly the identifiers it protects. tools/package-scan.cjs reads it when present and reports the live-identifier rule as unavailable when it is absent.",
+  "identifiers": [
+    ["friday-adult-reference-001", "live adult-reference subject"],
+    ["friday-reference-001", "live assessment reference"],
+    ["Bergenfield", "live organization name"],
+    ["ksgrcdpinvqfwxdirzyg", "unrelated Supabase project"]
+  ]
+}

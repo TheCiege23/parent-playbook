@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#071b17">
+<title>Parent Playbook · Body composition integration</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071b17;color:#f7f1e7;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}main{width:min(1040px,calc(100% - 32px));margin:auto;padding:28px 0 72px}a{color:#b9e994}.eyebrow{color:#efa33b;font:750 12px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase}h1{max-width:850px;margin:14px 0;font-size:clamp(38px,6vw,68px);line-height:.98;letter-spacing:-.05em}h2{font-size:25px;margin:0 0 8px}p{color:#afc5bd}.hero{padding:38px 0 28px}.banner,.step,.result{margin-top:18px;padding:22px;border:1px solid #36564d;border-radius:16px;background:#0c2620}.banner{border-left:4px solid #efa33b}.status{display:inline-flex;padding:6px 9px;border-radius:999px;background:#322712;color:#ffd292;font:750 11px ui-monospace,monospace;text-transform:uppercase}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.step{display:flex;flex-direction:column}.step input,.step select{width:100%;margin:10px 0;padding:12px;border:1px solid #58776d;border-radius:9px;background:#071b17;color:#f7f1e7;font:inherit}.step button,.button{align-self:flex-start;border:0;border-radius:10px;padding:11px 14px;background:#b9e994;color:#071b17;font:800 14px system-ui;cursor:pointer;text-decoration:none}.step button:disabled,.button[aria-disabled="true"]{opacity:.4;pointer-events:none}.step small{display:block;margin-top:12px;color:#78938a}.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fact{padding:15px;border-radius:12px;background:#12332b}.fact strong{display:block;color:#b9e994;font-size:22px}.fact span{color:#91aaa1;font-size:12px}.result[hidden],.facts[hidden]{display:none}.result table{width:100%;border-collapse:collapse;margin-top:14px}.result th,.result td{padding:11px;border-bottom:1px solid #36564d;text-align:left;font-size:13px}.result th{color:#91aaa1}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.ghost{background:transparent!important;color:#f7f1e7!important;border:1px solid #58776d!important}.error{color:#ffbe9d}.success{color:#b9e994}.fine{font-size:13px;color:#78938a}@media(max-width:780px){.grid{grid-template-columns:1fr}.facts{grid-template-columns:1fr}.step button{width:100%}.result{overflow:auto}}
+</style>
+</head>
+<body><main>
+<a href="/friday-demo">← Demo room</a>
+<header class="hero"><p class="eyebrow">Company integration gate</p><h1>Connect a licensed body-composition model without inventing results.</h1><p>This local validation room is the integration point for lean mass, fat mass, body-fat percentage, skeletal muscle mass and bone mineral content. Parent Playbook does not currently include a composition model or generate these values.</p></header>
+<section class="banner" aria-labelledby="currentStatus"><span class="status">Provider not configured</span><h2 id="currentStatus">Zero body-composition values are active</h2><p>A provider must document deployment rights, DEXA training provenance and independent DEXA validation. Every estimate must identify the exact approved model and disclose whether uncertainty is available.</p></section>
+<div class="grid">
+  <section class="step"><p class="eyebrow">Step 1</p><h2>Validate model evidence</h2><p>Choose the provider’s model-manifest JSON.</p><input id="manifestFile" type="file" accept="application/json,.json"><button id="manifestTemplate" class="ghost">Download manifest template</button><p id="manifestStatus" role="status">No model manifest loaded.</p></section>
+  <section class="step"><p class="eyebrow">Step 2</p><h2>Validate one estimate</h2><p>Choose scalar output JSON from that exact model.</p><input id="estimateFile" type="file" accept="application/json,.json" disabled><button id="estimateTemplate" class="ghost">Download estimate template</button><p id="estimateStatus" role="status">Waiting for an accepted manifest.</p></section>
+  <section class="step"><p class="eyebrow">Step 3</p><h2>Evaluate DEXA comparisons</h2><p>Choose an array of independent, coded observations.</p><input id="studyFile" type="file" accept="application/json,.json" disabled><button id="studyTemplate" class="ghost">Download study template</button><p id="studyStatus" role="status">Waiting for an accepted manifest.</p></section>
+</div>
+<section id="manifestResult" class="result" hidden></section>
+<section id="estimateResult" class="result" hidden></section>
+<section id="studyResult" class="result" hidden></section>
+<section class="step" id="historyStep" aria-labelledby="historyHeading">
+  <p class="eyebrow">Step 4</p><h2 id="historyHeading">Stored composition history</h2>
+  <p>Composition results are stored per organization, separately from provisional length assessments and separately from child athlete profiles. Nothing can be written here until a licensed provider passes steps 1 and 2, so this list is empty by design.</p>
+  <button id="historyConnect" class="ghost">Connect signed-in organization</button>
+  <select id="historyTeam" disabled aria-label="Organization"><option value="">Choose an organization</option></select>
+  <select id="historyScope" aria-label="Subject scope"><option value="adult_reference">Adult reference (no child profile)</option><option value="child_athlete">Child athlete on this roster</option></select>
+  <input id="historySubject" type="text" inputmode="text" autocomplete="off" placeholder="Opaque subject reference" aria-label="Opaque subject reference">
+  <button id="historyLoad" disabled>Load stored results</button>
+  <p id="historyStatus" role="status">No stored composition results.</p>
+  <small>Reads run against organization-scoped row-level security with a fresh authorization check. Listed rows contain scalar outputs, units, uncertainty disclosure, provider identity, timestamps, a consent reference and a bounded retention date — never photos, landmarks, geometry, raw validation observations or participant codes.</small>
+</section>
+<section id="historyResult" class="result" hidden></section>
+<section class="banner"><h2>What this proves</h2><p>The page proves that Parent Playbook can accept a documented provider, reject undeclared or malformed values, display scalar estimates with their uncertainty disclosure, calculate descriptive bias, MAE and RMSE against independent DEXA references, and hold accepted results in an organization-scoped store with tenant isolation, audited mutations and bounded retention. It does not prove the provider’s evidence, clinical validity, DEXA equivalence or accuracy for a population, and no composition result exists to store today.</p><div class="actions"><a class="button ghost" href="/company-sdk-demo">Open four-photo SDK</a><a class="button ghost" href="/company-persistence-demo">Open company data sandbox</a><a id="reportDownload" class="button" href="#" download hidden>Download aggregate report</a></div><p class="fine">Files stay in this browser tab. This page does not upload or persist the selected files. Aggregate report export excludes participant codes and row-level observations. Step 4 only reads already-stored organization records; it never writes one.</p></section>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script type="module" src="/company-composition-demo.mjs?v=86"></script>
+</main></body></html>

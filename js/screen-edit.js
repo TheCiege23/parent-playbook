@@ -65,7 +65,7 @@ function edRender(){
     <div class="field"><label>First name</label><input id="edFirst" value="${esc(ed.first)}" placeholder="Marcus"/></div>
     <div class="field"><label>Nickname (optional)</label><input id="edNick" value="${esc(ed.nick)}" placeholder="What you actually call them"/></div>
     <div class="field"><label>Birthdate</label>
-      <input id="edBd" type="date" value="${esc(ed.bd)}" max="${new Date().toISOString().slice(0,10)}"/>
+      <input id="edBd" type="date" value="${esc(ed.bd)}" max="${todayISO()}"/>
       <div id="edBand">${edBandNote(ed.bd)}</div></div>
     <div class="field"><label>Sex at birth (optional)</label>
       <div class="chipgrid two" id="edSex">

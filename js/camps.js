@@ -8,11 +8,30 @@
 // background-check machinery a 1:1 trainer booking needs and a program listing
 // doesn't. See TEAM-CONNECT-EXPANSION-PLAN.md, Part A.
 
+// Today as a plain YYYY-MM-DD in LOCAL time. Camp dates are plain dates with no timezone,
+// so they have to be compared as strings — building a Date from one and comparing instants
+// shifts the day across midnight for anyone west of UTC, which would hide a camp on its own
+// opening day.
+function campTodayISO(d){
+  const t = d || new Date();
+  return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+}
+// A camp is over once its last day has passed. A listing with no dates at all is
+// "Dates TBD", not expired, and stays visible.
+function campIsOver(c, todayISO){
+  const last = (c && (c.end_date || c.start_date)) || null;
+  return !!last && last < todayISO;
+}
 function campWhen(c){
   if(!c.start_date) return 'Dates TBD';
-  const s=new Date(c.start_date+'T00:00:00'), opts={month:'short',day:'numeric'};
-  if(!c.end_date || c.end_date===c.start_date) return s.toLocaleDateString(undefined,opts);
-  return s.toLocaleDateString(undefined,opts)+' – '+new Date(c.end_date+'T00:00:00').toLocaleDateString(undefined,opts);
+  const s=new Date(c.start_date+'T00:00:00');
+  // Without a year, a listing from last June is indistinguishable from one next June.
+  const sameYear = c.start_date.slice(0,4) === campTodayISO().slice(0,4);
+  const opts = {month:'short',day:'numeric'};
+  // The year belongs once, at the end of the range — "Jan 5, 2027 – Jan 9, 2027" says it twice.
+  const endOpts = sameYear ? opts : {month:'short',day:'numeric',year:'numeric'};
+  if(!c.end_date || c.end_date===c.start_date) return s.toLocaleDateString(undefined,endOpts);
+  return s.toLocaleDateString(undefined,opts)+' – '+new Date(c.end_date+'T00:00:00').toLocaleDateString(undefined,endOpts);
 }
 function campAges(c){
   if(c.age_min==null && c.age_max==null) return 'All ages';
@@ -35,7 +54,13 @@ async function openCamps(){
     if(error) throw error; camps=data||[];
   }catch(err){ console.error(err); return bootError(); }
   const sports=(state.ref&&state.ref.sports)||[];
-  const shown = campSport ? camps.filter(c=>c.sport_key===campSport) : camps;
+  // Drop camps that have already finished. The query orders by start_date ascending, so
+  // without this the OLDEST listings sat at the top of the screen — a parent opening
+  // Camps & programs met last year first, with no year shown to tell them apart, and could
+  // follow a dead sign-up link.
+  const today = campTodayISO();
+  const current = camps.filter(c => !campIsOver(c, today));
+  const shown = campSport ? current.filter(c=>c.sport_key===campSport) : current;
   root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <h1 style="font-size:22px">Camps &amp; programs</h1>

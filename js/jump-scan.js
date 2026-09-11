@@ -23,7 +23,7 @@ const JMP = { videoBlob:null, consent:false, subject:null, consentId:null };
 function jmpRetentionDate(){
   const d = new Date();
   d.setMonth(d.getMonth() + JUMP_RETENTION_MONTHS);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 const JMP_FLAG = 'pp_jump_active';
@@ -412,7 +412,7 @@ function jmpResult(result){
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: JMP.subject.id, metric_key: 'vertical', value: result.bestHeightIn, unit: 'in',
-      measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,
+      measured_on: todayISO(), source: 'video', created_by: state.user.id,
       note: 'On-device jump capture, best of ' + result.jumps.length,
     });
     if(error){

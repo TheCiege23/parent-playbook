@@ -41,7 +41,7 @@ const SPD_MODE = {
 function spdRetentionDate(){
   const d = new Date();
   d.setMonth(d.getMonth() + SPD_RETENTION_MONTHS);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 const SPD_FLAG = 'pp_speed_active';
@@ -354,6 +354,8 @@ const SPD_FAIL = {
   false_start: { h:'Movement started before the cue',
     p:"The athlete wasn't still right up until the clap or \"go,\" so there's no clean instant to time from. "
     + 'A short stationary beat before the cue is what this needs.' },
+  cue_too_late: { h:'The cue came too late in the clip',
+    p:'The cue was found, but so near the end of the recording that there was no footage left to see the move in. The athlete and the marks are fine — record again and clap a little sooner after starting the video.' },
   no_movement: { h:"Didn't see a clear first move after the cue",
     p:'The video played and a cue was found, but nothing after it looked like the athlete moving — usually the '
     + 'body left frame or the light made the outline hard to track. Whole body in frame for the whole clip fixes '
@@ -429,7 +431,7 @@ function spdResult(result){
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPD.subject.id, metric_key: metricKey, value, unit,
-      measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,
+      measured_on: todayISO(), source: 'video', created_by: state.user.id,
       note: isReaction ? 'On-device reaction-time capture' : 'On-device footwork-cadence capture',
     });
     if(error){

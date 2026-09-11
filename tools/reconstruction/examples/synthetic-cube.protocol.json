@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "protocol_id": "SYNTHETIC CUBE ONLY — not a body assessment",
+  "mesh_sha256": "e62a67afdefdcc14b9bac11576f608bf8932bcc6711e260dd1465bd803dd853e",
+  "calibration": {
+    "definition": "Synthetic cube edge assigned a 20 cm reference length; not measured human stature",
+    "vertices": [0, 1],
+    "measured": {"value": 20, "unit": "cm"}
+  },
+  "measurements": [
+    {
+      "key": "synthetic_second_edge",
+      "definition": "A second edge of the synthetic cube",
+      "kind": "landmark_distance",
+      "vertices": [1, 2],
+      "reference": {
+        "measured": {"value": 20, "unit": "cm"},
+        "method": "Analytical synthetic geometry; not a body reference",
+        "max_abs_error": {"value": 0.01, "unit": "cm"}
+      }
+    },
+    {
+      "key": "synthetic_section",
+      "definition": "Perimeter through the synthetic cube at native y = 1",
+      "kind": "plane_perimeter",
+      "axis": "y",
+      "plane": 1,
+      "reference": {
+        "measured": {"value": 82, "unit": "cm"},
+        "method": "Deliberately mismatched synthetic reference to demonstrate error reporting",
+        "max_abs_error": {"value": 1, "unit": "cm"}
+      }
+    },
+    {
+      "key": "synthetic_rejected_section",
+      "definition": "Deliberately coplanar plane to demonstrate rejection",
+      "kind": "plane_perimeter",
+      "axis": "y",
+      "plane": 0
+    }
+  ]
+}

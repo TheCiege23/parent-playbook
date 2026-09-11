@@ -18,9 +18,18 @@ const OW_STORE = 'ops';
 // ---- the week snapshot ----------------------------------------------------------
 // Written after every successful render. Holds only what the offline screen shows:
 // the built plan, who it's for, and which days are ticked.
+// The Monday of a given date, as a plain local YYYY-MM-DD. Computed here rather than
+// borrowed from program.js so the offline path carries no load-order dependency, and by
+// calendar arithmetic rather than epoch milliseconds so a DST week cannot shift it.
+function owWeekStart(d){
+  const t = d || new Date();
+  const x = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  x.setDate(x.getDate() - ((x.getDay()+6) % 7));
+  return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+}
 function owSaveWeek(snapshot){
   try{
-    localStorage.setItem(OW_WEEK_KEY, JSON.stringify({ at: Date.now(), ...snapshot }));
+    localStorage.setItem(OW_WEEK_KEY, JSON.stringify({ at: Date.now(), week_start: owWeekStart(), ...snapshot }));
   }catch(e){ /* quota or private mode — the app just loses its offline copy */ }
 }
 function owReadWeek(){
@@ -28,9 +37,13 @@ function owReadWeek(){
     const raw = localStorage.getItem(OW_WEEK_KEY); if(!raw) return null;
     const c = JSON.parse(raw);
     if(!c || !c.days || !c.at) return null;
-    // A week-old plan is the wrong week. Better to say "we can't reach the server"
-    // than to show Monday's session on the following Thursday.
-    if(Date.now() - c.at > 8*24*60*60*1000) return null;
+    // A plan is only valid for the week it was built for, and an elapsed-time check is not
+    // that. At eight days, a plan cached last Monday was still served THIS Monday — a new
+    // week, carrying last week's ticked days — which is exactly the "Monday's session on the
+    // following Thursday" failure the age check was meant to prevent. Compare weeks instead.
+    // A snapshot from a build that recorded none is refused rather than trusted; the next
+    // online render writes a fresh one.
+    if(!c.week_start || c.week_start !== owWeekStart()) return null;
     return c;
   }catch(e){ return null; }
 }

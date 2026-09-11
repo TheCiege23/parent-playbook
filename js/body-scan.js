@@ -6,13 +6,10 @@
 // engine arrives through registerBodyProvider(), and today that is js/pose-measure.js
 // running MediaPipe on the phone.
 //
-// The distinction is worth keeping straight, because it is the reason this feature is
-// honest. GIRTHS — chest, waist, hip — need a parametric body model fitted to a
-// silhouette, and the standard one is not licensed for commercial use. Nothing here
-// estimates one, and a plausible-looking guess at a child's waist would be worse than
-// no feature at all. LENGTHS between joints the model can see are a different problem:
-// two detected points, the distance between them, scaled by a height someone measured
-// with a tape. That is what the engine returns and all it returns.
+// The measurement provider returns provisional joint lengths. An optional, separate
+// worker intersects four manually reviewed silhouettes to preview a clothed surface.
+// That experimental geometry is temporary; it supplies no anatomical girths or body
+// composition estimates and is never part of the saved measurement record.
 //
 // ---------------------------------------------------------------------------
 //  THE THREE RULES THIS FILE ENFORCES IN CODE, NOT IN DOCUMENTATION
@@ -37,7 +34,7 @@
 // The wording a parent agreed to, versioned. Change the release text and this MUST
 // change with it: an old consent then stops matching, and the parent is asked again.
 // Silently reusing a release for terms it never covered is the failure this prevents.
-const SCAN_POLICY_VERSION = '2026-09-05.ondevice.v1';
+const SCAN_POLICY_VERSION = '2026-09-09.ondevice.v4';
 
 // BIPA wants a retention schedule that is published and honoured, with destruction no
 // later than the purpose being satisfied. A season is the purpose, so a year is the
@@ -116,6 +113,7 @@ const SCAN_POSES = [
 
 const SCAN_SETUP = [
   'Phone at hip height, leaning against something so it does not move between shots.',
+  'Mark the phone position and one standing center on the floor. Keep the same zoom while the subject rotates in place.',
   'Stand about 8 feet back, whole body in frame from head to feet.',
   'Plain wall behind you. Close-fitting clothes — loose fabric is what the estimate gets wrong.',
   'Same spot, same light for every future scan, or the comparison means nothing.',
@@ -186,7 +184,7 @@ async function loadScanConsent(athleteId, engineId){
       .select('id, policy_version, scan_engine, retention_until, granted_at')
       .eq('athlete_id', athleteId)
       .is('revoked_at', null)
-      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .gte('retention_until', todayISO())
       .eq('policy_version', SCAN_POLICY_VERSION)
       .eq('scan_engine', engineId || 'none')
       .order('granted_at', { ascending: false })
@@ -203,12 +201,12 @@ async function loadScanConsent(athleteId, engineId){
 async function latestHeightIn(athleteId){
   try{
     const { data } = await sb.from('measurements')
-      .select('value, measured_on')
-      .eq('athlete_id', athleteId).eq('metric_key', 'height')
+      .select('value, measured_on, source')
+      .eq('athlete_id', athleteId).eq('metric_key', 'height').eq('unit','in')
       .order('measured_on', { ascending: false }).limit(1);
     if(!data || !data[0]) return null;
     const v = Number(data[0].value);
-    return isFinite(v) && v > 0 ? { value: v, on: data[0].measured_on } : null;
+    return isFinite(v) && v > 0 ? { value: v, on: data[0].measured_on, measured_on:data[0].measured_on, source:data[0].source } : null;
   }catch(e){ console.error(e); return null; }
 }
 
@@ -253,6 +251,11 @@ async function shrinkFrame(file){
 // so that if the page is reloaded mid-capture the app can say what happened instead of
 // silently dumping someone back on a settings screen. sessionStorage, so it dies with
 // the tab.
+async function convertCapturePhoto(file,options){
+  if(!/^image\/hei[cf]/i.test(file?.type||'')&&!/\.hei[cf]$/i.test(file?.name||''))return file;
+  const {importScanPhoto}=await import('/js/photo-import.mjs');
+  return (await importScanPhoto(file,{...options,permissionAcknowledged:true})).blob;
+}
 const BS_FLAG = 'pp_scan_active';
 function bsMarkActive(on){
   try{ on ? sessionStorage.setItem(BS_FLAG, String(Date.now()))
@@ -287,7 +290,7 @@ function bsInterruptedNotice(){
 // ---------------------------------------------------------------------------
 //  THE FLOW
 // ---------------------------------------------------------------------------
-const BS = { frames:{}, consent:false, subject:null, heightIn:null, consentId:null };
+const BS = { frames:{}, consent:false, subject:null, heightIn:null, consentId:null, surfaceRequested:false };
 
 // The subject is an ATHLETE row, always. It used to be the signed-in adult, because the
 // feature was adults-only and there was no adult athlete to point at — which quietly
@@ -298,7 +301,7 @@ async function openBodyScan(subject){
   BS.subject = subject || state.active;
   if(!(await scanCapOk(BS.subject?.id))) return;
   logUsageEvent('scan_body_started');
-  BS.frames = {}; BS.consent = false; BS.consentId = null; BS.heightIn = null;
+  BS.frames = {}; BS.consent = false; BS.consentId = null; BS.heightIn = null; BS.surfaceRequested = false;
   if(!BS.subject || !BS.subject.id) return;
 
   if(!state.canEdit) return bsBlocked('Only a parent or co-parent can start a scan.',
@@ -324,6 +327,7 @@ async function openBodyScan(subject){
   // against, and the honest move is to say so rather than to invent a starting point.
   if(!height) return bsNeedsHeight();
   BS.heightIn = height.value;
+  BS.heightReference = { ...height };
 
   if(consent){ BS.consent = true; BS.consentId = consent.id; return bsPrepareEngine(); }
   bsConsent(gate.age, p, height);
@@ -400,7 +404,7 @@ function bsRefuse(gate){
 function bsRetentionDate(){
   const d = new Date();
   d.setMonth(d.getMonth() + SCAN_RETENTION_MONTHS);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,6 +445,14 @@ function bsConsent(age, p, height){
       <span>${esc(p.notice || 'They are measured and released.')} They exist in this browser for as long as the
         scan takes and are then discarded. Nothing is uploaded to your account and no record points at an
         image.</span></div></div>
+
+    ${p.id==='ondevice-pose'?`<div class="bs-promise"><div class="tick">◇</div><div>
+      <b>Optional temporary 3D preview</b>
+      <span>If you choose it before capture, the same photos are also processed on this device into silhouettes
+        for you to review and an experimental model of the visible clothed surface. This is not a body-fat or
+        anatomical-girth measurement. Photos and silhouettes are discarded after processing; the 3D preview is
+        discarded when you close or save the result. No geometry is uploaded, saved to your account or shared
+        with an organization. The preview is optional and starts switched off.</span></div></div>`:''}
 
     <div class="bs-promise"><div class="tick">🗓️</div><div>
       <b>Kept until ${esc(untilHuman)}</b>
@@ -496,6 +508,7 @@ function bsConsent(age, p, height){
       retention_until: until,
       method: 'in_app_written_release',
       detail: { produces: p.produces || [], engine_label: p.label || p.id,
+                optional_surface: p.id==='ondevice-pose'?'reviewed-silhouette-preview-v1/session-only':null,
                 height_in: height.value, height_on: height.on },
     }).select('id').maybeSingle();
 
@@ -561,15 +574,20 @@ function bsSetup(){
       scan cannot be compared with this one.</p>
     <div class="bs-setup">
       ${SETUP_DIAGRAM}
-      <div class="bs-pills"><span>Hip height, braced</span><span>~8 feet back</span><span>Whole body in frame</span>
+      <div class="bs-pills"><span>Hip height, braced</span><span>Mark phone + standing center</span><span>Same zoom</span>
+        <span>Rotate in place</span><span>~8 feet back</span><span>Whole body in frame</span>
         <span>Plain wall</span><span>Close-fitting clothes</span></div>
     </div>
+    ${bodyProvider()?.id==='ondevice-pose'?`<div class="bs-slot"><label><input type="checkbox" id="bsSurfaceOption">
+      Also create an experimental 3D preview</label><p class="muted-note">Review four silhouettes after the length
+      estimates. This adds processing time. The clothed-surface preview is temporary and its accuracy is unvalidated.
+      Saving keeps only the measurements.</p></div>`:''}
     <button class="btn amber" id="bsStart" style="margin-top:16px">Start with the front</button>
     <div style="text-align:center;margin-top:12px">
       <button class="pill" id="bsBail" style="background:transparent;color:var(--muted)">Cancel</button>
     </div>`);
   bg.querySelector('#bsBail').onclick = () => { bg.remove(); bsDiscard(); };
-  bg.querySelector('#bsStart').onclick = () => { bg.remove(); bsMarkActive(true); bsCapture(0); };
+  bg.querySelector('#bsStart').onclick = () => { BS.surfaceRequested=bg.querySelector('#bsSurfaceOption')?.checked===true; bg.remove(); bsMarkActive(true); bsCapture(0); };
 }
 
 function bsDots(i){
@@ -580,6 +598,8 @@ function bsDots(i){
 
 function bsCapture(i){
   const pose = SCAN_POSES[i];
+  const frameSet=BS.frames,subjectId=BS.subject?.id,actorId=state.user?.id,provider=bodyProvider();
+  let fileRequest=0,alive=true,preserve=false,camera=null,importAbort=null;
   const bg = sheet(H`
     <div class="lg-head">
       <button class="iconbtn" id="bsBack" aria-label="Back">${i ? '←' : '✕'}</button>
@@ -587,65 +607,140 @@ function bsCapture(i){
       <span class="lg-step">${i+1} of ${SCAN_POSES.length}</span>
     </div>
     ${bsDots(i)}
-    <div class="bs-view">
+    <p class="bs-camera-instruction">${esc(pose.hint)}</p>
+    <div class="bs-view" id="bsLiveView">
+      <video id="bsVideo" class="bs-live-video" muted playsinline hidden aria-label="Live camera preview"></video>
       <span class="brk tl"></span><span class="brk tr"></span>
       <span class="brk bl"></span><span class="brk br"></span>
       ${silFor(pose.key)}
-      <div class="bs-hint">${esc(pose.hint)}</div>
     </div>
-    <input id="bsFile" type="file" accept="image/*" capture="environment" hidden/>
-    <button class="bs-shutter" id="bsShot" aria-label="Take the ${esc(pose.label)} photo"></button>
+    <input id="bsFile" type="file" accept="image/*,.heic,.heif" capture="environment" hidden/>
+    <div class="bs-camera-controls">
+      <button class="btn amber" id="bsLive">Open live camera</button>
+      <button class="bs-shutter" id="bsShot" aria-label="Take the ${esc(pose.label)} photo"></button>
+      <button class="btn ghost" id="bsNative">Use camera app</button>
+    </div>
+    <p class="muted-note" id="bsCameraStatus" role="status" aria-live="polite">Open the live camera to use the guide, or use your camera app.</p>
     <p class="muted-note" style="margin-top:12px">Stays on this device.</p>
     <div class="err" id="bsErr"></div>`);
 
+  const remove=bg.remove.bind(bg);
+  bg.remove=()=>{if(!alive)return;alive=false;importAbort?.abort();camera?.stop();if(!preserve && BS.frames===frameSet)bsDiscard();remove();};
+  const done=()=>{preserve=true;bg.remove();};
+  const current=()=>alive&&bg.isConnected&&BS.frames===frameSet&&BS.subject?.id===subjectId&&state.user?.id===actorId&&bodyProvider()===provider&&BS.consent;
   const file = bg.querySelector('#bsFile');
-  bg.querySelector('#bsShot').onclick = () => file.click();
+  const cameraButton=bg.querySelector('#bsLive'),shutter=bg.querySelector('#bsShot'),video=bg.querySelector('#bsVideo');
+  const receive=async f=>{
+    const request=++fileRequest;
+    if(!f){if(alive)bg.querySelector('#bsErr').textContent='No photo was taken.';return;}
+    if(!current()){bg.remove();return;}
+    const heic=/^image\/hei[cf]/i.test(f.type||'')||/\.hei[cf]$/i.test(f.name||'');
+    importAbort?.abort();const controller=heic?new AbortController():null;importAbort=controller;
+    const guard=heic?setInterval(()=>{if(!current())bg.remove();},200):null;
+    try{
+      if(heic){const consent=await loadScanConsent(subjectId,provider?.id);if(request!==fileRequest)return;if(!current()||consent?.id!==BS.consentId){bg.remove();return;}}
+      const converted=await convertCapturePhoto(f,{signal:controller?.signal,onProgress:message=>{if(current())bg.querySelector('#bsCameraStatus').textContent=message;}});
+      if(request!==fileRequest||!current())return;
+      const small=await shrinkFrame(converted);
+      if(request!==fileRequest||!bg.isConnected)return;
+      if(!current()){bg.remove();return;}
+      done();bsReview(i,small);
+    }catch(error){if(request===fileRequest&&current())bg.querySelector('#bsErr').textContent=error.name==='AbortError'?'Photo import canceled.':error.message;}
+    finally{if(guard!==null)clearInterval(guard);if(importAbort===controller)importAbort=null;}
+  };
+  const native=()=>{if(!current()){bg.remove();return;}camera?.stop();camera=null;file.value='';file.click();};
+  bg.querySelector('#bsNative').onclick=native;
+  cameraButton.onclick=async()=>{
+    if(!current()){bg.remove();return;}
+    if(camera?.isReady()||camera?.isStarting()){camera.stop();camera=null;return;}
+    camera=createScanCamera({video,isCurrent:current,
+      authorize:async()=>{const consent=await loadScanConsent(subjectId,bodyProvider()?.id);return current()&&consent?.id===BS.consentId;},
+      onState:({state:phase,message})=>{
+        if(!alive)return;
+        const live=phase==='ready'||phase==='capturing';
+        video.hidden=!live;bg.querySelector('#bsLiveView').classList?.toggle('has-live-camera',live);
+        cameraButton.textContent=phase==='starting'?'Cancel camera request':live?'Close camera':'Open live camera';
+        cameraButton.disabled=phase==='capturing';
+        shutter.disabled=phase==='starting'||phase==='capturing';
+        bg.querySelector('#bsCameraStatus').textContent=message;
+      }});
+    await camera.start();
+  };
+  shutter.onclick=async()=>{
+    if(!current()){bg.remove();return;}
+    if(!camera?.isReady()){native();return;}
+    const captured=await camera.capture();
+    if(captured&&current())await receive(captured);
+  };
   bg.querySelector('#bsBack').onclick = () => {
-    bg.remove();
-    if(i) bsCapture(i - 1); else bsDiscard();
+    if(i){done();bsCapture(i - 1);}else bg.remove();
   };
   // Progress dots jump back to a completed step.
   bg.querySelectorAll('.bs-dots div').forEach((d, n) => {
-    if(n < i || BS.frames[SCAN_POSES[n].key]) d.onclick = () => { bg.remove(); bsCapture(n); };
+    if(n < i || BS.frames[SCAN_POSES[n].key]) d.onclick = () => { done(); bsCapture(n); };
   });
-  file.onchange = async () => {
-    const f = file.files[0];
-    if(!f){ bg.querySelector('#bsErr').textContent = 'No photo was taken.'; return; }
-    // Shrink BEFORE holding it. A full-resolution frame sitting in memory while the
-    // camera is foregrounded is what gets the page evicted on iOS.
-    const small = await shrinkFrame(f);
-    bg.remove(); bsReview(i, small);
-  };
+  file.onchange=()=>receive(file.files[0]);
 }
 
 // Review sits between every capture and the next one — a frame you cannot inspect is
 // a frame you will retake at the end instead of now.
-function bsReview(i, file){
+async function bsReview(i, file){
   const pose = SCAN_POSES[i];
+  const frameSet=BS.frames,subjectId=BS.subject?.id,actorId=state.user?.id,p=bodyProvider();
+  let accepted=false,alive=true,preserve=false;
   const url = URL.createObjectURL(file);
   const bg = sheet(H`
     <div class="lg-head"><h3>${esc(pose.label)}</h3>
       <span class="lg-step">${i+1} of ${SCAN_POSES.length}</span></div>
     <div class="bs-view" style="aspect-ratio:3/4">
-      <img src="${esc(url)}" alt="" style="width:100%;height:100%;object-fit:cover"/>
-      <div class="bs-hint">✓ Only this frame is analysed, then discarded</div>
+      <img src="${esc(url)}" alt="${esc(pose.label)} photo for review" style="width:100%;height:100%;object-fit:contain"/>
+      <div class="bs-hint">Confirm the ${esc(pose.label.toLowerCase())} view</div>
     </div>
+    <div id="bsPhotoCheck" role="status" aria-live="polite" style="font-size:14px;line-height:1.5;margin-top:12px">Checking this photo…</div>
     <div class="row2" style="margin-top:12px">
       <button class="btn ghost" id="bsRetake">Retake</button>
-      <button class="btn amber" id="bsUse">Use this shot</button>
+      <button class="btn amber" id="bsUse" disabled>Use this shot</button>
     </div>`);
-  const done = () => { try{ URL.revokeObjectURL(url); }catch(e){} bg.remove(); };
-  bg.querySelector('#bsRetake').onclick = () => { done(); bsCapture(i); };
+  const remove=bg.remove.bind(bg);
+  bg.remove=()=>{if(!alive)return;alive=false;file=null;try{URL.revokeObjectURL(url);}catch(_){}if(!preserve && BS.frames===frameSet)bsDiscard();remove();};
+  const current=()=>alive && BS.frames===frameSet && BS.subject?.id===subjectId && state.user?.id===actorId && bodyProvider()===p && BS.consent;
+  const done=()=>{preserve=true;bg.remove();};
+  bg.querySelector('#bsRetake').onclick = () => { if(!current()){bg.remove();return;}done(); bsCapture(i); };
   bg.querySelector('#bsUse').onclick = () => {
+    if(!current()){bg.remove();return;}
+    if(!accepted) return;
     BS.frames[pose.key] = file;          // in memory only — never uploadMedia, never a path
     done();
     if(i < SCAN_POSES.length - 1) bsCapture(i + 1); else bsRun();
   };
+  try{
+    // Review also runs the pose model, so refresh the release before that processing.
+    const live=await loadScanConsent(subjectId,p?.id);
+    if(!current()){bg.remove();return;}
+    if(!live || live.id!==BS.consentId){bg.remove();bsRefuse({msg:'Scan permission changed. The photos were discarded.'});return;}
+    const duplicate=await duplicatePhotoView(file,frameSet,pose.key);
+    if(!current()){bg.remove();return;}
+    if(duplicate){
+      bg.querySelector('#bsPhotoCheck').textContent='This is the same photo already accepted for the '+duplicate+' view. Take a separate photo for the '+pose.label.toLowerCase()+'.';
+      return;
+    }
+    const check=p?.reviewFrame?await p.reviewFrame({frame:file,view:pose.key}):null;
+    if(!current()){bg.remove();return;}
+    accepted=check?check.accepted===true:true;
+    const messages=check?[...(check.reasons||[]),...(check.warnings||[])]:[];
+    bg.querySelector('#bsPhotoCheck').innerHTML=`<b>${accepted?(check?'Basic photo checks passed.':'Review the whole photo before continuing.'):'Retake this photo.'}</b>${messages.length?'<ul>'+messages.map(m=>'<li>'+esc(m.message)+'</li>').join('')+'</ul>':''}<p>Confirm the correct view and that the head and feet are fully visible. These checks do not verify identity, exact facing direction or measurement accuracy.</p>`;
+    bg.querySelector('#bsUse').disabled=!accepted;
+  }catch(error){
+    if(!current()){bg.remove();return;}
+    console.error('photo review failed',error);
+    bg.querySelector('#bsPhotoCheck').textContent=error.message==='photo_file_too_large'?'This photo is too large to check. Take a new photo or choose one smaller than 25 MB.':'The photo check could not finish. Retake to retry; this photo has not been accepted.';
+  }
 }
 
 // Release every frame. Called on cancel, on failure and after a successful run —
 // there is no path through this file that keeps an image around.
 function bsDiscard(){
+  if(typeof stopScanCameras==='function')stopScanCameras();
   bsMarkActive(false);
   for(const k of Object.keys(BS.frames)){
     const f = BS.frames[k];
@@ -653,15 +748,33 @@ function bsDiscard(){
     delete BS.frames[k];
   }
   BS.consent = false;
+  BS.surfaceRequested = false;
+}
+
+async function bsReviewSurface(options){
+  const {reviewSurface}=await import('./surface-review.mjs');
+  if(!options.isCurrent())throw new DOMException('Scan ended.','AbortError');
+  return reviewSurface(options);
 }
 
 async function bsRun(){
   const p = bodyProvider();
-  const subject = BS.subject;
+  const subject = { ...BS.subject };
+  const actorId = state.user?.id;
+  const heightReference = { ...BS.heightReference };
+  const frameSet = BS.frames;
+  const frameSnapshot = { ...frameSet };
+  const capturedAt = new Date().toISOString();
+  const wantsSurface=BS.surfaceRequested&&p?.id==='ondevice-pose';
+  let cancelled=false,transitioning=false;
 
   const bg = sheet(H`<div class="center-screen" style="min-height:30dvh">
     <span class="spinner" role="status" aria-label="Loading"></span><div id="bsProg">Measuring…</div></div>`);
   const say = t => { const el = bg.querySelector('#bsProg'); if(el) el.textContent = t; };
+  const removeLoading=bg.remove.bind(bg);
+  bg.remove=()=>{if(!transitioning){cancelled=true;if(BS.frames===frameSet)bsDiscard();}removeLoading();};
+  const closeLoading=()=>{transitioning=true;bg.remove();};
+  const current=()=>!cancelled&&BS.frames===frameSet&&BS.consent&&state.user?.id===actorId&&bodyProvider()===p;
 
   // SECOND CHECK, and it re-reads the database rather than trusting BS.consent. The
   // first check ran before the camera opened; four photos later a co-parent may have
@@ -670,36 +783,69 @@ async function bsRun(){
   // the one that has to be true rather than remembered.
   const live = await loadScanConsent(subject.id, p && p.id);
   const gate = scanAllowed(subject, live);
-  if(!p || !gate.ok || !BS.consent){
-    bsDiscard(); bg.remove();
+  if(!p || !gate.ok || !current()){
+    if(BS.frames===frameSet) bsDiscard(); bg.remove();
     return bsRefuse({ msg: !p ? 'The measuring engine is no longer available.'
       : 'The permission covering this scan is no longer active.' });
   }
 
   let result = null, failure = null;
+  const clock=()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now();
+  const processingStarted=clock();
   try{
     result = await p.measure({
-      frames: { ...BS.frames },
-      heightIn: BS.heightIn,
+      frames: frameSnapshot,
+      heightIn: heightReference.value,
       sex: subject.sex_at_birth || null,
       ageYears: gate.age,
       onProgress: say,
     });
   }catch(err){ console.error(err); failure = err; }
+  const processingMs=clock()-processingStarted;
+
+  if(!failure&&result?.metrics&&Object.keys(result.metrics).length&&wantsSurface&&current()){
+    try{
+      say('Preparing the optional 3D review…');
+      result.surface=await bsReviewSurface({frames:frameSnapshot,heightM:heightReference.value*.0254,
+        mount:html=>{closeLoading();return sheet(html);},isCurrent:current,
+        authorize:async()=>{const consent=await loadScanConsent(subject.id,p.id);return consent?.id===live.id&&current();}});
+      if(!result.surface)result.surfaceNotice='3D preview skipped. Only length estimates were produced.';
+    }catch(error){
+      if(error.name==='AbortError'){cancelled=true;}
+      else result.surfaceNotice='The optional 3D preview could not finish. The length estimates are available; no surface was saved.';
+    }
+  }
+  const stillCurrent=current();
 
   // Frames are gone before anything is rendered, success or failure.
-  bsDiscard();
-  bg.remove();
+  if(BS.frames===frameSet) bsDiscard();
+  for(const key of Object.keys(frameSnapshot))delete frameSnapshot[key];
+  closeLoading();
+  if(!stillCurrent){
+    if(result?.surface?.mesh){result.surface.mesh.vertices.length=0;result.surface.mesh.faces.length=0;result.surface=null;}
+    return;
+  }
 
   if(failure || !result || !result.metrics || !Object.keys(result.metrics).length)
     return bsFailed(failure);
-  bsResult(result);
+  let record;
+  try{
+    record=buildScanRecord(result,{athleteId:subject.id,actorId,consentId:live.id,capturedAt,
+      engine:{id:p.id,version:p.version,model:p.model},height:heightReference,defaultUnit:p.defaultUnit,processingMs});
+  }catch(error){return bsFailed(error);}
+  bsResult(result,subject,record);
 }
 
 // Every way this can fail, told apart. A single "try again" for four different causes
 // sends a parent back to redo the identical thing that just didn't work — and three of
 // these are fixed by changing something specific, not by trying harder.
 const BS_FAIL = {
+  duplicate_photos: {h:'Each view needs its own photo',p:'The same photo was used for more than one view. Take separate front, right, back and left photos.'},
+  photo_file_unreadable: {h:'A photo could not be read',p:'Take a new photo for each view and try again.'},
+  photo_file_too_large: {h:'A photo is too large to check',p:'Take new photos or use images smaller than 25 MB each.'},
+  photo_check_unavailable: {h:'The photo reuse check is unavailable',p:'Open the app over HTTPS in an up-to-date browser, then try again.'},
+  needs_four_views: {h:'Four views are required',p:'Take the front, right, back and left photos before measuring.'},
+  capture_quality: {h:'A photo did not pass the final check',p:'Show one person with the whole body clearly visible in each view. The result was not saved.'},
   needs_height: { h:'No height to scale against',
     p:'The scan works out proportions; a measured height turns them into inches. Add one in Growth and the '
     + 'same photos would have worked.' },
@@ -745,10 +891,8 @@ function bsFailed(err){
   };
 }
 
-// Reading order is the argument. The RATIOS go first because they are the numbers the
-// method actually supports — they are unaffected by the one modelled quantity in the
-// chain (see pose-measure.js on the crown estimate) and they are what youth sport
-// reads. The inches follow, labelled as close rather than exact.
+// Descriptive ratios precede absolute lengths. Both retain landmark and capture
+// uncertainty; neither cancels scan-to-scan error or predicts sporting potential.
 //
 // No target, no range, no colour. A child's proportions are not an achievement and
 // there is no better value to be closer to — the same rule that keeps red off every
@@ -759,38 +903,37 @@ function bsRatioCards(result){
   if(r.ape != null){
     const pct = Math.round((r.ape - 1) * 1000) / 10;
     cards.push({ k:'Arm span vs height', v:(r.ape).toFixed(2) + '×',
-      s: Math.abs(pct) < 1.5 ? 'Arm span and height are about the same, which is the most common build.'
-        : pct > 0 ? `Arm span is about ${Math.abs(pct).toFixed(0)}% longer than height — reach that shows up in `
-                    + 'catching and blocking.'
-                  : `Height is about ${Math.abs(pct).toFixed(0)}% more than arm span — a build that tends to `
-                    + 'favour running over reaching.' });
+      s:`Estimated arm span is ${Math.abs(pct).toFixed(1)}% ${pct>=0?'longer':'shorter'} than the height used for this scan. This does not determine sporting ability.` });
   }
   if(r.legShare != null){
     cards.push({ k:'Legs as a share of height', v:Math.round(r.legShare * 1000) / 10 + '%',
-      s:'The number to watch across scans, not today. Legs lengthen first in a growth spurt, so this rising '
-      + 'is the earliest sign one has started — usually months before the height curve bends.' });
+      s:'Estimated leg length relative to recorded height. Capture differences can change this ratio; it does not identify the timing of a growth spurt.' });
   }
   if(!cards.length) return '';
   return H`<div class="bs-ratios">${cards.map(c => H`<div class="bs-ratio">
     <div class="k">${esc(c.k)}</div><b>${esc(c.v)}</b><span>${esc(c.s)}</span></div>`).join('')}</div>`;
 }
 
-function bsResult(result){
+function bsResult(result,subject,record){
   bsMarkActive(false);
   const rows = Object.entries(result.metrics || {});
-  const nameOf = k => (typeof metricName === 'function' ? metricName(k) : k.replace(/_/g, ' '));
+  const nameOf = k => (typeof BODY_OUTPUTS!=='undefined' && BODY_OUTPUTS[k]?.label) || (typeof metricName === 'function' ? metricName(k) : k.replace(/_/g, ' '));
   const d = result.detail || {};
   const conf = result.confidence != null ? Math.round(result.confidence * 100) : null;
   // The mesh frame is only put in the DOM if the provider actually returned a URL. An
   // empty 3D box saying "no model available" is worse than no box.
   const wantsMesh = !!result.meshUrl;
-  const bg = sheet(H`<h3>Measured</h3>
-    <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos have been discarded. These
-      numbers are what was kept.</p>
+  const bg = sheet(H`<h3>${esc(subject.first_name || 'Athlete')} · measured</h3>
+    <p style="font-size:13px;color:var(--muted);margin:6px 0 14px">The photos and silhouettes have been discarded.
+      Saving keeps only the measurements.${result.surface?' The temporary 3D preview is not saved.':''}</p>
+
+    ${result.surface?'<section id="bsSurface" class="card app-pad" style="margin:12px 0"></section>':''}
+    ${result.surfaceNotice?'<p class="muted-note">'+esc(result.surfaceNotice)+'</p>':''}
 
     ${wantsMesh ? H`<div class="bs-mesh" id="bsMesh"><div class="bs-mesh-load"><span class="spinner" role="status" aria-label="Loading"></span></div></div>` : ''}
 
     ${bsRatioCards(result)}
+    ${record?.meta?.processing?'<p class="muted-note">'+esc(scanProcessingLabel(record.meta))+'</p>':''}
 
     <div class="sec-title" style="margin-top:18px">Lengths</div>
     <div class="card app-pad">
@@ -800,12 +943,13 @@ function bsResult(result){
         <b style="font-family:'Archivo',sans-serif">${esc(String(v))}"</b></div>`).join('')}
     </div>
 
+    ${rows.some(([k])=>typeof BODY_SIDE_KEYS!=='undefined' && BODY_SIDE_KEYS.includes(k))?'<p class="muted-note">Left/right readings are provisional joint-distance estimates from the front photo. Mirroring or pose error can change side labels or create an apparent difference. They do not diagnose limb-length differences or injury risk.</p>':''}
     <div class="teach" style="margin-top:14px"><div class="ic">📐</div><div>
-      <h4>Close, and comparable — not a tape measure</h4>
+      <h4>Estimated lengths</h4>
       <p>These are scaled from the ${esc(String(result.heightIn))}" height on file, so they carry however far
-      out that is. Treat the inches as approximate and the change between scans as the real signal — the same
-      method makes the same small error every time, so it cancels.
-      ${conf != null ? `Read of these four photos: ${conf}% confident.` : ''}
+      out that is. Pose, clothing and camera position also affect the result. Repeat conditions when
+      comparing scans; measurement error does not necessarily cancel between scans.
+      ${conf != null ? `Capture quality score: ${conf}/100. This heuristic is not a measurement-accuracy percentage.` : ''}
       ${d.framesMissed && d.framesMissed.length
         ? `The ${esc(d.framesMissed.join(' and '))} shot could not be read, so this used
            ${esc(String((d.framesUsed || []).length))}.` : ''}
@@ -820,8 +964,24 @@ function bsResult(result){
 
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
-      <button class="btn amber" id="bsSave">Save to Growth</button>
+      <button class="btn amber" id="bsSave">Save & view Body Insights</button>
     </div>`);
+
+  let disposeSurface=null,closed=false;
+  const removeResult=bg.remove.bind(bg);
+  const resultGuard=setInterval(()=>{if(!bg.isConnected||state.user?.id!==record.rows[0].created_by)bg.remove();},200);
+  bg.remove=()=>{
+    if(closed)return;closed=true;clearInterval(resultGuard);disposeSurface?.();
+    if(result.surface?.mesh){result.surface.mesh.vertices.length=0;result.surface.mesh.faces.length=0;}
+    result.surface=null;
+    const host=bg.querySelector('#bsMesh');host?._disposeMesh?.();removeResult();
+  };
+  if(result.surface){
+    import('./surface-review.mjs').then(({renderSurfacePreview})=>{
+      if(closed||!bg.isConnected||state.user?.id!==record.rows[0].created_by)return;
+      disposeSurface=renderSurfacePreview(bg.querySelector('#bsSurface'),result.surface);
+    }).catch(()=>{if(!closed){bg.querySelector('#bsSurface').textContent='The experimental preview could not be displayed. Your length estimates are still available.';}});
+  }
 
   // Rendered AFTER the sheet exists, and never awaited by anything that matters. If the
   // mesh fails, the frame is removed and the measurements stand on their own — the
@@ -830,34 +990,20 @@ function bsResult(result){
     const host = bg.querySelector('#bsMesh');
     renderBodyMesh(host, result.meshUrl).then(ok => { if(!ok && host) host.remove(); });
   }
-  bsAppendMaturity(bg);
+  bsAppendMaturity(bg,subject);
 
-  const close = () => {
-    const host = bg.querySelector('#bsMesh');
-    if(host && host._disposeMesh) host._disposeMesh();   // stop the loop, free the GL context
-    bg.remove();
-  };
+  const close = () => bg.remove();
   bg.querySelector('#bsDrop').onclick = close;
   bg.querySelector('#bsSave').onclick = async e => {
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
-    const today = new Date().toISOString().slice(0,10);
-    // `photo` is a real value of the measure_source enum. This said 'scan' for as long
-    // as the file has existed, which is not one of (manual, guided, photo, import) —
-    // every save would have failed on the enum cast. Nothing caught it because no
-    // provider existed to produce a result anyone could press Save on.
-    const payload = rows.map(([k, v]) => ({
-      athlete_id: BS.subject.id, metric_key: k, value: Number(v), unit: 'in',
-      measured_on: today, source: 'photo', created_by: state.user.id,
-      note: 'On-device scan, scaled to ' + result.heightIn + '" height',
-    })).filter(r => isFinite(r.value));
-    const { error } = await sb.from('measurements').insert(payload);
-    if(error){
+    try{ await saveScanRecord(record); }catch(error){
       console.error(error);
-      toast('Could not save that');
-      e.target.innerHTML = 'Save to Growth'; e.target.disabled = false; return;
+      toast('Could not save. Check your connection and scan permission, then retry.');
+      e.target.innerHTML = 'Retry save'; e.target.disabled = false; return;
     }
     logUsageEvent('scan_body_saved');
-    close(); toast('Saved'); renderApp('growth');
+    close(); toast('Saved');
+    if(state.active?.id===subject.id) renderApp('insights');
   };
 }
 
@@ -869,23 +1015,23 @@ function bsResult(result){
 // who just measured their kid sees it without a second trip. A family with no parent
 // heights or height reading on file sees nothing added here, not a gap or an error —
 // growthCard() itself returns '' when there is nothing it can show.
-async function bsAppendMaturity(bg){
+async function bsAppendMaturity(bg,subject){
   const host = bg.querySelector('#bsMaturity');
   if(!host || typeof maturityReport !== 'function' || typeof growthCard !== 'function') return;
   try{
     const [{ data: ath }, { data: heightRows }, { data: sportRow }] = await Promise.all([
       sb.from('athletes').select('sex_at_birth,mother_height_in,father_height_in,birthdate')
-        .eq('id', BS.subject.id).maybeSingle(),
+        .eq('id', subject.id).maybeSingle(),
       sb.from('measurements').select('metric_key,value,measured_on')
-        .eq('athlete_id', BS.subject.id).eq('metric_key', 'height')
+        .eq('athlete_id', subject.id).eq('metric_key', 'height').eq('unit','in')
         .order('measured_on', { ascending:false }).limit(60),
       sb.from('athlete_sports').select('sport_key,age_cutoff_md')
-        .eq('athlete_id', BS.subject.id).eq('is_primary', true).maybeSingle(),
+        .eq('athlete_id', subject.id).eq('is_primary', true).maybeSingle(),
     ]);
     if(!ath || !document.body.contains(host)) return;
-    const mat = maturityReport({ ...ath, birthdate: ath.birthdate || BS.subject.birthdate },
+    const mat = maturityReport({ ...ath, birthdate: ath.birthdate || subject.birthdate },
                                heightRows || [], sportRow || null);
-    const html = growthCard(mat, BS.subject);
+    const html = growthCard(mat, subject);
     if(html) host.innerHTML = html;
   }catch(e){
     // Decoration on top of a result that already stands on its own — a failure here
@@ -897,10 +1043,9 @@ async function bsAppendMaturity(bg){
 // ===================================================================
 //  MESH VIEWER — the 3D slot, wired to the same seam
 // ===================================================================
-// Displaying a body mesh is easy. DERIVING one from four photographs is the entire
-// product, and it is the part this app does not have — see the header. So this is a
-// viewer, not a generator: if a provider returns a mesh alongside its measurements,
-// it renders. If not, nothing here runs and nothing here is downloaded.
+// Optional GLTF viewer for providers that return a mesh URL. The built-in experimental
+// generator is separate: surface-review.mjs uses surface-worker.js and visual-hull.js,
+// renders its in-memory geometry locally, and never routes it through this URL viewer.
 //
 // The provider contract gains one optional field:
 //
@@ -1042,7 +1187,7 @@ async function fillScanConsents(){
     const { data, error } = await sb.from('biometric_consents')
       .select('id, athlete_id, granted_at, retention_until, scan_engine, subject_is_minor')
       .is('revoked_at', null)
-      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .gte('retention_until', todayISO())
       .order('granted_at', { ascending: false });
     if(error) throw error;
     rows = data || [];

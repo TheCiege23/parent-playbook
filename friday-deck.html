@@ -1,0 +1,284 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Parent Playbook · buyer deck</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<!--
+  Buyer presentation, week of September 14, 2026. Content lives in FRIDAY-DECK.md;
+  this renders it. Numbers here are covered by tests/deck-evidence.test.cjs, which
+  fails if the build version, parity score or archive size moves without the deck.
+
+  NOT in the Dockerfile COPY allowlist, deliberately: the speaker notes name our
+  weakest categories and the defects found during the build. Open it locally.
+
+  Keys: arrows or space to move, N for notes, P to print, F for fullscreen.
+-->
+<style>
+  :root{
+    --ink:#0d1117; --paper:#f6f7f9; --muted:#5b6673; --line:#d8dde4;
+    --accent:#1f6feb; --warm:#b54708; --good:#116329;
+    --slide-w:1120px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--ink:#e8eaed;--paper:#0d1117;--muted:#9aa4b2;--line:#242c38;--accent:#6ea8fe;--warm:#f0a868;--good:#5dd39e}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+  .slide{width:100%;max-width:var(--slide-w);display:none}
+  .slide.on{display:block;animation:in .18s ease-out}
+  @keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+  h1{font-size:clamp(28px,4.2vw,46px);line-height:1.14;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:clamp(22px,3vw,32px);line-height:1.2;margin:0 0 18px;letter-spacing:-.015em}
+  .lede{font-size:clamp(17px,2vw,21px);color:var(--muted);margin:0 0 26px;max-width:62ch}
+  ul,ol{margin:0 0 18px;padding-left:1.1em}
+  li{margin:0 0 10px;max-width:74ch}
+  li strong{font-weight:650}
+  .sub{color:var(--muted)}
+
+  table{border-collapse:collapse;width:100%;margin:0 0 18px;font-size:14.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:color-mix(in srgb,var(--ink) 8%,transparent);padding:1.5px 5px;border-radius:4px}
+
+  .stat{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
+  .stat div{flex:1 1 150px;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .stat b{display:block;font-size:26px;letter-spacing:-.02em;line-height:1.1}
+  .stat span{font-size:12.5px;color:var(--muted)}
+
+  .flag{border-left:3px solid var(--warm);padding:12px 16px;margin:0 0 18px;
+    background:color-mix(in srgb,var(--warm) 8%,transparent);border-radius:0 8px 8px 0}
+  .flag b{color:var(--warm)}
+  .ok{color:var(--good);font-weight:650}
+
+  .notes{display:none;margin-top:24px;padding:16px 18px;border:1px dashed var(--line);border-radius:10px;
+    font-size:14.5px;color:var(--muted);max-width:78ch}
+  body.notes-on .notes{display:block}
+  .notes b{color:var(--ink)}
+
+  .bar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
+    padding:9px 18px;font-size:12.5px;color:var(--muted);
+    background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(8px);
+    border-top:1px solid var(--line)}
+  .bar .grow{flex:1}
+  .bar kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  .bar button{font:inherit;color:inherit;background:none;border:1px solid var(--line);
+    border-radius:6px;padding:3px 10px;cursor:pointer}
+  .bar button:hover{border-color:var(--accent);color:var(--accent)}
+
+  @media print{
+    .bar{display:none}
+    .slide{display:block!important;page-break-after:always;max-width:none}
+    .notes{display:block!important}
+    .stage{display:block;min-height:0;padding:0}
+    body{background:#fff;color:#000}
+  }
+</style>
+
+<div class="stage">
+
+<section class="slide on">
+  <p class="eyebrow">Parent Playbook · September 2026</p>
+  <h1>Body intelligence that stays attached to the athlete's journey.</h1>
+  <p class="lede">A four-view photo scan inside a product parents already use for training, rest
+    and schedule — and an organization side that can hold the results properly.</p>
+  <ul>
+    <li><strong>For parents:</strong> 25 provisional length and proportion outputs, growth and
+      maturity context, printable report, CSV and JSON export.</li>
+    <li><strong>For organizations:</strong> rostered athletes, consent, organization-scoped records
+      with full audit and bounded retention.</li>
+    <li><strong>For a buyer:</strong> a portable SDK, its migrations and its verification tooling,
+      hostable on your own origin.</li>
+    <li><strong>Live now</strong> at playbookbp.com on build <code>pp-v97</code>.</li>
+  </ul>
+  <div class="notes"><b>Notes.</b> Lead with the journey, not the measurement. Do not open on parity
+    percentages. If asked what is live right now: capture, outputs, insights, organization records
+    and the SDK are live; composition is gated off and produces nothing.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Slide 2</p>
+  <h2>Capability against FIT:MATCH, stated plainly</h2>
+  <div class="stat">
+    <div><b>37.75%</b><span>weighted, 38% rounded</span></div>
+    <div><b>0 / 13</b><span>categories fully accepted</span></div>
+    <div><b>3</b><span>categories deployed &amp; demonstrated</span></div>
+    <div><b>1</b><span>category with nothing shipped</span></div>
+  </div>
+  <table>
+    <tr><th>Stage</th><th>Meaning</th><th>Categories</th></tr>
+    <tr><td class="ok">0.75</td><td>Deployed and demonstrated</td>
+      <td>Body-insights portal, integration and portable results, data protection and operation</td></tr>
+    <tr><td>0.5</td><td>Core workflow with automated checks</td>
+      <td>Guided capture, 25+ anthropometrics, PHV and maturity offset, predicted adult height,
+        static asymmetry, history and reference comparisons, presentation</td></tr>
+    <tr><td>0.25</td><td>Partial</td><td>Personalized 3D body, circumferences</td></tr>
+    <tr><td>0</td><td>Nothing shipped</td><td><strong>Body composition</strong></td></tr>
+  </table>
+  <p class="sub">Fixed rubric, recorded in <code>tools/parity-progress.json</code>. Stages are
+    engineering judgments, not measured accuracy.</p>
+  <div class="notes"><b>Notes.</b> The weights matter more than the total: body composition (15) and
+    personalized 3D body (20) carry 35 of 100 points and are the two weakest. Say it before they
+    find it. The score did not move during this build cycle and was not meant to — the recent work
+    was operational evidence, not new measurement capability. What moves it is licensed technology
+    and validation studies, not more code.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Slide 3</p>
+  <h2>The live sequence</h2>
+  <ol>
+    <li>Consent check, then four guided views — front, right, back, left.</li>
+    <li><strong>Automatic per-photo review:</strong> person detection, landmark visibility,
+      frame-edge and coverage checks, exact-duplicate rejection.</li>
+    <li><strong>On-device pose measurement</strong> returning 25 of 25 provisional outputs, with
+      recorded wall-clock processing time.</li>
+    <li><strong>Body Insights:</strong> outputs, bilateral pairs and differences, growth context,
+      printable report, CSV and JSON export.</li>
+    <li><strong>Organization view:</strong> the same record saved, reopened, exported and deleted —
+      every mutation audited, every record given a retention date.</li>
+  </ol>
+  <div class="notes"><b>Notes.</b> Rehearse on the presentation device and browser beforehand, and
+    rehearse a rejected scan too, so a failure on the day looks like a designed path rather than a
+    crash. Processing time is client-recorded and includes model load on a cold run — never present
+    it as a benchmark against anyone.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Slide 4</p>
+  <h2>Data operation — the part that is actually finished</h2>
+  <ul>
+    <li><strong>Tenant isolation lives in the database, not only the app.</strong> Row-level
+      security, organization-admin policies, a scalar-only payload allowlist, and privileges that
+      deny <code>TRUNCATE</code> to every tenant role.</li>
+    <li><strong>176 executable database tests</strong> against a disposable PostgreSQL cluster built
+      by replaying the real 79 migrations — not assertions about SQL source text.</li>
+    <li><strong>Deletion is rehearsed, not asserted:</strong> the row goes, the deletion is audited,
+      the audit row keeps no copy of the values, the scheduled sweep removes expired records, and
+      another organization cannot delete yours.</li>
+    <li><strong>Restore is rehearsed:</strong> the schema dumps and restores with row-level security
+      and privileges intact — and the rehearsal damages the restored copy on purpose to prove it
+      would notice if they were not.</li>
+    <li><strong>The buyer archive stands alone:</strong> 152 files, checksummed, verified by one
+      command; its own bundled migrations rebuild the schema and pass all 176 tests on a clean
+      database.</li>
+  </ul>
+  <div class="notes"><b>Notes.</b> The strongest slide — the one claim backed by executed tests
+    rather than judgment. Three defects worth admitting if pressed, because finding them is the
+    point: the SQL payload allowlist accepted a record with a missing outputs key (a NULL
+    comparison), a provider could register declaring zero outputs, and 51 production tables granted
+    <b>TRUNCATE</b> to tenant roles — which bypasses row-level security entirely. All three were
+    found by executing the tests, and all three are fixed and covered.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Slide 5</p>
+  <h2>Real-person surface evidence — and what it is not</h2>
+  <ul>
+    <li>One authorized adult reference set completed the full SDK flow: <strong>25 of 25</strong>
+      provisional outputs and a rotatable experimental surface.</li>
+    <li>Strict reconstruction found 4,770 connected body voxels plus a detached 14-voxel artifact.
+      The opt-in bounded removal took out that <strong>0.29%</strong> fragment without filling or
+      joining geometry, and recorded exact counts.</li>
+    <li>Three pose-guided plane sections measured, with view spread recorded. At the hip plane,
+      three contours were found and only the unique contour containing the reconstruction axis was
+      measured.</li>
+  </ul>
+  <div class="flag">
+    <b>What this is not.</b> These are clothed-surface perimeters, not validated anatomical girths.
+    Anatomical accuracy, repeatability, intended-phone behavior and buyer-host deployment are
+    unverified. No composition value has ever been produced — the provider gate reports
+    <em>Model not configured</em> and generates nothing.
+  </div>
+  <div class="notes"><b>Notes.</b> Say the limits out loud rather than leaving them in small type; a
+    buyer who finds a limit themselves discounts everything else on the slide. Composition requires
+    an owned, licensed or buyer-supplied model with DEXA training provenance and independent
+    validation evidence. We built the gate that would accept one and the evaluator that would score
+    it. We have not claimed, and will not claim, DEXA equivalence or clinical validity.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Slide 6</p>
+  <h2>Where this goes, and what it needs</h2>
+  <p class="lede"><strong>Now:</strong> capture, 25 outputs, growth and maturity, organization
+    records, portable SDK — deployed.</p>
+  <ul>
+    <li><strong>A licensed composition model</strong> plus its independent DEXA evidence — unlocks
+      FM05, the single heaviest gap at 15 points.</li>
+    <li><strong>An agreement study</strong> against a reference protocol — unlocks percentiles and
+      circumference claims.</li>
+    <li><strong>Buyer-host acceptance</strong> and a physical-device rehearsal.</li>
+  </ul>
+  <p class="sub">Each of these is blocked on an input, not on engineering. Around the core: movement
+    video, trainer and camp discovery, organization analytics.</p>
+  <div class="notes"><b>Notes.</b> Close on what the buyer supplies rather than what we still owe.
+    Population reference comparisons are deliberately switched off: the app shows a plain
+    explanation instead of a percentile, because pose-derived estimates have not been shown to
+    measure the same quantity as tape-and-caliper anthropometry. Hand over
+    <b>REFERENCE-COHORTS.md</b> — it demonstrates the standard being applied rather than merely
+    described.</div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Appendix</p>
+  <h2>Limits to disclose, and how to re-derive every number</h2>
+  <ul>
+    <li>No validated anatomical circumference, no body-composition output, no claim of FIT:MATCH
+      accuracy equivalence, no DEXA equivalence, no clinical validity.</li>
+    <li>PHV and maturity offset are manual anthropometric estimates with real population and
+      individual limits.</li>
+    <li>Measurement dates are not scan-session identifiers; historical records lack complete
+      provenance.</li>
+    <li>The trainer marketplace exists in code but is disabled pending vendor and legal review.</li>
+    <li>Assessment captures are discarded; no retained training dataset is implied.</li>
+  </ul>
+  <table>
+    <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
+    <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v97</code>, 27/27</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>356/356</td></tr>
+    <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>176/176</td></tr>
+    <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>6/6 checks</td></tr>
+    <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>
+    <tr><td>Weighted parity</td><td><code>node tools/parity-progress.cjs</code></td><td>37.75%</td></tr>
+  </table>
+</section>
+
+</div>
+
+<div class="bar">
+  <span id="pos">1 / 7</span>
+  <span class="grow"></span>
+  <button id="notes">Speaker notes</button>
+  <button onclick="print()">Print</button>
+  <span><kbd>←</kbd> <kbd>→</kbd> move · <kbd>N</kbd> notes · <kbd>F</kbd> fullscreen</span>
+</div>
+
+<script>
+  var slides = document.querySelectorAll('.slide'), at = 0, pos = document.getElementById('pos');
+  function show(i){
+    at = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function(s, n){ s.classList.toggle('on', n === at); });
+    pos.textContent = (at + 1) + ' / ' + slides.length;
+    // Deep-link the current slide so a reload during a presentation does not lose your place.
+    history.replaceState(null, '', '#' + (at + 1));
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { show(at + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { show(at - 1); e.preventDefault(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key === 'n' || e.key === 'N') document.body.classList.toggle('notes-on');
+    else if (e.key === 'f' || e.key === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen();
+    }
+  });
+  document.getElementById('notes').addEventListener('click', function(){
+    document.body.classList.toggle('notes-on');
+  });
+  show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+</script>

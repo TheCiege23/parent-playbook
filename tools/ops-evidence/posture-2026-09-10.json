@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-10T18:16:44Z",
+  "server_version": "17.6",
+  "project": "xqvqjkdxykowwpcmyudz",
+  "source": "tests/db/posture.sql run against the live Supabase project",
+  "checks": {
+    "rls_enabled_on_every_public_table": { "pass": true, "detail": [] },
+    "no_excess_tenant_grants": { "pass": true, "detail": [] },
+    "definer_functions_pin_search_path": { "pass": true, "detail": [] },
+    "tenant_roles_cannot_create_schema_objects": {
+      "pass": true,
+      "detail": { "anon on public": false, "anon on private": false, "authenticated on public": false, "authenticated on private": false }
+    },
+    "auto_rls_guardrail_intact": {
+      "pass": true,
+      "detail": { "event_trigger_present": true, "event_trigger_enabled": true, "anon_can_execute": false, "authenticated_can_execute": false }
+    },
+    "retention_jobs_registered_and_healthy": {
+      "pass": true,
+      "detail": [
+        { "name": "biometric-retention", "active": true, "schedule": "20 3 * * *", "runs": 5, "last_status": "succeeded" },
+        { "name": "company-body-assessment-retention", "active": true, "schedule": "35 3 * * *", "runs": 1, "last_status": "succeeded" },
+        { "name": "company-composition-result-retention", "active": true, "schedule": "50 3 * * *", "runs": 0, "last_status": null },
+        { "name": "company-reference-assessment-retention", "active": true, "schedule": "40 3 * * *", "runs": 0, "last_status": null }
+      ]
+    },
+    "nothing_retained_past_its_retention_date": {
+      "pass": true,
+      "detail": { "company_composition_results": 0, "company_body_assessments": 0, "company_reference_assessments": 0 }
+    },
+    "composition_gate_closed": { "pass": true, "detail": { "registered_providers": 0, "stored_results": 0 } }
+  }
+}

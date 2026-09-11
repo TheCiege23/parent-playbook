@@ -272,7 +272,7 @@ function sptResult(elapsedS, videoFile){
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPT.subject.id, metric_key: d.key, value: Math.round(elapsedS * 100) / 100, unit: 's',
-      measured_on: new Date().toISOString().slice(0,10), source: 'guided', created_by: state.user.id,
+      measured_on: todayISO(), source: 'guided', created_by: state.user.id,
       note: 'Hand-timed with the in-app stopwatch, ' + d.label,
     });
     if(error){
@@ -320,7 +320,7 @@ function sptvConsent(age){
   const minor = age < ADULT_AGE;
   const nm = esc(SPTV.subject.first_name || 'this athlete');
   const d = SPT.distance;
-  const until = (() => { const dt = new Date(); dt.setMonth(dt.getMonth() + SPRINT_RETENTION_MONTHS); return dt.toISOString().slice(0,10); })();
+  const until = (() => { const dt = new Date(); dt.setMonth(dt.getMonth() + SPRINT_RETENTION_MONTHS); return localDay(dt); })();
   const untilHuman = new Date(until + 'T00:00:00').toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
 
   const bg = sheet(H`<h3>Measure ${nm}'s sprint speed</h3>
@@ -529,6 +529,8 @@ function sptvDiscard(){
 const SPRINT_FAIL = {
   no_pose: { h:'A body could not be tracked in that video',
     p:'Usually the whole run wasn\'t in frame, or the light made the outline hard to track. Whole course in frame, good light, phone steady — that fixes this most often.' },
+  clip_too_long: { h:'The clip was longer than the part we read',
+    p:'The run finished after the point where the video stops being examined, so the second crossing was never seen. The marks are probably fine. Record again and start the video closer to the run — a few seconds of lead-in is plenty.' },
   no_crossing_detected: { h:"Didn't see a clear crossing at one of the marks",
     p:'The video played and a body was tracked, but it never clearly passed through one of the two spots you marked. Re-check that the marks match where the run actually happened.' },
   crossed_out_of_order: { h:'The finish came before the start',
@@ -625,7 +627,7 @@ function sptvResult(result){
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPT.subject.id, metric_key: d.key, value: result.elapsedS, unit: 's',
-      measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,
+      measured_on: todayISO(), source: 'video', created_by: state.user.id,
       note: `On-device calibrated sprint capture, ${d.label} — ${result.speedMph} mph`,
     });
     if(error){
