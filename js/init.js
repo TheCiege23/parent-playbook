@@ -89,6 +89,7 @@ function owFailScreen(glyph, title, body, retry, btnLabel, btnFn){
   if(typeof owBadge==='function') owBadge();
   $("#owGo").onclick = btnFn || (()=>location.reload());
   { const o=$("#owOut"); if(o) o.onclick=async()=>{
+      await releasePushOnThisDevice();
       try{ await sb.auth.signOut(); }catch(e){}
       state.user=null; state.athletes=[]; state.active=null; renderAuth('login'); }; }
   if(retry) owBackoff();

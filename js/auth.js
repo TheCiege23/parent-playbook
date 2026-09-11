@@ -80,7 +80,7 @@ function renderNoAccess(){
     </div>
   </div>`;
   $("#naNew").onclick=renderOnboarding;
-  $("#naOut").onclick=async()=>{ await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
+  $("#naOut").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
 }
 
 async function loadAthletes(){

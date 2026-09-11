@@ -616,6 +616,9 @@ function confirmDeleteAccount(){
     }
     // Sign out locally too — the token is dead server-side, but leaving it in storage
     // would show a stale, half-loaded app until the next reload.
+    // The cascade on guardians already removed the push row; this is here for the
+    // browser-side unsubscribe, so a deleted account leaves no live delivery channel.
+    await releasePushOnThisDevice();
     try{ await sb.auth.signOut(); }catch(err){ /* the user is already gone */ }
     state.user=null; state.athletes=[]; state.active=null; state.ref=null;
     bg.remove();

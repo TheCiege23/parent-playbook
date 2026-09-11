@@ -128,7 +128,7 @@ async function screenAccount(){
   $("#acctBack").onclick=()=>renderApp('profile');
   // Deliberately plain text, not a button: on a shared family phone nobody should hit
   // log out by accident reaching for something else.
-  $("#acctLogout").onclick=async()=>{ await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
+  $("#acctLogout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
