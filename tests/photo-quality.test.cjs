@@ -26,7 +26,12 @@ test('side views allow an occluded far side; direction checks stay advisory',()=
   const c=setup(),p=pose();for(const i of [12,24,26,28])p.landmarks[0][i].visibility=.1;
   assert.equal(c.checkPhotoPose(p,'left').accepted,true);assert.equal(c.checkPhotoPose(p,'front').accepted,false);
   const wide=pose();wide.landmarks[0][11].x=.3;wide.landmarks[0][12].x=.7;
-  const result=c.checkPhotoPose(wide,'right');assert.equal(result.accepted,true);assert.ok(result.warnings.some(r=>r.code==='check_direction'));
+  // A square photo, so the normalized ratio and the pixel ratio are the same number and this
+  // case still asserts exactly what it always asserted.
+  const result=c.checkPhotoPose(wide,'right',{width:1000,height:1000});assert.equal(result.accepted,true);assert.ok(result.warnings.some(r=>r.code==='check_direction'));
+  // Without dimensions the ratio cannot be computed, only guessed, so the check stays silent
+  // rather than telling a parent to re-take a photo on a number it could not work out.
+  assert.ok(!c.checkPhotoPose(wide,'right').warnings.some(r=>r.code==='check_direction'));
 });
 test('review releases bitmaps after a successful check and after inference failure',async()=>{
   let closed=0;const c=setup({createImageBitmap:async()=>({close(){closed++;}})});
@@ -44,4 +49,51 @@ test('the actual measurement provider enforces four checked views and records th
   await assert.rejects(c.measureFromFrames({frames:{front:{},back:{}},heightIn:60}),/needs_four_views/);
   c.loadPoseLandmarker=async()=>({detect:()=>({landmarks:[[],[]]})});
   await assert.rejects(c.measureFromFrames({frames,heightIn:60}),/capture_quality/);assert.equal(closed,8);
+});
+
+test('the direction check does not depend on the shape of the photograph',()=>{
+  // Normalized x is a fraction of the photo's width and normalized y a fraction of its
+  // height, so width/torso only becomes a ratio of two lengths once the aspect is put back.
+  // Before that, the same athlete at the same angle crossed the 0.4 threshold in a 4:3 photo
+  // and cleared it in a 3:4 one: a warning about which way a child is facing that actually
+  // depended on the shape of the picture.
+  const c=setup();
+  // Shoulders 300px apart, torso 400px: a true ratio of 0.75, comfortably facing the camera.
+  const framed=(w,h)=>{
+    const p=pose();
+    const shoulderNorm=300/w, torsoNorm=400/h;
+    p.landmarks[0][11].x=.5-shoulderNorm/2; p.landmarks[0][12].x=.5+shoulderNorm/2;
+    p.landmarks[0][11].y=.30; p.landmarks[0][12].y=.30;
+    p.landmarks[0][23].y=.30+torsoNorm;    p.landmarks[0][24].y=.30+torsoNorm;
+    return c.checkPhotoPose(p,'front',{width:w,height:h});
+  };
+  const warned=r=>r.warnings.some(x=>x.code==='check_direction');
+  assert.equal(warned(framed(1200,1200)),false,'square: a facing athlete should not be warned');
+  assert.equal(warned(framed(1200,1600)),false,'portrait: the same athlete, the same verdict');
+  assert.equal(warned(framed(1600,1200)),false,'landscape: the same athlete, the same verdict');
+});
+
+test('a genuinely turned athlete is still flagged, in any photo shape',()=>{
+  const c=setup();
+  const framed=(w,h)=>{
+    const p=pose();
+    const shoulderNorm=90/w, torsoNorm=400/h;   // true ratio 0.225 — clearly turned away
+    p.landmarks[0][11].x=.5-shoulderNorm/2; p.landmarks[0][12].x=.5+shoulderNorm/2;
+    p.landmarks[0][11].y=.30; p.landmarks[0][12].y=.30;
+    p.landmarks[0][23].y=.30+torsoNorm;    p.landmarks[0][24].y=.30+torsoNorm;
+    return c.checkPhotoPose(p,'front',{width:w,height:h});
+  };
+  const warned=r=>r.warnings.some(x=>x.code==='check_direction');
+  for(const [label,w,h] of [['square',1200,1200],['portrait',1200,1600],['landscape',1600,1200]])
+    assert.equal(warned(framed(w,h)),true,`${label}: a turned athlete should still be flagged`);
+});
+
+test('a malformed dimensions object is treated as unknown, not as a ratio',()=>{
+  const c=setup();
+  const wide=pose();wide.landmarks[0][11].x=.3;wide.landmarks[0][12].x=.7;
+  const warned=d=>c.checkPhotoPose(wide,'right',d).warnings.some(x=>x.code==='check_direction');
+  // Zero or negative dimensions would make the ratio infinite or sign-flipped; none of these
+  // may produce a verdict.
+  for(const d of [{width:0,height:1000},{width:1000,height:0},{width:-4,height:10},{},null])
+    assert.equal(warned(d),false,`dimensions ${JSON.stringify(d)} should not produce a direction verdict`);
 });

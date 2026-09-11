@@ -222,7 +222,7 @@ async function measureFromFrames({ frames, heightIn, onProgress }){
     try{
       bmp = await createImageBitmap(frames[k]);
       const res = landmarker.detect(bmp);
-      const check=checkPhotoPose(res,k);
+      const check=checkPhotoPose(res,k,{width:bmp.width,height:bmp.height});
       captureChecks.push(photoCheckSummary(check));
       if(!check.accepted){ missed.push(k); continue; }
       const world = res && res.worldLandmarks && res.worldLandmarks[0];

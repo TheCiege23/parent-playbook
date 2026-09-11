@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const EXPECTED_CACHE = 'pp-v94';
+const EXPECTED_CACHE = 'pp-v95';
 const required = [
   ['/', /Parent Playbook/i],
   ['/sw.js', new RegExp(`const CACHE = ['"]${EXPECTED_CACHE}['"]`)],
@@ -52,27 +52,68 @@ async function request(base, pathname) {
   return { response, body: await response.text() };
 }
 
+// A deploy swaps containers, and a request made during the swap can reach the old
+// container, the new one, or a half-swapped state. That is what produced a 26/27 run
+// against pp-v94 which then passed on every run afterwards: not a regression, a snapshot
+// taken too early. A single pass cannot tell those apart, so a failure is not reported
+// until it has survived a recheck a few seconds later.
+//
+// A check that only needed the deploy to settle passes, but says so through
+// settledAfterMs, and the result carries a settled count and a note. Letting it pass
+// silently would trade one misleading result for another: the point is to be able to
+// tell a rollout apart from a regression, not to make rollouts look clean.
+const SETTLE_ATTEMPTS = 3;
+const SETTLE_DELAY_MS = 2000;
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function evaluate(base, item) {
+  try {
+    const { response, body } = await request(base, item.pathname);
+    if (item.expectation === 'required') return { status: response.status, ok: response.status === 200 && item.token.test(body) };
+    return { status: response.status, ok: response.status === 404 };
+  } catch (error) {
+    return { status: null, ok: false, error: error.message };
+  }
+}
+
 async function run(baseValue) {
   const base = normalizeBase(baseValue);
+  // One plan, index-parallel with checks, so a recheck re-runs the same expectation
+  // rather than matching a row back by path.
+  const plan = [
+    ...required.map(([pathname, token]) => ({ pathname, token, expectation: 'required' })),
+    ...forbidden.map(pathname => ({ pathname, token: null, expectation: 'not-public' })),
+  ];
   const checks = [];
-  for (const [pathname, token] of required) {
-    try {
-      const { response, body } = await request(base, pathname);
-      const ok = response.status === 200 && token.test(body);
-      checks.push({ pathname, expectation: 'required', status: response.status, ok });
-    } catch (error) {
-      checks.push({ pathname, expectation: 'required', status: null, ok: false, error: error.message });
+  for (const item of plan) {
+    const { status, ok, error } = await evaluate(base, item);
+    checks.push({ pathname: item.pathname, expectation: item.expectation, status, ok, ...(error ? { error } : {}) });
+  }
+  // Recheck only what failed, so a clean run costs exactly what it did before: no delay
+  // is waited and no extra request is made unless something is already failing.
+  let waitedMs = 0;
+  for (let attempt = 1; attempt <= SETTLE_ATTEMPTS && checks.some(row => !row.ok); attempt++) {
+    await delay(SETTLE_DELAY_MS);
+    waitedMs += SETTLE_DELAY_MS;
+    for (let i = 0; i < checks.length; i++) {
+      if (checks[i].ok) continue;
+      const { status, ok, error } = await evaluate(base, plan[i]);
+      checks[i].status = status;
+      checks[i].ok = ok;
+      if (error) checks[i].error = error; else delete checks[i].error;
+      if (ok) checks[i].settledAfterMs = waitedMs;
     }
   }
-  for (const pathname of forbidden) {
-    try {
-      const { response } = await request(base, pathname);
-      checks.push({ pathname, expectation: 'not-public', status: response.status, ok: response.status === 404 });
-    } catch (error) {
-      checks.push({ pathname, expectation: 'not-public', status: null, ok: false, error: error.message });
-    }
-  }
-  return { schema: 'PP_DEPLOYMENT_SMOKE_V1', base: base.origin, expectedCache: EXPECTED_CACHE, ok: checks.every(row => row.ok), checks };
+  const settled = checks.filter(row => row.settledAfterMs).length;
+  return {
+    schema: 'PP_DEPLOYMENT_SMOKE_V1',
+    base: base.origin,
+    expectedCache: EXPECTED_CACHE,
+    ok: checks.every(row => row.ok),
+    settled,
+    ...(settled ? { settleNote: settled + ' check(s) failed on the first pass and passed once the deploy settled; this run overlapped a rollout and should be repeated for a clean reading' } : {}),
+    checks,
+  };
 }
 
 if (require.main === module) {
@@ -85,4 +126,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { EXPECTED_CACHE, normalizeBase, run };
+module.exports = { EXPECTED_CACHE, SETTLE_ATTEMPTS, SETTLE_DELAY_MS, normalizeBase, run };

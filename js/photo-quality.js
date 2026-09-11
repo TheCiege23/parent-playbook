@@ -2,7 +2,7 @@
 // MediaPipe normalized landmarks: https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker/web_js
 // Thresholds are provisional engineering choices pending real-device reference trials.
 const PHOTO_QUALITY_VERSION = 'photo-quality-v1';
-function checkPhotoPose(result,view){
+function checkPhotoPose(result,view,dims){
   const reasons=[],warnings=[];
   const add=(list,code,message)=>list.push({code,message});
   const finish=()=>({protocol:PHOTO_QUALITY_VERSION,view,accepted:reasons.length===0,reasons,warnings});
@@ -40,9 +40,22 @@ function checkPhotoPose(result,view){
     const shoulderY=(n[11].y+n[12].y)/2,hipY=(n[23].y+n[24].y)/2;
     const torso=hipY-shoulderY;
     const width=Math.abs(n[11].x-n[12].x);
-    // Advisory only: perspective, body shape and model uncertainty can change this ratio.
-    if(torso>0 && (facing?width/torso<.4:width/torso>1))
-      add(warnings,'check_direction',facing?'Check that the athlete is facing directly toward or away from the camera.':'Check that the athlete is turned fully sideways.');
+    // Normalized x is a fraction of the photo's WIDTH and normalized y a fraction of its
+    // HEIGHT, so width/torso is not a ratio of two lengths until the aspect is put back:
+    //   width_px / torso_px = (width_norm / torso_norm) * (imageWidth / imageHeight)
+    // Without that, the same athlete at the same angle crossed the threshold in a 4:3
+    // photo and cleared it in a 3:4 one — a warning about which way a child is facing
+    // that actually depended on the shape of the picture.
+    const aspect = dims && dims.width>0 && dims.height>0 ? dims.width/dims.height : null;
+    // No dimensions means the ratio cannot be computed, only guessed. This check exists to
+    // tell a parent to re-take a photo, so it stays silent rather than guess. Both callers
+    // have the bitmap and pass them.
+    if(aspect && torso>0){
+      const ratio=(width/torso)*aspect;
+      // Advisory only: perspective, body shape and model uncertainty can change this ratio.
+      if(facing?ratio<.4:ratio>1)
+        add(warnings,'check_direction',facing?'Check that the athlete is facing directly toward or away from the camera.':'Check that the athlete is turned fully sideways.');
+    }
   }
   return finish();
 }
@@ -52,6 +65,6 @@ function photoCheckSummary(check){
 }
 async function reviewPosePhoto({frame,view}){
   const landmarker=await loadPoseLandmarker();let bitmap;
-  try{bitmap=await createImageBitmap(frame);return checkPhotoPose(landmarker.detect(bitmap),view);}
+  try{bitmap=await createImageBitmap(frame);return checkPhotoPose(landmarker.detect(bitmap),view,{width:bitmap.width,height:bitmap.height});}
   finally{bitmap?.close?.();}
 }
