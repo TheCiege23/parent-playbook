@@ -149,7 +149,12 @@ function main(argv) {
       if (!a.out) return usage('--generate-key needs --out <dir>.');
       const k = generateKey(a.out);
       console.log('Key pair written.');
-      console.log('  private  ' + k.privPath + '   (mode 600 — never commit this, never send it)');
+      console.log('  private  ' + k.privPath);
+      // 0o600 is requested, but only POSIX honours it. On Windows the file inherits the
+      // user profile's ACL instead, so claiming 'mode 600' there would be describing a
+      // protection that was not applied.
+      console.log('           never commit this and never send it. Back it up somewhere you control:');
+      console.log('           losing it means you cannot sign a future release with this identity.');
       console.log('  public   ' + k.pubPath);
       console.log('  fingerprint ' + k.fingerprint);
       console.log('');

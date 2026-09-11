@@ -24,6 +24,12 @@ COPY tools/sdk-demo.html ./company-sdk-demo.html
 # Root assets and PWA plumbing
 COPY icon.svg og.png manifest.webmanifest sw.js sitemap.xml llms.txt ./
 
+# The PUBLIC half of the package signing key. A buyer verifying a signed SDK archive needs
+# this from a route the archive cannot influence, and the repository is private — so the
+# site is that route. Serving a public key is what a public key is for. The PRIVATE half
+# lives outside the repository and is never built into anything.
+COPY SIGNING-KEY.pub.pem ./SIGNING-KEY.pub.pem
+
 # App code
 COPY css/   ./css/
 COPY js/    ./js/

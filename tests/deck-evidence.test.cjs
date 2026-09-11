@@ -196,9 +196,9 @@ const DB_RESTORE = 17;
 test('every document quotes the same database total', () => {
   const sites = [
     ['CLAUDE-CONTINUATION-HANDOFF.md', /Executable database tests: \*\*(\d+)\/(\d+) passing\*\*/, 'the handoff summary line'],
-    ['CLAUDE-CONTINUATION-HANDOFF.md', /database (\d+)\/(\d+), host serving/, "the handoff's acceptance paragraph"],
+    ['CLAUDE-CONTINUATION-HANDOFF.md', /database (\d+)\/(\d+)[,.]/, "the handoff's acceptance paragraph"],
     ['FRIDAY-DECK.md', /\| Database suite \|[^|]*\| (\d+)\/(\d+) on a disposable cluster/, 'the deck evidence table'],
-    ['FRIDAY-DECK.md', /database (\d+)\/(\d+), host serving/, "the deck's buyer-package row"],
+    ['FRIDAY-DECK.md', /database (\d+)\/(\d+)[,.]/, "the deck's buyer-package row"],
     ['friday-deck.html', /<td>Database suite<\/td><td><code>node tests\/db\/run\.cjs<\/code><\/td><td>(\d+)\/(\d+)<\/td>/, 'the rendered deck'],
     ['BODY-SDK.md', /(\d+)\/(\d+) database cases/, 'the SDK guide'],
   ];
