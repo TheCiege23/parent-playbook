@@ -67,7 +67,10 @@ test('the acceptance tool keeps stating what a clean run does not establish', ()
   assert.ok(Array.isArray(NOT_ESTABLISHED) && NOT_ESTABLISHED.length >= 5,
     'the honesty block must not be emptied out');
   const joined = NOT_ESTABLISHED.join(' ').toLowerCase();
-  for (const subject of ['accuracy', 'composition', 'dexa', 'restore', 'unsigned']) {
+  // 'substitution' rather than 'unsigned': signing now exists, so the block no longer says
+  // the manifest is unsigned unconditionally — but it must still name the thing a checksum
+  // cannot do, and must still say authenticity is unestablished without an independent key.
+  for (const subject of ['accuracy', 'composition', 'dexa', 'restore', 'substitution', 'authenticity']) {
     assert.ok(joined.includes(subject), `the honesty block should still cover: ${subject}`);
   }
 });

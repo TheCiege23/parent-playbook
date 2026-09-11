@@ -206,6 +206,34 @@ const get = (port, pathname) => new Promise(resolve => {
   req.on('error', e => resolve({ status: 0, type: '', body: e.message }));
 });
 
+// --- signature ------------------------------------------------------------
+// The manifest detects accidental change. It cannot detect substitution: anyone who
+// replaces a file can rewrite its hash to agree. A detached signature closes that, but only
+// against a public key the reader obtained independently of this package — so this check
+// needs one supplied, and SKIPs rather than passing when it has none. A SKIP here is the
+// honest answer to "is this package authentic": unknown.
+function checkSignature() {
+  const signaturePath = path.join(root, 'signature.json');
+  const keyPath = process.env.PP_SDK_PUBLIC_KEY;
+  if (!fs.existsSync(signaturePath)) {
+    return record('signature', 'skip',
+      'this package carries no detached signature, so origin is unverified — checksums detect accidental change, not substitution');
+  }
+  if (!keyPath) {
+    return record('signature', 'skip',
+      'a signature is present but no public key was supplied; set PP_SDK_PUBLIC_KEY to a key obtained independently of this package');
+  }
+  let outcome;
+  try { outcome = require(path.join(root, 'tools/sdk-sign.cjs')).verifySignature(root, keyPath); }
+  catch (error) { return record('signature', 'fail', 'the signature could not be checked: ' + error.message); }
+  if (!outcome.ok) return record('signature', 'fail', outcome.problems.join('; '));
+  return record('signature', 'pass',
+    'the manifest was signed by key ' + outcome.keyFingerprint + ' and has not been altered since'
+    + (outcome.trustAnchorInsideBundle
+      ? ' — WARNING: that key came from inside this package, which proves internal consistency only'
+      : ''));
+}
+
 async function checkHost() {
   if (has('--skip-host')) return record('host', 'skip', 'skipped by --skip-host');
   const host = path.join(root, 'tools/sdk-host.cjs');
@@ -243,7 +271,7 @@ const NOT_ESTABLISHED = [
   'FITMATCH equivalence, DEXA equivalence and clinical validity are not claimed or tested.',
   'Provider backup restore. A logical dump and restore is rehearsed here, including that row-level security and table privileges survive it. Restoring from the hosting provider\u2019s own backups, and point-in-time recovery, are not rehearsed.',
   'Buyer-host deployment and physical-device capture have not been performed.',
-  'The checksum manifest is unsigned: it detects accidental change, not substitution.',
+  'Package authenticity, unless the signature check above passed against a public key you obtained independently of this package. A checksum manifest on its own detects accidental change, not substitution.',
 ];
 
 async function main() {
@@ -257,6 +285,7 @@ async function main() {
   checkExclusions();
   checkContracts();
   checkDatabase();
+  checkSignature();
   await checkHost();
 
   const failed = results.filter(r => r.status === 'fail');

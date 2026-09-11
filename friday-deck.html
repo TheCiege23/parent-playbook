@@ -164,7 +164,7 @@
     <li><strong>Restore is rehearsed:</strong> the schema dumps and restores with row-level security
       and privileges intact — and the rehearsal damages the restored copy on purpose to prove it
       would notice if they were not.</li>
-    <li><strong>The buyer archive stands alone:</strong> 154 files, checksummed, verified by one
+    <li><strong>The buyer archive stands alone:</strong> 155 files, checksummed, verified by one
       command; its own bundled migrations rebuild the schema and pass all 204 tests on a clean
       database.</li>
   </ul>
@@ -240,7 +240,7 @@
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
     <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v108</code>, 28/28</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>462/462</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>474/474</td></tr>
     <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>204/204</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>6/6 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>
