@@ -965,7 +965,8 @@ function bsResult(result,subject,record){
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="bsDrop">Discard</button>
       <button class="btn amber" id="bsSave">Save & view Body Insights</button>
-    </div>`);
+    </div>
+    ${bsEvidenceEnabled()?'<button class="btn ghost sm" id="bsEvidence" style="margin-top:10px">Save session evidence</button><p class="muted-note" style="margin-top:6px">Records which build and device produced this run. No measurement, height or name is included.</p>':''}`);
 
   let disposeSurface=null,closed=false;
   const removeResult=bg.remove.bind(bg);
@@ -993,6 +994,7 @@ function bsResult(result,subject,record){
   bsAppendMaturity(bg,subject);
 
   const close = () => bg.remove();
+  { const ev=bg.querySelector('#bsEvidence'); if(ev) ev.onclick=()=>bsSaveEvidence(result,record,ev); }
   bg.querySelector('#bsDrop').onclick = close;
   bg.querySelector('#bsSave').onclick = async e => {
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
@@ -1005,6 +1007,57 @@ function bsResult(result,subject,record){
     close(); toast('Saved');
     if(state.active?.id===subject.id) renderApp('insights');
   };
+}
+
+// ---- device-session evidence -----------------------------------------------------------
+//
+// Opt-in per session with ?evidence=1, and deliberately not a product feature. A parent has
+// no use for this and should not meet a control that exists so we can evidence our own
+// capability claims; the flag keeps it out of their way without a separate build.
+function bsEvidenceEnabled(){
+  try{ return new URLSearchParams(location.search).get('evidence')==='1'; }catch(e){ return false; }
+}
+
+// Writes a record of HOW this run happened, never WHAT it measured. The build comes from the
+// service-worker cache name rather than from anything typed here, which is what makes it
+// checkable afterwards against tools/device-evidence.cjs. The expected output count is read
+// from BODY_OUTPUTS rather than written as 25, so the two cannot drift apart.
+async function bsSaveEvidence(result,record,btn){
+  if(typeof DeviceEvidence==='undefined'){ toast('Session evidence is unavailable on this build'); return; }
+  const label=btn.textContent;
+  btn.disabled=true; btn.textContent='Collecting…';
+  try{
+    const seen=await DeviceEvidence.collectDeviceEvidence();
+    const defined=typeof BODY_OUTPUTS!=='undefined'?Object.keys(BODY_OUTPUTS):[];
+    const produced=Object.keys(result.metrics||{});
+    const evidence=DeviceEvidence.buildDeviceEvidence({
+      recordedAt:new Date().toISOString(),
+      build:{serviceWorkerCache:seen.serviceWorkerCache,origin:seen.origin},
+      device:{userAgent:seen.userAgent,viewportWidth:seen.viewportWidth,viewportHeight:seen.viewportHeight,
+        pixelRatio:seen.pixelRatio,standalone:seen.standalone,maxTouchPoints:seen.maxTouchPoints},
+      run:{workflowVersion:SCAN_POLICY_VERSION,
+        engineId:record.meta.engine.id,engineVersion:record.meta.engine.version,engineModel:record.meta.engine.model,
+        processingMs:record.meta.processing?.duration_ms||0,
+        outputCount:produced.length,
+        expectedOutputs:defined.length||produced.length,
+        missingOutputKeys:defined.filter(k=>!produced.includes(k)),
+        heightSupplied:Number(result.heightIn)>0},
+    });
+    // recordedAt is an instant used as a filename, not a calendar day — slicing it is the
+    // right thing here and is why it is 19 characters rather than 10.
+    const name='device-session-'+evidence.build.serviceWorkerCache+'-'
+      +evidence.recordedAt.slice(0,19).replace(/[:T-]/g,'')+'.json';
+    const blob=new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=name;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('Session evidence saved');
+  }catch(error){
+    console.error(error); reportError(error,'scan:deviceEvidence');
+    toast('Could not build session evidence');
+  }
+  btn.disabled=false; btn.textContent=label;
 }
 
 // Progressive, same idiom as the mesh above: the primary result renders immediately and
