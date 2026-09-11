@@ -28,7 +28,7 @@ const okDevice = () => ({
   viewportWidth: 390, viewportHeight: 844, pixelRatio: 3, standalone: true, maxTouchPoints: 5,
 });
 const okRun = () => ({
-  sdkVersion: '0.13.0', engineId: 'synthetic-engine', engineVersion: '1.0.0', engineModel: 'synthetic-model',
+  workflowVersion: '0.13.0', engineId: 'synthetic-engine', engineVersion: '1.0.0', engineModel: 'synthetic-model',
   processingMs: 14400, outputCount: 25, expectedOutputs: 25, missingOutputKeys: [], heightSupplied: true,
 });
 const okInput = (over = {}) => ({
@@ -149,7 +149,7 @@ test('a page with no cache API reports an unknown build instead of guessing', ()
 
 test('a result summary reduces to counts, and the summary itself is not retained', () => {
   const summary = {
-    sdkVersion: '0.13.0', engine: { id: 'e', version: '1', model: 'm' },
+    workflowVersion: '0.13.0', engine: { id: 'e', version: '1', model: 'm' },
     processingMs: 14400, outputCount: 25, missingOutputs: [], height: 74,
     measurements: [{ key: 'stature', value: 74, unit: 'in' }],   // must not survive
     pairs: [{ label: 'Femur', left: 1, right: 2 }],

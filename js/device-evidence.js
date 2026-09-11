@@ -43,7 +43,7 @@
   const SHAPE = {
     build: { serviceWorkerCache: 'string', origin: 'string' },
     device: { userAgent: 'string', viewportWidth: 'integer', viewportHeight: 'integer', pixelRatio: 'number', standalone: 'boolean', maxTouchPoints: 'integer' },
-    run: { sdkVersion: 'string', engineId: 'string', engineVersion: 'string', engineModel: 'string', processingMs: 'number', outputCount: 'integer', expectedOutputs: 'integer', missingOutputKeys: 'string[]', heightSupplied: 'boolean' },
+    run: { workflowVersion: 'string', engineId: 'string', engineVersion: 'string', engineModel: 'string', processingMs: 'number', outputCount: 'integer', expectedOutputs: 'integer', missingOutputKeys: 'string[]', heightSupplied: 'boolean' },
   };
 
   const isInt = v => Number.isInteger(v);
@@ -127,7 +127,9 @@
     if (!summary || typeof summary !== 'object') fail('A result summary is required.');
     const missing = Array.isArray(summary.missingOutputs) ? summary.missingOutputs.slice() : [];
     return {
-      sdkVersion: String(summary.sdkVersion || ''),
+      // The SDK summary calls this sdkVersion; the in-app scan has no SDK and supplies its
+      // own policy version. Accept either rather than making one of them lie.
+      workflowVersion: String(summary.workflowVersion || summary.sdkVersion || ''),
       engineId: String((summary.engine && summary.engine.id) || ''),
       engineVersion: String((summary.engine && summary.engine.version) || ''),
       engineModel: String((summary.engine && summary.engine.model) || ''),
