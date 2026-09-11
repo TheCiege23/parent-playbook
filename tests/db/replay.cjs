@@ -47,11 +47,29 @@ for (const name of files) {
   }
 }
 
-const failed = results.filter(r => !r.ok);
+// Harness steps are counted apart from migrations. Folding them into one total made the
+// summary contradict itself: the file count said 79 while succeeded said 80, because the
+// preamble and the post-identity seed hook were being credited as migrations. A report whose
+// own three numbers do not reconcile invites doubt about everything else in it, and the
+// question this file exists to answer is about the real migration history, not about the
+// harness that hosts it.
+const isHarness = r => / \(harness( hook)?\)$/.test(r.file);
+const migrations = results.filter(r => !isHarness(r));
+const harness = results.filter(isHarness);
+const failedMigrations = migrations.filter(r => !r.ok);
+const failedHarness = harness.filter(r => !r.ok);
+const failed = [...failedMigrations, ...failedHarness];
+// One results row per migration file, or the counts below describe something other than
+// what was on disk.
+if (migrations.length !== files.length) {
+  throw new Error(`replay recorded ${migrations.length} migration results for ${files.length} files on disk`);
+}
 console.log('MIGRATION REPLAY');
-console.log('  total files applied :', files.length);
-console.log('  succeeded           :', results.length - failed.length - 0);
-console.log('  failed              :', failed.length);
+console.log('  migration files     :', files.length);
+console.log('  migrations applied  :', migrations.length - failedMigrations.length);
+console.log('  migrations failed   :', failedMigrations.length);
+console.log('  harness steps       :', `${harness.length - failedHarness.length}/${harness.length}`,
+  '(' + harness.map(h => h.file.replace(/ \(harness( hook)?\)$/, '')).join(', ') + ')');
 console.log('');
 for (const f of failed) {
   const firstError = (f.out.split('\n').find(l => /ERROR|FATAL/.test(l)) || f.out.split('\n')[0] || '').trim();
