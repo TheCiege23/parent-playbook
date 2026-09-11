@@ -121,7 +121,7 @@ function openMediaViewer(id){
     <div class="mv-stage">${body}</div>
     <div class="mv-meta">
       ${m.caption?H`<b>${esc(m.caption)}</b>`:''}
-      <span>${m.taken_on?esc(fmtDate(m.taken_on)):esc(fmtDate((m.created_at||'').slice(0,10)))} · private to your household</span>
+      <span>${m.taken_on?esc(fmtDate(m.taken_on)):esc(m.created_at?fmtDate(localDay(new Date(m.created_at))):'—')} · private to your household</span>
     </div>
     ${strip.length>1?H`<div class="mv-strip">
       ${strip.map(x=>H`<button class="${x.id===m.id?'on':''}" data-jump="${esc(x.id)}">

@@ -133,7 +133,7 @@ async function adminReviewTrainer(id){
 
   const verRow=([k,label])=>{ const st=vstatus(k); const v=vrow(k)||{};
     const url=verUrls[k];
-    const expVal=v.expires_at?String(v.expires_at).slice(0,10):'';
+    const expVal=v.expires_at?localDay(new Date(v.expires_at)):'';
     const needsExp=(k!=='identity');
     return H`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
       <div style="display:flex;justify-content:space-between;align-items:center">
