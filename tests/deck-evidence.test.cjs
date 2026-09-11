@@ -138,3 +138,22 @@ test('the source deck and the rendered deck tell the same story', () => {
     assert.ok(rendered.includes(heading), `friday-deck.html lost the slide: ${heading}`);
   }
 });
+
+test('the deck cites the JavaScript suite size the repository actually has', () => {
+  // I previously called this unenforceable — "the one number the guard can't check without
+  // running the suite it belongs to" — and let it go stale three times in a row: 276, then
+  // 283, then 289 against a suite that had grown past all of them. It is enforceable. Every
+  // test in this repository is a top-level `test(` call, so the count is derivable by
+  // reading the files, and the static total matches `node --test` exactly.
+  //
+  // If tests ever start being generated inside a loop, this will under-count and fail. That
+  // is the right failure: it means the number on the slide can no longer be derived this way
+  // and the deck needs a different source for it, not that the deck is wrong.
+  const dir = path.join(root, 'tests');
+  const declared = fs.readdirSync(dir)
+    .filter(f => f.endsWith('.test.cjs'))
+    .reduce((n, f) => n + (fs.readFileSync(path.join(dir, f), 'utf8').match(/^\s*test\(/gm) || []).length, 0);
+  assert.ok(declared > 0, 'no test declarations found; the counting assumption has broken');
+  assert.ok(deck.includes(`${declared}/${declared}`),
+    `the deck should cite ${declared}/${declared} for the JavaScript suite; it grew without the deck being updated`);
+});
