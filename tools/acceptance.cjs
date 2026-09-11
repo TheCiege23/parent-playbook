@@ -255,7 +255,23 @@ async function checkHost() {
     // And a path outside the allowlist must not be reachable.
     const leak = await get(port, '/manifest.json');
     if (leak.status === 200) return record('host', 'fail', 'the host served /manifest.json, which is outside its allowlist');
-    return record('host', 'pass', `serves /healthz and /js/body-sdk.mjs as ${mod.type.split(';')[0]}; off-allowlist paths refused`);
+
+    // The page a buyer actually opens has to carry its own limits. Everything else in this
+    // run checks files and contracts; nobody was checking that the one human-readable
+    // surface still says what the outputs are and are not. A demo page that quietly lost
+    // "no body composition" would pass every other check in this tool.
+    const page = await get(port, '/');
+    if (page.status !== 200) return record('host', 'fail', `the demo page returned ${page.status}`);
+    const required = [
+      [/Provisional/i, 'the provisional marking'],
+      [/unvalidated|not established/i, 'the accuracy caveat'],
+      [/No anatomical girths or body composition/i, 'the refusal to claim girths or composition'],
+      [/I have permission to process/i, 'the permission gate'],
+    ];
+    const missing = required.filter(([re]) => !re.test(page.body || '')).map(([, what]) => what);
+    if (missing.length) return record('host', 'fail', 'the demo page is missing ' + missing.join(', '));
+
+    return record('host', 'pass', `serves /healthz and /js/body-sdk.mjs as ${mod.type.split(';')[0]}; off-allowlist paths refused; the demo page keeps its provisional, accuracy, girth/composition and permission disclosures`);
   } finally {
     child.kill();
   }
