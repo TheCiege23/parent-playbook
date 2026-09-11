@@ -604,6 +604,116 @@ add('K05', 'auto-rls', 'the guardrail still fires after EXECUTE was revoked', {
         select relrowsecurity::text from pg_class where oid='public.k05_guardrail_probe'::regclass;`,
   expect: 'ok', expectOut: 'true' });
 
+// =========================================================== L. push subscription claim
+//
+// push_subscriptions.endpoint is UNIQUE and belongs to the BROWSER, not to whoever is
+// signed in. On a shared device the second parent to enable reminders collided with the
+// first parent's row: ps_insert refuses a row for another user, ps_delete reaches only your
+// own rows, and there is no update policy, so there was no way to take the endpoint and no
+// way to be told why. public.claim_push_subscription is the way, and it displaces another
+// guardian's row only on proof the caller holds the subscription — both keys, not just the
+// endpoint, because an endpoint can leak into a log while the keys stay in the browser.
+//
+// GUARDIAN_A and GUARDIAN_B are the two synthetic parents sharing one browser.
+const GUARDIAN_A = ADMIN_A;
+const GUARDIAN_B = ADMIN_B;
+const EP = 'https://push.example.invalid/endpoint/synthetic-AAA';
+const K1 = 'synthetic-p256dh-key-one';
+const K2 = 'synthetic-auth-key-one';
+const OTHER_K1 = 'synthetic-p256dh-key-two';
+const OTHER_K2 = 'synthetic-auth-key-two';
+
+const claim = (ep, k1, k2) =>
+  "select public.claim_push_subscription('" + ep + "','" + k1 + "','" + k2 + "');";
+// A row planted as the table owner, standing in for the parent who never logged out.
+const heldBy = (uid, k1, k2) =>
+  "insert into public.push_subscriptions(user_id, endpoint, p256dh, auth) values ('"
+  + uid + "','" + EP + "','" + (k1 || K1) + "','" + (k2 || K2) + "');";
+const ownerOf = "select user_id::text from public.push_subscriptions where endpoint = '" + EP + "';";
+const rowCount = "select count(*)::text from public.push_subscriptions where endpoint = '" + EP + "';";
+
+add('L01', 'push-claim', 'anon cannot execute the claim function at all',
+  { role: 'anon', sql: claim(EP, K1, K2), expect: 'error', expectError: /permission denied for function claim_push_subscription/ });
+add('L02', 'push-claim', 'authenticated with no JWT subject is refused, not treated as nobody',
+  { role: 'authenticated', sql: claim(EP, K1, K2), expect: 'error', expectError: /only be claimed by a signed-in guardian/ });
+add('L03', 'push-claim', 'a first subscribe on an unheld endpoint succeeds',
+  { role: 'authenticated', claims: GUARDIAN_A, sql: claim(EP, K1, K2), expect: 'ok', expectOut: 't' });
+add('L04', 'push-claim', 'and the row it wrote belongs to the caller, not to anyone they named',
+  { role: 'authenticated', claims: GUARDIAN_A, sql: claim(EP, K1, K2) + ownerOf, expect: 'ok', expectOut: GUARDIAN_A });
+add('L05', 'push-claim', 'claiming an endpoint you already hold is a no-op that succeeds',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_A, sql: claim(EP, K1, K2), expect: 'ok', expectOut: 't' });
+add('L06', 'push-claim', 'and re-claiming does not duplicate the row',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_A, sql: claim(EP, K1, K2) + rowCount, expect: 'ok', expectOut: '1' });
+add('L07', 'push-claim', 'THE CASE: the next parent on the same browser takes the endpoint',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, K1, K2), expect: 'ok', expectOut: 't' });
+add('L08', 'push-claim', 'and the row is now theirs, so the reminders go to the right person',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, K1, K2) + ownerOf, expect: 'ok', expectOut: GUARDIAN_B });
+add('L09', 'push-claim', 'the displaced row is gone rather than left beside the new one',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, K1, K2) + rowCount, expect: 'ok', expectOut: '1' });
+add('L10', 'push-claim', 'NEGATIVE: an endpoint without its keys cannot be taken',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, OTHER_K1, OTHER_K2), expect: 'ok', expectOut: 'f' });
+add('L11', 'push-claim', 'and the rightful owner keeps it when the keys do not match',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, OTHER_K1, OTHER_K2) + 'reset role;' + ownerOf, expect: 'ok', expectOut: GUARDIAN_A });
+add('L12', 'push-claim', 'one right key is not enough — p256dh alone does not claim it',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, K1, OTHER_K2) + 'reset role;' + ownerOf, expect: 'ok', expectOut: GUARDIAN_A });
+add('L13', 'push-claim', 'nor auth alone',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: claim(EP, OTHER_K1, K2) + 'reset role;' + ownerOf, expect: 'ok', expectOut: GUARDIAN_A });
+add('L14', 'push-claim', 'an empty endpoint is refused',
+  { role: 'authenticated', claims: GUARDIAN_A, sql: claim('', K1, K2), expect: 'error', expectError: /endpoint and both subscription keys are required/ });
+add('L15', 'push-claim', 'an empty key is refused',
+  { role: 'authenticated', claims: GUARDIAN_A, sql: claim(EP, '', K2), expect: 'error', expectError: /endpoint and both subscription keys are required/ });
+add('L16', 'push-claim', 'an absurdly long endpoint is refused rather than stored',
+  { role: 'authenticated', claims: GUARDIAN_A,
+    sql: "select public.claim_push_subscription(repeat('x',2049),'" + K1 + "','" + K2 + "');",
+    expect: 'error', expectError: /endpoint and both subscription keys are required/ });
+add('L17', 'push-claim', 'the function did not loosen the table: a guardian still cannot delete another row',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B,
+    sql: "delete from public.push_subscriptions where endpoint = '" + EP + "';reset role;" + rowCount,
+    expect: 'ok', expectOut: '1' });
+add('L18', 'push-claim', 'nor read one: ps_select still scopes to your own rows',
+  { setup: heldBy(GUARDIAN_A), role: 'authenticated', claims: GUARDIAN_B, sql: rowCount, expect: 'ok', expectOut: '0' });
+add('L19', 'push-claim', 'anon still cannot read the table directly either',
+  { setup: heldBy(GUARDIAN_A), role: 'anon', sql: rowCount, expect: 'ok', expectOut: '0' });
+
+// =========================================================== M. service value constraints
+//
+// price_cents, duration_min and max_group_size were plain ints with nothing behind them,
+// and the browser's only guard was isNaN(parseFloat(v)) — which '-40' passes.
+const TRAINER = GUARDIAN_A;
+const svcSetup =
+  "insert into public.trainer_profiles(id, status, display_name) values ('"
+  + TRAINER + "','draft','Synthetic Trainer A') on conflict (id) do nothing;";
+const svc = (cols) =>
+  "insert into public.services(trainer_id, title, price_cents, duration_min, max_group_size) values ('"
+  + TRAINER + "','Synthetic session'," + cols + ");";
+const svcCount = "select count(*)::text from public.services where trainer_id='" + TRAINER + "';";
+
+add('M01', 'service-values', 'a well-formed service is still accepted',
+  { setup: svcSetup, sql: svc('4000, 60, 1') + svcCount, expect: 'ok', expectOut: '1' });
+add('M02', 'service-values', 'THE CASE: a negative price is refused by the database',
+  { setup: svcSetup, sql: svc('-4000, 60, 1'),
+    expect: 'error', expectError: /services_price_cents_not_negative/ });
+add('M03', 'service-values', 'a free session is allowed — zero is a real price',
+  { setup: svcSetup, sql: svc('0, 60, 1') + svcCount, expect: 'ok', expectOut: '1' });
+add('M04', 'service-values', 'a zero-minute session is refused',
+  { setup: svcSetup, sql: svc('4000, 0, 1'),
+    expect: 'error', expectError: /services_duration_min_positive/ });
+add('M05', 'service-values', 'a negative duration is refused',
+  { setup: svcSetup, sql: svc('4000, -5, 1'),
+    expect: 'error', expectError: /services_duration_min_positive/ });
+add('M06', 'service-values', 'a group of zero athletes is refused',
+  { setup: svcSetup, sql: svc('4000, 60, 0'),
+    expect: 'error', expectError: /services_max_group_size_at_least_one/ });
+add('M07', 'service-values', 'a negative group size is refused',
+  { setup: svcSetup, sql: svc('4000, 60, -5'),
+    expect: 'error', expectError: /services_max_group_size_at_least_one/ });
+add('M08', 'service-values', 'an unspecified group size stays allowed — null is not zero',
+  { setup: svcSetup, sql: svc('4000, 60, null') + svcCount, expect: 'ok', expectOut: '1' });
+add('M09', 'service-values', 'an UPDATE cannot smuggle a negative price past the constraint either',
+  { setup: svcSetup + svc('4000, 60, 1'),
+    sql: "update public.services set price_cents = -4000 where trainer_id='" + TRAINER + "';",
+    expect: 'error', expectError: /services_price_cents_not_negative/ });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

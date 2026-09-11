@@ -111,19 +111,21 @@ async function enablePush(){
     }
     if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:keyBytes });
     const j=sub.toJSON();
-    const { error }=await sb.from('push_subscriptions').upsert(
-      { user_id:state.user.id, endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth },
-      { onConflict:'endpoint', ignoreDuplicates:true });
+    // claim_push_subscription rather than an upsert. The table is UNIQUE on endpoint and
+    // an endpoint belongs to the BROWSER, so on a shared device the row may still be held
+    // by whoever used this browser last. The old upsert wrote ON CONFLICT DO NOTHING,
+    // which returns success whether it wrote a row or silently declined to, and there is
+    // no update policy that would let it do anything else.
+    //
+    // The function takes the endpoint from another guardian only when we can also produce
+    // the subscription's own keys, which only the browser holding it has. It returns false
+    // rather than raising when it will not, so there is a truthful answer to show either
+    // way and no read-back is needed to find out what actually happened.
+    const { data:claimed, error }=await sb.rpc('claim_push_subscription',{
+      p_endpoint:sub.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth });
     if(error){ console.error(error); reportError(error,'push:subscribe'); toast('Could not turn on notifications'); return false; }
-    // ON CONFLICT DO NOTHING reports success whether it wrote a row or silently declined
-    // to. Read it back: the select policy only returns rows whose user_id is ours, so an
-    // empty result means another account on this browser still holds the endpoint and
-    // nothing will ever be delivered here. Saying "Notifications on" to that is a lie.
-    const { data:mine, error:readBack } = await sb.from('push_subscriptions')
-      .select('id').eq('endpoint', sub.endpoint).limit(1);
-    if(readBack){ console.error(readBack); reportError(readBack,'push:subscribe'); }
-    else if(!mine || !mine.length){
-      reportError(new Error('push endpoint still held by another account'),'push:subscribe');
+    if(claimed!==true){
+      reportError(new Error('push endpoint held by another account and the keys did not match'),'push:subscribe');
       toast('Another account on this device still has reminders on. Log out of it first.');
       return false;
     }

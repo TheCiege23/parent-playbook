@@ -1,5 +1,5 @@
-// services.price_cents, duration_min and max_group_size are plain `int` columns with no
-// check constraint behind them, so the database will take a negative price without
+// services.price_cents, duration_min and max_group_size were plain `int` columns with no
+// check constraint behind them, so the database would take a negative price without
 // complaint. The only validation in front of it was
 //
 //   if(priceV===''||isNaN(parseFloat(priceV))) ...
@@ -11,8 +11,15 @@
 // because -5 is truthy. The fallback only ever caught NaN and zero, so a negative duration
 // or a group size of -5 was storable too.
 //
-// The fix is client-side because adding check constraints is a schema change to a live
-// database. The constraint that is missing is recorded here so it is not forgotten.
+// Both halves are now in place, and they do different jobs. The constraints in
+// 20260911160500_service_value_constraints.sql are the rule: the table is reachable through
+// PostgREST by any approved trainer, so a rule enforced only by one screen is a suggestion.
+// The checks in the browser are still there because a constraint violation arrives as
+// `new row for relation "services" violates check constraint ...`, which is not a sentence
+// to show a trainer who typed a minus sign by accident.
+//
+// The constraints themselves are exercised executably against a real cluster in
+// tests/db/security-tests.cjs, group `service-values`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -21,14 +28,32 @@ const path = require('node:path');
 const base = path.resolve(__dirname, '..');
 const read = p => fs.readFileSync(path.join(base, p), 'utf8');
 
-test('the database really will accept these values', () => {
+test('the base table never constrained these columns', () => {
+  // Where the hole was, and why the constraints had to arrive in a later migration rather
+  // than being edited into the original one — that file has already run everywhere.
   const sql = read('supabase/migrations/20260806160436_trainer_marketplace_enums_tables.sql');
   const table = sql.slice(sql.indexOf('create table if not exists services'));
   const body = table.slice(0, table.indexOf(');') + 2);
   assert.match(body, /price_cents int not null/, 'a plain int');
-  assert.ok(!/price_cents[^,]*check/.test(body), 'with no check constraint — which is why the client has to');
+  assert.ok(!/price_cents[^,]*check/.test(body), 'with nothing behind it');
   assert.ok(!/duration_min[^,]*check/.test(body));
   assert.ok(!/max_group_size[^,]*check/.test(body));
+});
+
+test('the migration adds the rule to the table, where it belongs', () => {
+  const sql = read('supabase/migrations/20260911160500_service_value_constraints.sql');
+  assert.match(sql, /add constraint services_price_cents_not_negative\s*\n?\s*check \(price_cents >= 0\)/,
+    'zero is a real price — a free introductory session — so this is >= and not >');
+  assert.match(sql, /add constraint services_duration_min_positive\s*\n?\s*check \(duration_min > 0\)/,
+    'a session lasts at least a minute, so this one IS strict');
+  assert.match(sql, /add constraint services_max_group_size_at_least_one\s*\n?\s*check \(max_group_size is null or max_group_size >= 1\)/,
+    'null means unspecified and must stay allowed; it is not the same as zero');
+  // NOT VALID then VALIDATE: the second step is what makes an existing bad row fail here,
+  // naming the constraint, rather than inside somebody's unrelated deploy later.
+  for (const c of ['services_price_cents_not_negative', 'services_duration_min_positive', 'services_max_group_size_at_least_one']) {
+    assert.ok(sql.includes('add constraint ' + c) && sql.includes('validate constraint ' + c),
+      c + ' should be added NOT VALID and then validated');
+  }
 });
 
 test('the old validation let every one of these through', () => {
@@ -47,11 +72,27 @@ test('the old validation let every one of these through', () => {
   assert.equal(oldInt('abc', 60), 60);
 });
 
-test('the sheet now refuses each of them, with a reason', () => {
+test('the sheet still refuses each of them, with a sentence a person can read', () => {
   const src = read('js/trainer-services.js');
   assert.match(src, /if\(priceCents<0\)\{ errEl\.textContent="A price can't be negative\."; return; \}/);
   assert.match(src, /if\(durMin<=0\)\{ errEl\.textContent='A session has to be at least a minute long\.'; return; \}/);
   assert.match(src, /if\(grpSize<1\)\{ errEl\.textContent='A group is at least one athlete\.'; return; \}/);
+});
+
+test('the browser agrees with the database about where the boundaries are', () => {
+  // If these ever drift apart, a trainer gets a raw constraint violation for a value the
+  // form told them was fine — or the form refuses something the table would have taken.
+  const src = read('js/trainer-services.js');
+  const sql = read('supabase/migrations/20260911160500_service_value_constraints.sql');
+  // price: both allow zero, both refuse negative.
+  assert.ok(sql.includes('price_cents >= 0') && /priceCents<0/.test(src),
+    'price: zero allowed, negative refused, on both sides');
+  // duration: both refuse zero.
+  assert.ok(sql.includes('duration_min > 0') && /durMin<=0/.test(src),
+    'duration: zero refused on both sides');
+  // group size: both refuse zero, both allow unspecified.
+  assert.ok(sql.includes('max_group_size >= 1') && /grpSize<1/.test(src),
+    'group size: below one refused on both sides');
 });
 
 test('the row is built from the values that were checked', () => {

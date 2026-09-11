@@ -183,14 +183,14 @@ test('the recorded archive still describes the payload that would be built today
 // nothing was checking that the four documents quoting it agreed.
 //
 // They stopped agreeing. CLAUDE-CONTINUATION-HANDOFF.md said 154/154 while the deck, the
-// SDK guide and the handoff's own SDK paragraph all said 176/176. A buyer reading two of
+// SDK guide and the handoff's own SDK paragraph all said 204/204. A buyer reading two of
 // our documents would have found two different numbers for the same command.
 //
 // This cannot verify the total is right; only running tests/db/run.cjs does that. It can
 // verify that one number was updated everywhere, which is the failure that actually
 // happened.
-const DB_TOTAL = 176;
-const DB_SECURITY = 159;
+const DB_TOTAL = 204;
+const DB_SECURITY = 187;
 const DB_RESTORE = 17;
 
 test('every document quotes the same database total', () => {

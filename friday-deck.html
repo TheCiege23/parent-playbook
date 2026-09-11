@@ -94,7 +94,7 @@
       with full audit and bounded retention.</li>
     <li><strong>For a buyer:</strong> a portable SDK, its migrations and its verification tooling,
       hostable on your own origin.</li>
-    <li><strong>Live now</strong> at playbookbp.com on build <code>pp-v105</code>.</li>
+    <li><strong>Live now</strong> at playbookbp.com on build <code>pp-v106</code>.</li>
   </ul>
   <div class="notes"><b>Notes.</b> Lead with the journey, not the measurement. Do not open on parity
     percentages. If asked what is live right now: capture, outputs, insights, organization records
@@ -156,16 +156,16 @@
     <li><strong>Tenant isolation lives in the database, not only the app.</strong> Row-level
       security, organization-admin policies, a scalar-only payload allowlist, and privileges that
       deny <code>TRUNCATE</code> to every tenant role.</li>
-    <li><strong>176 executable database tests</strong> against a disposable PostgreSQL cluster built
-      by replaying the real 79 migrations — not assertions about SQL source text.</li>
+    <li><strong>204 executable database tests</strong> against a disposable PostgreSQL cluster built
+      by replaying the real 81 migrations — not assertions about SQL source text.</li>
     <li><strong>Deletion is rehearsed, not asserted:</strong> the row goes, the deletion is audited,
       the audit row keeps no copy of the values, the scheduled sweep removes expired records, and
       another organization cannot delete yours.</li>
     <li><strong>Restore is rehearsed:</strong> the schema dumps and restores with row-level security
       and privileges intact — and the rehearsal damages the restored copy on purpose to prove it
       would notice if they were not.</li>
-    <li><strong>The buyer archive stands alone:</strong> 152 files, checksummed, verified by one
-      command; its own bundled migrations rebuild the schema and pass all 176 tests on a clean
+    <li><strong>The buyer archive stands alone:</strong> 154 files, checksummed, verified by one
+      command; its own bundled migrations rebuild the schema and pass all 204 tests on a clean
       database.</li>
   </ul>
   <div class="notes"><b>Notes.</b> The strongest slide — the one claim backed by executed tests
@@ -239,9 +239,9 @@
   </ul>
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
-    <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v105</code>, 28/28</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>426/426</td></tr>
-    <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>176/176</td></tr>
+    <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v106</code>, 28/28</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>431/431</td></tr>
+    <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>204/204</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>6/6 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>
     <tr><td>Weighted parity</td><td><code>node tools/parity-progress.cjs</code></td><td>37.75%</td></tr>

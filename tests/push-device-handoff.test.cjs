@@ -9,15 +9,24 @@
 //   3. Parent B signs in and turns on reminders. The insert collides with A's row and does
 //      nothing. PostgREST returns no error, so B is told "Notifications on 🔔".
 //   4. B never receives a reminder. A's weekly reminder still arrives on that iPad, and
-//      notify-weekly writes it as "<child>'s first name>'s week is ready" — a title that
+//      notify-weekly writes it as "<child's first name>'s week is ready" — a title that
 //      shows on a locked screen, to whoever is holding the device now.
 //
-// Two faults, fixed separately here: logging out now releases the endpoint, and enablePush
-// reads the row back instead of trusting a write that is allowed to do nothing.
+// This is fixed in two places, and both are exercised here.
 //
-// These drive the real js/pwa.js against a fake browser and a fake PostgREST that enforces
-// both the unique constraint and the row-level policies as written in the migration, so the
-// scenario above runs end to end rather than being asserted about.
+// Logging out releases the endpoint: the departing parent deletes their own row (which is
+// all ps_delete permits) and unsubscribes the browser. That covers the ordinary case.
+//
+// It does not cover a session that was simply abandoned, so enablePush no longer upserts at
+// all. It calls public.claim_push_subscription, which takes the endpoint from another
+// guardian ONLY when the caller can also produce the subscription's own p256dh and auth
+// keys — which the browser holding it reports unchanged whoever is signed in, and which
+// someone who merely saw an endpoint in a log cannot produce. It returns false rather than
+// raising when it will not, so there is a truthful answer to show either way.
+//
+// The fake PostgREST below enforces the unique constraint, each row-level policy as the
+// migration writes it, and the function's own logic. The SQL itself is tested separately
+// and executably in tests/db/security-tests.cjs, group `push-claim`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -26,32 +35,46 @@ const path = require('node:path');
 
 const base = path.resolve(__dirname, '..');
 
-// ---- a PostgREST that behaves like the migration says --------------------------------
+// ---- a PostgREST that behaves like the migrations say ---------------------------------
 //
-// supabase/migrations/20260806173442_push_and_payment_columns.sql:
+// 20260806173442_push_and_payment_columns.sql:
 //   endpoint text not null unique
 //   ps_select / ps_insert / ps_delete, each gated on user_id = auth.uid()
-//   ...and NO update policy, which is why the upsert cannot rebind the row.
+//   ...and NO update policy, which is why an upsert could never rebind the row.
+// 20260911160000_push_subscription_claim.sql:
+//   claim_push_subscription(endpoint, p256dh, auth) -> boolean, SECURITY DEFINER
 function fakePostgrest(db, session) {
   const visible = r => r.user_id === session.id;
   return {
+    rpc(name, args) {
+      assert.equal(name, 'claim_push_subscription', 'unexpected function: ' + name);
+      const { p_endpoint, p_p256dh, p_auth } = args;
+      if (!session.id) {
+        return Promise.resolve({ data: null, error: { code: '42501', message: 'a push subscription can only be claimed by a signed-in guardian' } });
+      }
+      if (!p_endpoint || p_endpoint.length > 2048 || !p_p256dh || !p_auth) {
+        return Promise.resolve({ data: null, error: { code: '22023', message: 'endpoint and both subscription keys are required' } });
+      }
+      const held = db.find(r => r.endpoint === p_endpoint);
+      if (!held) {
+        db.push({ id: 'row-' + (db.length + 1), user_id: session.id, endpoint: p_endpoint, p256dh: p_p256dh, auth: p_auth });
+        return Promise.resolve({ data: true, error: null });
+      }
+      if (held.user_id === session.id) {
+        held.p256dh = p_p256dh; held.auth = p_auth;
+        return Promise.resolve({ data: true, error: null });
+      }
+      // Held by someone else: only the holder of the subscription's keys may displace it.
+      if (held.p256dh !== p_p256dh || held.auth !== p_auth) {
+        return Promise.resolve({ data: false, error: null });
+      }
+      db.splice(db.indexOf(held), 1);
+      db.push({ id: 'row-' + (db.length + 1), user_id: session.id, endpoint: p_endpoint, p256dh: p_p256dh, auth: p_auth });
+      return Promise.resolve({ data: true, error: null });
+    },
     from(table) {
       assert.equal(table, 'push_subscriptions', 'unexpected table: ' + table);
       return {
-        upsert(row, opts) {
-          const clash = db.find(r => r.endpoint === row.endpoint);
-          if (clash) {
-            // ON CONFLICT DO NOTHING. No error, no write, no hint that anything happened.
-            if (opts && opts.ignoreDuplicates) return Promise.resolve({ error: null });
-            // The other branch would need an update policy, and there isn't one.
-            return Promise.resolve({ error: { code: '42501', message: 'new row violates row-level security policy' } });
-          }
-          if (row.user_id !== session.id) {
-            return Promise.resolve({ error: { code: '42501', message: 'new row violates row-level security policy' } });
-          }
-          db.push({ id: 'row-' + (db.length + 1), ...row });
-          return Promise.resolve({ error: null });
-        },
         select() {
           const where = {};
           const q = {
@@ -85,23 +108,18 @@ function fakePostgrest(db, session) {
 function fakeBrowser(opts) {
   const o = opts || {};
   const log = { toasts: [], reported: [], unsubscribed: 0 };
-  let sub = o.subscribed === false ? null : {
-    endpoint: 'https://push.example.test/endpoint/AAA',
-    options: { applicationServerKey: null },
-    toJSON: () => ({ keys: { p256dh: 'p256dh-AAA', auth: 'auth-AAA' } }),
+  const KEYS = o.keys || { p256dh: 'p256dh-AAA', auth: 'auth-AAA' };
+  const ENDPOINT = o.endpoint || 'https://push.example.test/endpoint/AAA';
+  const make = (applicationServerKey) => ({
+    endpoint: ENDPOINT,
+    options: { applicationServerKey: applicationServerKey || null },
+    toJSON: () => ({ keys: { ...KEYS } }),
     unsubscribe() { log.unsubscribed++; sub = null; return Promise.resolve(true); },
-  };
+  });
+  let sub = o.subscribed === false ? null : make(null);
   const pushManager = {
     getSubscription: () => Promise.resolve(sub),
-    subscribe(cfg) {
-      sub = {
-        endpoint: 'https://push.example.test/endpoint/AAA',
-        options: { applicationServerKey: cfg.applicationServerKey },
-        toJSON: () => ({ keys: { p256dh: 'p256dh-AAA', auth: 'auth-AAA' } }),
-        unsubscribe() { log.unsubscribed++; sub = null; return Promise.resolve(true); },
-      };
-      return Promise.resolve(sub);
-    },
+    subscribe(cfg) { sub = make(cfg.applicationServerKey); return Promise.resolve(sub); },
   };
   const registration = { pushManager };
   const navigator = {
@@ -111,7 +129,7 @@ function fakeBrowser(opts) {
       getRegistration: () => Promise.resolve(o.registered === false ? undefined : registration),
     },
   };
-  return { log, navigator, registration, currentSub: () => sub };
+  return { log, navigator, registration, currentSub: () => sub, KEYS, ENDPOINT };
 }
 
 function loadPwa(browser, session, db) {
@@ -132,33 +150,51 @@ function loadPwa(browser, session, db) {
   return ctx;
 }
 
-test('the leak, reproduced: without a release the second parent is told a lie', async () => {
-  // This is the pre-fix behaviour of the WRITE, kept as the negative control. The upsert
-  // still silently declines — that is the database doing what the policy says — and the
-  // test shows that the read-back is the only thing standing between that and "on".
+test('THE CASE: the next parent on a shared browser gets the endpoint', () => {
+  // This is what used to fail silently. B never logged A out; the row is still A's, and the
+  // browser reports the same subscription it always had. B can produce its keys, so B takes
+  // it — and, crucially, A stops receiving reminders on a device A no longer uses.
   const db = [];
   const session = { id: 'parent-A' };
   const browser = fakeBrowser({ subscribed: false });
   const ctx = loadPwa(browser, session, db);
 
-  assert.equal(await ctx.enablePush(), true, 'the first parent subscribes normally');
-  assert.equal(db.length, 1);
-  assert.equal(db[0].user_id, 'parent-A');
+  return ctx.enablePush().then(first => {
+    assert.equal(first, true, 'the first parent subscribes normally');
+    assert.equal(db.length, 1);
+    assert.equal(db[0].user_id, 'parent-A');
 
-  // Parent B signs in on the same browser. Same endpoint, because the endpoint is the
-  // browser's. A never logged out, so A's row is still there.
-  session.id = 'parent-B';
-  const ok = await ctx.enablePush();
-  assert.equal(ok, false, 'enablePush must not report success it did not achieve');
-  assert.equal(db.length, 1, 'the collision wrote nothing, exactly as ON CONFLICT DO NOTHING says');
-  assert.equal(db[0].user_id, 'parent-A', "and the row still belongs to the parent who left");
+    session.id = 'parent-B';
+    return ctx.enablePush().then(second => {
+      assert.equal(second, true, 'the second parent now succeeds instead of being told a lie');
+      assert.equal(db.length, 1, 'and there is still exactly one row for this browser');
+      assert.equal(db[0].user_id, 'parent-B', 'which belongs to whoever is signed in now');
+      assert.match(browser.log.toasts[browser.log.toasts.length - 1], /Notifications on/);
+    });
+  });
+});
+
+test('NEGATIVE: an endpoint without its keys cannot be taken', async () => {
+  // The reason the function asks for the keys and not just the endpoint. An endpoint can
+  // leak into a log or an error report; the keys stay in the browser that holds the
+  // subscription. Someone with only the endpoint would otherwise be able to stop a
+  // stranger's reminders and have their own delivered to that stranger's lock screen.
+  const db = [{ id: 'row-1', user_id: 'parent-A', endpoint: 'https://push.example.test/endpoint/AAA',
+                p256dh: 'the-real-p256dh', auth: 'the-real-auth' }];
+  const session = { id: 'attacker' };
+  const browser = fakeBrowser({ keys: { p256dh: 'guessed', auth: 'guessed' } });
+  const ctx = loadPwa(browser, session, db);
+
+  assert.equal(await ctx.enablePush(), false, 'the claim is refused');
+  assert.equal(db.length, 1);
+  assert.equal(db[0].user_id, 'parent-A', 'and the rightful owner keeps their reminders');
   assert.match(browser.log.toasts[browser.log.toasts.length - 1], /another account/i,
-    'the parent is told what is actually wrong');
+    'the caller is told what is actually wrong rather than "Notifications on"');
   assert.ok(browser.log.reported.some(r => /push:subscribe/.test(r)),
     'and it is reported, because silent reminder loss is invisible otherwise');
 });
 
-test('logging out releases the endpoint, and the next parent gets it', async () => {
+test('logging out still releases the endpoint, which is the ordinary path', async () => {
   const db = [];
   const session = { id: 'parent-A' };
   const browser = fakeBrowser({ subscribed: false });
@@ -167,22 +203,18 @@ test('logging out releases the endpoint, and the next parent gets it', async () 
   assert.equal(await ctx.enablePush(), true);
   assert.equal(db.length, 1);
 
-  // A logs out. This runs while A still has a token — which is why it has to come before
-  // signOut() and not after.
+  // This runs while A still has a token — which is why it has to come before signOut()
+  // and not after: ps_delete is gated on auth.uid().
   await ctx.releasePushOnThisDevice();
-  assert.equal(db.length, 0, "the row goes with the parent who is leaving");
+  assert.equal(db.length, 0, 'the row goes with the parent who is leaving');
   assert.equal(browser.log.unsubscribed, 1, 'and the browser-side subscription is dropped too');
   assert.equal(browser.currentSub(), null);
-
-  session.id = 'parent-B';
-  assert.equal(await ctx.enablePush(), true, 'the next parent subscribes cleanly');
-  assert.equal(db.length, 1);
-  assert.equal(db[0].user_id, 'parent-B', 'and the reminders now go to the right person');
 });
 
 test('a parent can only release their own row, never somebody else\'s', async () => {
-  // ps_delete is `using (user_id = auth.uid())`. If that ever stopped being true, one
-  // guardian could switch off another's reminders by knowing an endpoint.
+  // ps_delete is `using (user_id = auth.uid())`. The claim function deliberately did not
+  // loosen this: taking an endpoint requires the keys, and plain deletion still does not
+  // reach another guardian's row at all.
   const db = [];
   const session = { id: 'parent-A' };
   const browser = fakeBrowser({ subscribed: false });
@@ -214,8 +246,18 @@ test('releasing with a registration but no subscription is a no-op', async () =>
   assert.equal(db.length, 1, 'nothing is subscribed here, so there is nothing to release');
 });
 
+test('enablePush claims through the function and never upserts the table', () => {
+  const src = fs.readFileSync(path.join(base, 'js', 'pwa.js'), 'utf8');
+  assert.match(src, /sb\.rpc\('claim_push_subscription',\{/,
+    'the subscribe path should go through the function');
+  assert.ok(!/from\('push_subscriptions'\)\.upsert/.test(src),
+    'the ON CONFLICT DO NOTHING upsert must be gone, not merely bypassed');
+  assert.match(src, /if\(claimed!==true\)\{/,
+    'a false return is not success and must not be treated as one');
+});
+
 test('every sign-out path releases this device first', () => {
-  // The fix is only worth anything if it is on every exit. Six places call signOut().
+  // The release is only worth anything if it is on every exit. Six places call signOut().
   const sites = [
     ['js/shell.js', '#logout'],
     ['js/account.js', '#acctLogout'],
@@ -247,6 +289,18 @@ test('nothing else calls signOut without releasing', () => {
   const total = found.reduce((a, [, n]) => a + n, 0);
   assert.equal(total, 6,
     'the sign-out paths changed (' + JSON.stringify(found) + '); each one needs releasePushOnThisDevice() before it');
+});
+
+test('the migration grants the function to authenticated and nobody else', () => {
+  const sql = fs.readFileSync(
+    path.join(base, 'supabase', 'migrations', '20260911160000_push_subscription_claim.sql'), 'utf8');
+  assert.match(sql, /security definer/, 'it has to bypass RLS to delete a row RLS protects');
+  assert.match(sql, /set search_path = ''/, 'and a definer function must pin its search_path');
+  assert.match(sql, /revoke all on function public\.claim_push_subscription\(text, text, text\) from public;/,
+    'EXECUTE is granted to PUBLIC by default, which includes anon');
+  assert.match(sql, /grant execute on function public\.claim_push_subscription\(text, text, text\) to authenticated;/);
+  assert.match(sql, /and ps\.p256dh = p_p256dh\s*\n\s*and ps\.auth = p_auth;/,
+    'displacing another guardian must require both keys, not just the endpoint');
 });
 
 test('the helper ships to the browser and survives offline', () => {

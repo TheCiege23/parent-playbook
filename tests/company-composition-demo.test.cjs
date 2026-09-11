@@ -14,5 +14,5 @@ test('production allowlist and smoke checks include every composition integratio
   const docker=read('Dockerfile'),smoke=read('tools/deployment-smoke.cjs'),worker=read('sw.js');
   for(const name of ['company-composition-demo.html','company-composition-demo.mjs'])assert.match(docker,new RegExp(name.replace('.','\\.')));
   for(const route of ['/company-composition-demo','/company-composition-demo.mjs','/js/body-composition-contract.mjs','/js/body-composition-validation.mjs'])assert.ok(smoke.includes(route));
-  assert.match(worker,/pp-v105/);assert.ok(worker.includes('/company-composition-demo'));
+  assert.match(worker,/pp-v106/);assert.ok(worker.includes('/company-composition-demo'));
 });

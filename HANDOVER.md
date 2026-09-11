@@ -145,10 +145,10 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
 | `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
-| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 176 cases pass as restricted roles: 159 security cases plus a 17-case restore and deletion rehearsal |
+| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 204 cases pass as restricted roles: 187 security cases plus a 17-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
-| `node --test tests/<name>.test.cjs` | 107 contract and adapter checks against the shipped modules. The full 283-check suite covers app code that is not part of this package and runs in the source repository, not here |
+| `node --test tests/<name>.test.cjs` | 107 contract and adapter checks against the shipped modules. The full 431-check suite covers app code that is not part of this package and runs in the source repository, not here |
 
 The checksum manifest is unsigned. It detects accidental change, not a determined substitution, and
 it can be replaced alongside modified files. Keep a separately trusted copy if you are verifying a

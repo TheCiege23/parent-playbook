@@ -51,6 +51,8 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260910014500_company_body_active_consent_rpc.sql','supabase/migrations/20260910033000_company_adult_reference_assessments.sql',
   'supabase/migrations/20260910190000_company_composition_results.sql','supabase/migrations/20260910200000_least_privilege_public_table_grants.sql',
   'supabase/migrations/20260910210000_capture_rls_auto_enable_event_trigger.sql',
+  'supabase/migrations/20260911160000_push_subscription_claim.sql',
+  'supabase/migrations/20260911160500_service_value_constraints.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.

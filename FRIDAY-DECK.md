@@ -13,10 +13,10 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v105`, 28/28 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 426/426 |
-| Database suite | `node tests/db/run.cjs` | 176/176 on a disposable cluster built from the real migrations: 159 security cases plus a 17-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 6/6 checks: manifest 152/152, exclusions clean, contracts 107/107, database 176/176, host serving |
+| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v106`, 28/28 checks, `ok: true` |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 431/431 |
+| Database suite | `node tests/db/run.cjs` | 204/204 on a disposable cluster built from the real migrations: 187 security cases plus a 17-case restore and deletion rehearsal |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 6/6 checks: manifest 154/154, exclusions clean, contracts 107/107, database 204/204, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 37.75%, 38% rounded, 0 of 13 categories fully accepted |
 
@@ -31,7 +31,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
   predicted adult height.
 - An organization side: rostered athletes, consent, an organization-scoped record with audit and
   retention, and an SDK a company can host itself.
-- Deployed and reachable today at playbookbp.com on build `pp-v105`.
+- Deployed and reachable today at playbookbp.com on build `pp-v106`.
 
 *Speaker notes.* Lead with the journey, not the measurement — the measurement is a feature of a
 product parents already use for training, rest and schedule. Do not open on parity percentages.
@@ -84,8 +84,8 @@ against anyone.
 - **Tenant isolation is enforced in the database, not only in the app.** Row-level security,
   organization-admin policies, a scalar-only payload allowlist, and privileges that deny
   `TRUNCATE` to every tenant role.
-- **176 executable database tests**, run against a disposable PostgreSQL cluster built by replaying
-  the real 79 migrations — not assertions about SQL source text.
+- **204 executable database tests**, run against a disposable PostgreSQL cluster built by replaying
+  the real 81 migrations — not assertions about SQL source text.
 - **Deletion is rehearsed, not asserted**: the row goes, the deletion is audited, the audit row keeps
   no copy of the values, the scheduled sweep removes expired records, and another organization cannot
   delete yours.
@@ -94,8 +94,8 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 152 files, checksummed, one command to verify it, and its own
-  bundled migrations rebuild the schema and pass all 176 tests on a clean database.
+- **The buyer archive stands alone**: 154 files, checksummed, one command to verify it, and its own
+  bundled migrations rebuild the schema and pass all 204 tests on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
 than judgment. Three defects worth admitting if pressed, because finding them is the point: the
