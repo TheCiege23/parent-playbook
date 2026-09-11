@@ -529,6 +529,8 @@ function sptvDiscard(){
 const SPRINT_FAIL = {
   no_pose: { h:'A body could not be tracked in that video',
     p:'Usually the whole run wasn\'t in frame, or the light made the outline hard to track. Whole course in frame, good light, phone steady — that fixes this most often.' },
+  clip_too_long: { h:'The clip was longer than the part we read',
+    p:'The run finished after the point where the video stops being examined, so the second crossing was never seen. The marks are probably fine. Record again and start the video closer to the run — a few seconds of lead-in is plenty.' },
   no_crossing_detected: { h:"Didn't see a clear crossing at one of the marks",
     p:'The video played and a body was tracked, but it never clearly passed through one of the two spots you marked. Re-check that the marks match where the run actually happened.' },
   crossed_out_of_order: { h:'The finish came before the start',

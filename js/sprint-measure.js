@@ -28,7 +28,14 @@
 // on a paused frame) than overlaying UI on a live camera feed would have been.
 
 const SPRINT_SAMPLE_MS = 33;      // fine enough to resolve a fast youth sprint's crossing instants
-const SPRINT_MAX_SECONDS = 8;
+// How much of the clip is examined. This has to cover the whole run PLUS whatever lead-in
+// the parent recorded before it started — they press record, the child gets set, then goes.
+// At 8s it did not: a 40-yard dash takes a young child 8-9 seconds on its own, so the finish
+// crossing fell outside the window and came back as "no crossing detected", which told the
+// parent to re-check their marks. They could re-mark forever and never succeed. It also
+// contradicted SPRINT_MEAS_MAX_S below, which accepts an elapsed time this could never see.
+// Only a long clip pays the extra frames; a short one still stops at its own duration.
+const SPRINT_MAX_SECONDS = 20;
 const SPRINT_MEAS_MIN_S = 0.8;    // same sanity floor as the stopwatch — faster isn't a real sprint
 const SPRINT_MEAS_MAX_S = 15;
 const YD_TO_MI = 1 / 1760;
@@ -101,7 +108,13 @@ async function measureSprintFromVideo({ videoBlob, startPoint, finishPoint, dist
 
   const tStart = crossingTime(series, startPoint.x);
   const tFinish = crossingTime(series, finishPoint.x);
-  if(tStart == null || tFinish == null) throw new Error('no_crossing_detected');
+  if(tStart == null || tFinish == null){
+    // Distinguish the two causes. If the clip ran past the window we read, the marks may be
+    // perfect and the run simply happened after we stopped looking — telling the parent to
+    // re-check their marks would send them round in circles.
+    const truncated = frames.sourceDurationS > frames.readDurationS + 0.05;
+    throw new Error(truncated ? 'clip_too_long' : 'no_crossing_detected');
+  }
   // The athlete has to actually cross the start line before the finish line in time —
   // not just have both x-positions appear somewhere in the clip. A finish-before-start
   // reading means the marks were likely swapped, or the run happened backwards, and

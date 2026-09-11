@@ -120,7 +120,8 @@ async function extractJumpFrames(videoBlob, onProgress, opts){
       video.onloadedmetadata = res;
       video.onerror = () => rej(new Error('video_unreadable'));
     });
-    const duration = Math.min(video.duration || 0, maxSeconds);
+    const sourceDurationS = video.duration || 0;
+    const duration = Math.min(sourceDurationS, maxSeconds);
     if(!(duration > 0.3)) throw new Error('video_unreadable');
 
     const landmarker = await loadVideoPoseLandmarker(onProgress);
@@ -140,6 +141,11 @@ async function extractJumpFrames(videoBlob, onProgress, opts){
       if(world && norm) frames.push({ t, world, norm });
       if(onProgress) onProgress(`Reading the video — ${Math.round((t/duration)*100)}%`);
     }
+    // Not part of the frame data — metadata about how much of the clip was examined, so a
+    // missing crossing can be reported as "we stopped reading before it happened" rather
+    // than as "it never happened".
+    frames.sourceDurationS = sourceDurationS;
+    frames.readDurationS = duration;
     return frames;
   } finally {
     URL.revokeObjectURL(url);
