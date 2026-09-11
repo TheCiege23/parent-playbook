@@ -48,7 +48,15 @@
 // the whole test) to keep the extra per-frame detection cost from growing with it.
 
 const REACT_SAMPLE_MS = 20;      // 50 samples/sec — keeps reaction-time quantisation small
-const REACT_MAX_SECONDS = 4;     // the whole test: a still beat, the cue, one move
+// The frame window is DERIVED from where the cue actually lands, not fixed. The audio is
+// decoded over the whole clip, so the cue can be anywhere the parent happened to clap, but
+// frames used to stop at a flat 4s. A cue at 5s left no frames after it, which surfaced as
+// `no_movement` — copy that tells the parent the body left frame or the light was bad, when
+// the body was in frame the whole time and we simply stopped reading before the cue. Since
+// findCue() runs first, the window can reach exactly as far past the cue as a reaction is
+// allowed to take and no further, so an ordinary lead-in costs nothing.
+const REACT_TAIL_S = 0.5;        // a little past the slowest reaction we would accept
+const REACT_HARD_CAP_S = 30;     // bounds the work if a clip is pathologically long
 const REACT_MOVE_M = 0.04;       // hip-midpoint displacement that counts as "moved"
 const REACT_STILL_M = 0.03;      // pre-cue wobble below this still counts as "still"
 const REACT_MIN_S = 0.08;        // faster than this is not a tracked reaction, it's noise
@@ -130,7 +138,8 @@ async function measureReactionTimeFromVideo({ videoBlob, onProgress }){
   const cueT = findCue(envelope);
 
   const frames = await extractJumpFrames(videoBlob, onProgress,
-    { sampleMs: REACT_SAMPLE_MS, maxSeconds: REACT_MAX_SECONDS });
+    { sampleMs: REACT_SAMPLE_MS,
+      maxSeconds: Math.min(cueT + REACT_MAX_S + REACT_TAIL_S, REACT_HARD_CAP_S) });
   if(frames.length < 6) throw new Error('no_pose');
 
   if(onProgress) onProgress('Finding the first move…');
@@ -158,7 +167,13 @@ async function measureReactionTimeFromVideo({ videoBlob, onProgress }){
 
   const after = frames.filter(f => f.t >= cueT && okHip(f));
   const moved = after.find(f => dist(hipMid(f), base) > REACT_MOVE_M);
-  if(!moved) throw new Error('no_movement');
+  if(!moved){
+    // Separate "nothing after the cue looked like a move" from "the clip ran past where we
+    // could look". Only reachable now for a cue beyond the hard cap, but reporting that as
+    // the athlete failing to move would be the same wrong answer as before.
+    if(cueT + REACT_MIN_S > frames.readDurationS) throw new Error('cue_too_late');
+    throw new Error('no_movement');
+  }
 
   const reactionS = moved.t - cueT;
   if(!(reactionS >= REACT_MIN_S && reactionS <= REACT_MAX_S)) throw new Error('implausible');
