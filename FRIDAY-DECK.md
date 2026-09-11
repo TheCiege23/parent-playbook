@@ -13,8 +13,8 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v106`, 28/28 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 440/440 |
+| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v107`, 28/28 checks, `ok: true` |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 454/454 |
 | Database suite | `node tests/db/run.cjs` | 204/204 on a disposable cluster built from the real migrations: 187 security cases plus a 17-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 6/6 checks: manifest 154/154, exclusions clean, contracts 107/107, database 204/204, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
@@ -31,7 +31,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
   predicted adult height.
 - An organization side: rostered athletes, consent, an organization-scoped record with audit and
   retention, and an SDK a company can host itself.
-- Deployed and reachable today at playbookbp.com on build `pp-v106`.
+- Deployed and reachable today at playbookbp.com on build `pp-v107`.
 
 *Speaker notes.* Lead with the journey, not the measurement — the measurement is a feature of a
 product parents already use for training, rest and schedule. Do not open on parity percentages.
