@@ -88,3 +88,14 @@ test('the screen filters finished camps out of the list it renders', () => {
   assert.match(source, /const shown = campSport \? current\./,
     'the sport filter must narrow the CURRENT camps, not the unfiltered list');
 });
+
+test('a date range names the year once, not on both ends', () => {
+  const ctx = context();
+  const next = new Date().getFullYear() + 1;
+  const range = ctx.campWhen({ start_date: `${next}-01-05`, end_date: `${next}-01-09` });
+  const years = (range.match(new RegExp(String(next), 'g')) || []).length;
+  assert.equal(years, 1, `"${range}" should carry the year once`);
+  assert.match(range, new RegExp(`${next}$`), 'the year belongs at the end of the range');
+  // A single-day camp still carries it.
+  assert.match(ctx.campWhen({ start_date: `${next}-01-05`, end_date: null }), new RegExp(String(next)));
+});

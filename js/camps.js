@@ -27,9 +27,11 @@ function campWhen(c){
   const s=new Date(c.start_date+'T00:00:00');
   // Without a year, a listing from last June is indistinguishable from one next June.
   const sameYear = c.start_date.slice(0,4) === campTodayISO().slice(0,4);
-  const opts = sameYear ? {month:'short',day:'numeric'} : {month:'short',day:'numeric',year:'numeric'};
-  if(!c.end_date || c.end_date===c.start_date) return s.toLocaleDateString(undefined,opts);
-  return s.toLocaleDateString(undefined,opts)+' – '+new Date(c.end_date+'T00:00:00').toLocaleDateString(undefined,opts);
+  const opts = {month:'short',day:'numeric'};
+  // The year belongs once, at the end of the range — "Jan 5, 2027 – Jan 9, 2027" says it twice.
+  const endOpts = sameYear ? opts : {month:'short',day:'numeric',year:'numeric'};
+  if(!c.end_date || c.end_date===c.start_date) return s.toLocaleDateString(undefined,endOpts);
+  return s.toLocaleDateString(undefined,opts)+' – '+new Date(c.end_date+'T00:00:00').toLocaleDateString(undefined,endOpts);
 }
 function campAges(c){
   if(c.age_min==null && c.age_max==null) return 'All ages';
