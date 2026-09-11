@@ -20,6 +20,7 @@ const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const KEY_FILE = 'SIGNING-KEY.pub.pem';
 const keyPath = path.join(root, KEY_FILE);
+const SIGN = require(path.join(root, 'tools', 'sdk-sign.cjs'));
 
 test('the public key is committed and is a usable ed25519 public key', () => {
   assert.ok(fs.existsSync(keyPath), KEY_FILE + ' should be committed so a buyer can obtain it from here');
@@ -73,23 +74,35 @@ test('.gitignore still refuses private keys while allowing this one file', () =>
   }
 });
 
-test('the fingerprint recorded in the documentation is this key', () => {
-  // The documented fingerprint is what a buyer compares against. If the file and the prose
-  // drift apart, the instruction to "check the fingerprint" becomes noise.
+// The documented fingerprint is what a buyer compares against. There is deliberately no
+// second implementation of the hash here: an earlier version of this file computed it
+// independently, which is exactly the drift the check was meant to prevent — and it drifted
+// the moment tools/sdk-sign.cjs started normalising line endings. The tool is the only
+// implementation; these pin its OUTPUT and its stability.
+const DOCUMENTED_FINGERPRINT = '0cc2d189c342212d23d250264f8ab71d';
+
+test('the documented fingerprint is the one the tool computes for the committed key', () => {
   const pem = fs.readFileSync(keyPath, 'utf8');
-  const fingerprint = crypto.createHash('sha256').update(pem.trim()).digest('hex').slice(0, 32);
+  assert.equal(SIGN.fingerprint(pem), DOCUMENTED_FINGERPRINT,
+    'the committed key does not fingerprint to the documented value');
   const guide = fs.readFileSync(path.join(root, 'BODY-SDK.md'), 'utf8');
-  assert.ok(guide.includes(fingerprint),
-    'BODY-SDK.md should record the fingerprint ' + fingerprint + ' of the committed public key');
+  assert.ok(guide.includes(DOCUMENTED_FINGERPRINT),
+    'BODY-SDK.md should record ' + DOCUMENTED_FINGERPRINT + ' so a buyer has something to compare');
 });
 
-test('the signing tool agrees on how a fingerprint is computed', () => {
-  // Two implementations of "the fingerprint" would eventually disagree, and the disagreement
-  // would look like a tampered package.
-  const SIGN = require(path.join(root, 'tools', 'sdk-sign.cjs'));
+test('the fingerprint does not depend on how the key file was encoded', () => {
+  // The same key reaching a reader through a Windows checkout, or saved by an editor that
+  // writes CRLF, must fingerprint identically. Otherwise the published value reads as a
+  // mismatch and the alarm it raises is "this key is not theirs" — a false tamper report
+  // caused entirely by text encoding. Measured before this was fixed: the CRLF form of the
+  // committed key hashed to c522cb17fe3f2dff794616638e23fb99 instead.
+  const CR = String.fromCharCode(13), LF = String.fromCharCode(10);
   const pem = fs.readFileSync(keyPath, 'utf8');
-  const mine = crypto.createHash('sha256').update(pem.trim()).digest('hex').slice(0, 32);
-  assert.equal(SIGN.fingerprint(pem), mine);
-  // Whitespace at the edges must not change it, since files get reflowed by editors.
-  assert.equal(SIGN.fingerprint('\n' + pem + '\n\n'), mine);
+  const asLf = pem.split(CR + LF).join(LF);
+  const asCrlf = asLf.split(LF).join(CR + LF);
+  assert.notEqual(asCrlf, asLf, 'the two encodings must actually differ, or this proves nothing');
+  assert.equal(SIGN.fingerprint(asLf), DOCUMENTED_FINGERPRINT, 'LF form');
+  assert.equal(SIGN.fingerprint(asCrlf), DOCUMENTED_FINGERPRINT, 'CRLF form');
+  // Surrounding whitespace must not matter either, since files get reflowed.
+  assert.equal(SIGN.fingerprint(LF + pem + LF + LF), DOCUMENTED_FINGERPRINT, 'padded');
 });
