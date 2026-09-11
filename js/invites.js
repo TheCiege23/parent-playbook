@@ -152,9 +152,24 @@ function bindCodeRow(id, onChange){
   const fire=()=>{ cells.forEach(c=>c.classList.toggle('filled',!!c.value));
                    if(onChange) onChange(value().length===6); };
 
+  // Fill from `start` with as many digits as were given, clear the rest, and land the caret
+  // on the first empty box. Shared by paste and by multi-digit autofill.
+  const spread=(digits,start=0)=>{
+    const d=digits.replace(/\D/g,'').slice(0,6-start);
+    cells.forEach((x,n)=>{ if(n>=start) x.value=d[n-start]||''; });
+    cells[Math.min(start+d.length,5)].focus();
+    fire();
+  };
   cells.forEach((c,i)=>{
+    // One digit per box is the design, but more than one can arrive in a single box: iOS
+    // one-time-code autofill puts the WHOLE code into the focused field, and some Android
+    // keyboards commit a composed string. Taking slice(0,1) there silently dropped five of
+    // the six digits and left the parent retyping a code their phone had already offered.
+    // Spread them instead, which is what the paste handler below already does.
     c.oninput=()=>{
-      c.value=c.value.replace(/\D/g,'').slice(0,1);
+      const digits=c.value.replace(/\D/g,'');
+      if(digits.length>1){ spread(digits,i); return; }
+      c.value=digits.slice(0,1);
       if(c.value && i<5) cells[i+1].focus();
       fire();
     };
@@ -170,9 +185,7 @@ function bindCodeRow(id, onChange){
       const d=t.replace(/\D/g,'').slice(0,6);
       if(!d) return;
       e.preventDefault();
-      cells.forEach((x,n)=>{ x.value=d[n]||''; });
-      cells[Math.min(d.length,5)].focus();
-      fire();
+      spread(d);
     };
   });
   return value;
