@@ -57,6 +57,51 @@ test('a desktop session is recorded as one rather than refused', () => {
   assert.equal(result.deviceClass, 'desktop');
 });
 
+test('a record with no viewport does not establish a device', () => {
+  // Found by driving the deployed demo from an automation browser, which reported 0x0. It
+  // was touch-capable, so the class came out 'touch-wide' and the record verified clean —
+  // a claim about hardware that nothing in the record supported. A session that cannot say
+  // how big the screen was is not evidence about a device.
+  const record = DE.buildDeviceEvidence(okInput({
+    device: { ...okDevice(), viewportWidth: 0, viewportHeight: 0 },
+  }));
+  const result = DE.verifyDeviceEvidence(record, { expectedCache: 'pp-v106' });
+  assert.equal(result.ok, false, 'a dimensionless session must not verify clean');
+  assert.equal(result.deviceClass, 'unknown', 'and must not be classified as any kind of device');
+  assert.ok(result.problems.some(p => /No viewport was observed \(0x0\)/.test(p)), result.problems.join('; '));
+});
+
+test('one missing dimension is enough to withhold the classification', () => {
+  // A width with no height is not a screen. Checking only one of the two would let half a
+  // measurement through.
+  for (const [w, h] of [[1512, 0], [0, 945]]) {
+    const record = DE.buildDeviceEvidence(okInput({
+      device: { ...okDevice(), viewportWidth: w, viewportHeight: h },
+    }));
+    const result = DE.verifyDeviceEvidence(record, { expectedCache: 'pp-v106' });
+    assert.equal(result.ok, false, w + 'x' + h + ' must not verify clean');
+    assert.equal(result.deviceClass, 'unknown', w + 'x' + h + ' must not be classified');
+  }
+});
+
+test('real devices still classify and still verify', () => {
+  // The negative control for the two above: the guard must not have made every record fail.
+  const cases = [
+    [390, 844, 5, 'touch-handheld'],
+    [1512, 945, 0, 'desktop'],
+    [1024, 1366, 5, 'touch-wide'],
+    [700, 900, 0, 'narrow-viewport'],
+  ];
+  for (const [w, h, touch, expected] of cases) {
+    const record = DE.buildDeviceEvidence(okInput({
+      device: { ...okDevice(), viewportWidth: w, viewportHeight: h, maxTouchPoints: touch },
+    }));
+    const result = DE.verifyDeviceEvidence(record, { expectedCache: 'pp-v106' });
+    assert.equal(result.deviceClass, expected, w + 'x' + h + ' touch=' + touch);
+    assert.equal(result.ok, true, w + 'x' + h + ' should still verify clean');
+  }
+});
+
 test('a record from an older deployment is caught', () => {
   // The whole reason the build is read from the cache name rather than written down.
   const record = DE.buildDeviceEvidence(okInput({ build: { ...okBuild(), serviceWorkerCache: 'pp-v83' } }));
