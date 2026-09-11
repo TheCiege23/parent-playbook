@@ -24,7 +24,10 @@ function verifyBundle(directory){
       if(stat.isSymbolicLink()){errors.push('Symbolic link is not allowed: '+rel);continue;}
       if(stat.isDirectory()){
         if(!allowedDirs.has(rel))errors.push('Unexpected directory: '+rel);else walk(p,rel);
-      }else if(!stat.isFile()||(!expected.has(rel)&&rel!=='manifest.json'))errors.push('Unexpected file: '+rel);
+      // signature.json is a DETACHED signature over the manifest: legitimately present,
+      // never required, and not itself a manifest entry — tools/sdk-sign.cjs writes it after
+      // the build. Rejecting it here made signing a package break its own verification.
+      }else if(!stat.isFile()||(!expected.has(rel)&&rel!=='manifest.json'&&rel!=='signature.json'))errors.push('Unexpected file: '+rel);
     }
   }
   try{walk(root);}catch{errors.push('Unable to read bundle directory');}
@@ -42,7 +45,10 @@ function verifyBundle(directory){
     const source=fs.readFileSync(path.join(root,'js/body-sdk.mjs'),'utf8');
     if(!source.includes("SDK_VERSION = '"+manifest.sdkVersion+"'"))errors.push('SDK version mismatch');
   }
-  return {ok:errors.length===0,sdkVersion:manifest.sdkVersion,fileCount:entries.size,errors};
+  // Report whether a detached signature accompanies the package. Its VALIDITY is a
+  // separate question for tools/sdk-sign.cjs; this only says whether one is there.
+  const signed=fs.existsSync(path.join(root,'signature.json'));
+  return {ok:errors.length===0,sdkVersion:manifest.sdkVersion,fileCount:entries.size,signed,errors};
 }
 if(require.main===module){
   const result=verifyBundle(process.argv[2]||path.join(__dirname,'..'));

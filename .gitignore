@@ -2,6 +2,12 @@
 node_modules/
 
 # local env / secrets — never commit these
+# tools/sdk-sign.cjs refuses to WRITE a key in here, but a key can still arrive by being
+# copied in. Belt and braces: a signing key must never be committed or sent to anyone.
+*.pem
+*.key
+pp-sdk-signing-key*
+
 .env
 .env.local
 .env.*.local
