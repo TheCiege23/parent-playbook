@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 function setup(){
  let n=0;const c=vm.createContext({console,uuid:()=>`id-${++n}`});
  vm.runInContext(`function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}`,c);
- for(const file of ['body-outputs','scan-record','body-insights','assessment-report'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
+ for(const file of ['dates','body-outputs','scan-record','body-insights','assessment-report'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
  return c;
 }
 function joints(){

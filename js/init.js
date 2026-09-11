@@ -48,9 +48,18 @@ function bootError(err){
   if(kind==='offline'){
     const cache = (typeof owReadWeek==='function') ? owReadWeek() : null;
     if(cache) return owRenderCachedWeek(cache);
-    return owFailScreen('📡','No connection',
-      "You're offline and we haven't saved a week to this device yet. Open the app once with a connection and it'll be here next time.",
-      false);
+    // A saved week that belongs to a DIFFERENT week is not the same as never having saved
+    // one. Since the cache became week-scoped, a parent who used the app all last week hits
+    // this screen on Monday morning, and telling them nothing was ever saved would be false
+    // and would read as the app having lost their week.
+    const cacheState = (typeof owWeekCacheState==='function') ? owWeekCacheState() : 'none';
+    return cacheState==='stale'
+      ? owFailScreen('📡','No connection',
+          "You're offline, and the week saved on this device is last week's. Open the app once with a connection and this week will be here too.",
+          false)
+      : owFailScreen('📡','No connection',
+          "You're offline and we haven't saved a week to this device yet. Open the app once with a connection and it'll be here next time.",
+          false);
   }
   if(kind==='signed_out'){
     return owFailScreen('👋','You\'ve been signed out',

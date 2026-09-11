@@ -164,13 +164,27 @@ async function main() {
   // (0xC000013A), after which the postmaster kills every other process and shuts down
   // mid-run. That produced failures that looked like migration errors and were not.
   //
-  // Spawning the postmaster as our own detached child gives it DETACHED_PROCESS, so it has
-  // no console to receive those events. `pg_ctl stop` still works against it: it finds the
-  // server through postmaster.pid, not through who started it.
+  // Spawning the postmaster as our own detached child gives it DETACHED_PROCESS and
+  // CREATE_NEW_PROCESS_GROUP, and it is the process group that provides the immunity: a
+  // control event aimed at this console is not delivered to another group. `pg_ctl stop`
+  // still works against it, because it finds the server through postmaster.pid rather than
+  // through who started it.
+  //
+  // Detaching is also the whole reason a console window appears for the length of a run.
+  // DETACHED_PROCESS is mutually exclusive with the CREATE_NO_WINDOW that windowsHide asks
+  // for, so Windows honours the detach and discards the hide; measured, the detached spawn
+  // costs exactly one visible window and the non-detached one costs none.
+  //
+  // That window is only worth paying for when a console exists to send the event. Run with
+  // no terminal attached — from the desktop app, from tools/acceptance.cjs, from CI — there
+  // is nothing that can deliver a Ctrl+C here, so detaching buys no protection and costs a
+  // window on every run. So detach only when a terminal is attached, which is exactly the
+  // situation the 0xC000013A cascade came from in the first place.
+  const interactive = Boolean(process.stdout.isTTY || process.stdin.isTTY);
   const logFd = fs.openSync(logFile, 'a');
   const launcher = spawn(bin('postgres'), ['-D', dataDir, '-p', String(port),
     '-c', 'listen_addresses=127.0.0.1', '-c', 'fsync=off', '-c', 'full_page_writes=off'],
-    { detached: true, stdio: ['ignore', logFd, logFd], windowsHide: true });
+    { detached: interactive, stdio: ['ignore', logFd, logFd], windowsHide: true });
   launcher.unref();
   fs.closeSync(logFd);
   started = true;

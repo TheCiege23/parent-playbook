@@ -21,7 +21,14 @@ function buildBundle(destination){
   if(!SNAPSHOT_LINE.test(guideSource))throw new Error('BODY-SDK.md has no handoff snapshot line to strip; the self-description guard is no longer doing anything. Restore the line or update the pattern deliberately.');
   const guide=guideSource.replace(SNAPSHOT_LINE,'This archive does not record its own file count or checksum. Both are published alongside the archive, so a transferred package is checked against something other than itself.');
   // Snapshot only the explicit files before creating the destination.
-  const files=BUNDLE_FILES.map(name=>({name,bytes:name==='README.md'?Buffer.from(currentReadme):name==='BODY-SDK.md'?Buffer.from(guide):fs.readFileSync(path.join(root,name))}));
+  // Line endings are normalized to LF so the archive is a function of the COMMIT rather
+  // than of the checkout. With core.autocrlf the working tree holds CRLF on Windows and LF
+  // on Linux, so the same commit produced two different archives with two different
+  // checksums — and a buyer who rebuilt on Linux and compared against a hash published from
+  // Windows would reasonably conclude the package had been altered. This package is text
+  // throughout; tools/package-scan.cjs refuses binaries, so there is nothing here to corrupt.
+  const toLF=buf=>Buffer.from(buf.toString('utf8').replace(/\r\n/g,'\n'),'utf8');
+  const files=BUNDLE_FILES.map(name=>({name,bytes:toLF(name==='README.md'?Buffer.from(currentReadme):name==='BODY-SDK.md'?Buffer.from(guide):fs.readFileSync(path.join(root,name)))}));
   fs.mkdirSync(path.dirname(output),{recursive:true});fs.mkdirSync(output);
   for(const file of files){const target=path.join(output,file.name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.bytes,{flag:'wx'});}
   const manifest={schema:'PP_BODY_SDK_BUNDLE_V1',sdkVersion:version,createdAt:new Date().toISOString(),

@@ -32,6 +32,19 @@ function owSaveWeek(snapshot){
     localStorage.setItem(OW_WEEK_KEY, JSON.stringify({ at: Date.now(), week_start: owWeekStart(), ...snapshot }));
   }catch(e){ /* quota or private mode — the app just loses its offline copy */ }
 }
+// Why there is no usable week, which is not the same question as whether there is one.
+// 'none' means nothing was ever saved on this device; 'stale' means a week was saved and
+// it belongs to a different week. The offline screen says different things for those two,
+// and telling a parent who used the app all last week that nothing was ever saved is a
+// small lie that makes the app look broken.
+function owWeekCacheState(){
+  try{
+    const raw = localStorage.getItem(OW_WEEK_KEY); if(!raw) return 'none';
+    const c = JSON.parse(raw);
+    if(!c || !c.days || !c.at) return 'none';
+    return (c.week_start && c.week_start === owWeekStart()) ? 'current' : 'stale';
+  }catch(e){ return 'none'; }
+}
 function owReadWeek(){
   try{
     const raw = localStorage.getItem(OW_WEEK_KEY); if(!raw) return null;

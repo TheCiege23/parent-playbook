@@ -14,9 +14,14 @@ async function screenScan(){
   const a = state.active;
 
   const { data: recent } = await sb.from('measurements')
-    .select('metric_key,value,unit,measured_on,source')
+    .select('id,metric_key,value,unit,measured_on,source,created_at')
     .eq('athlete_id', a.id).in('source', ['photo','video','guided'])
-    .order('measured_on', { ascending:false }).limit(6);
+    // Order fully before taking six. measured_on is a DATE and one body scan writes
+    // twenty-five rows sharing it, so ordering by date alone left the database to choose
+    // which six appeared and the list changed between visits with no new data. created_at
+    // breaks the tie by what was recorded last; id makes the order total.
+    .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).order('id', { ascending:false })
+    .limit(6);
 
   $("#screen").innerHTML = H`
     ${topBar('Body & movement assessments')}

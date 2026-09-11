@@ -208,6 +208,13 @@ function renderAuth(mode='login', prefill=''){
 // JS — so typos used to travel to Supabase and bounce back as a raw API string.
 function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
 
+// A configuration fault reaches a user as a generic apology, so the exact cause has to be
+// recorded here: two of friendlyAuthErr's four call sites never logged the raw error, and
+// without this the detail would be lost entirely rather than merely hidden.
+function authConfigProblem(raw){
+  try{ console.error('auth configuration problem:', raw); }catch(_){}
+  try{ if(typeof reportError==='function') reportError(new Error(raw), 'auth:config'); }catch(_){}
+}
 function friendlyAuthErr(m){
   // MUST come before the "confirm" branch below. Supabase reports a mail-server failure
   // as "Error sending confirmation email", which contains the word "confirm" — so the
@@ -223,8 +230,15 @@ function friendlyAuthErr(m){
   if(/already registered/i.test(m)) return "That email already has an account. Try logging in.";
   if(/invalid login/i.test(m)) return "Email or password is incorrect.";
   if(/not confirmed|confirm/i.test(m)) return "Please confirm your email first — check your inbox and spam folder.";
-  if(/provider.*disabled|logins are disabled/i.test(m)) return "Email sign-in is turned off in settings — enable the Email provider in Supabase.";
-  if(/redirect/i.test(m)) return "This link target isn't allowed yet — add the Site URL in Supabase settings.";
+  // These two are OUR misconfiguration, not anything the person signing in can act on. They
+  // used to hand a parent an instruction that only the operator can carry out, naming our
+  // infrastructure vendor to them — and it is the first thing a prospective buyer would see
+  // if auth were misconfigured during a demo. Say what is true for them, and keep the
+  // actionable detail where the operator will find it.
+  if(/provider.*disabled|logins are disabled|redirect/i.test(m)){
+    authConfigProblem(m);
+    return "Sign-in is temporarily unavailable. That's a fault on our side, not yours — please try again shortly, or email support@playbookbp.com.";
+  }
   if(/rate/i.test(m)) return "Too many tries — wait a moment and retry.";
   return m;
 }
