@@ -200,6 +200,47 @@ Note: those two identifiers appear as example text and default input values in `
 
 The working tree contains extensive continuing work. Inspect `git status --short --untracked-files=all` first. Do not reset, clean, discard, stash or overwrite unrelated changes.
 
+## Production deletion rehearsal — done, September 10, 2026
+
+Authorized in-session, on the live ParentPlaybook project (`xqvqjkdxykowwpcmyudz`). A clearly
+synthetic provider registration and composition result were inserted and committed, then deleted,
+in a single round trip so no visible state change was ever exposed to the app.
+
+| Observation | Value |
+| --- | --- |
+| Row present after the committed insert | 1 |
+| Insert audit rows | 1 |
+| Row present after the committed delete | 0 |
+| Delete audit rows | 1 |
+| Composition results remaining | 0 |
+| Provider registrations remaining | 0 |
+
+The delete audit row carries identifiers and provider metadata only — team, result, assessment,
+subject reference, subject scope, provider, model, model version — and **no outputs and no values**.
+That is the property that decides whether deletion means anything, and it now holds in production
+as well as in the disposable-cluster rehearsal.
+
+**Two caveats, both material.** The statements ran through the Supabase service role, so row-level
+security was bypassed for the setup and the delete; the RLS-enforced delete path — an organization
+admin deleting their own record, and another organization being unable to — is covered by
+`tests/db/restore-deletion.cjs` as restricted roles, not by this. And `auth.uid()` is null under the
+service role, so both audit rows carry a null actor. This rehearsal proves the schema, triggers,
+audit trail and absence of residue in production; it does not re-prove authorization there.
+
+Two audit rows referencing the synthetic record remain in `access_log`, deliberately. They are the
+evidence, and an audit trail that can be tidied away after the fact is not one. Nothing else
+remains: zero composition results, zero provider registrations, so the app still reports
+*Model not configured* and still produces no composition value.
+
+The real adult-reference record was not touched and was confirmed intact afterwards:
+`friday-adult-reference-001` / `friday-reference-001`, 25 outputs, retention 2026-10-10, with
+`updated_at` still equal to `created_at`.
+
+**Still open:** restoring from Supabase’s own backups, point-in-time recovery, and backup deletion.
+The retention jobs for adult-reference assessments (`jobid` 7, 03:40 UTC) and composition results
+(`jobid` 11, 03:50 UTC) have never fired: cron is healthy and other jobs ran, but both were created
+after their window on September 10. First firing is 03:40 and 03:50 UTC on September 11.
+
 ## Standing limitations
 
 Automated tests prove contract behaviour, not anatomical accuracy. Synthetic fixtures prove arithmetic and rejection paths, not human performance. Deployment proves availability, not scientific validity. Executing a migration against a disposable cluster proves the SQL is correct, not that Supabase will behave identically.
