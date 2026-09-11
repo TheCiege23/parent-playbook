@@ -64,6 +64,35 @@ function showIosPushHelp(){
   bg.querySelector('#iosOk').onclick=()=>bg.remove();
 }
 
+// Signing out has to take this device's push subscription with it.
+//
+// endpoint is UNIQUE on push_subscriptions and enablePush() upserts ON CONFLICT DO
+// NOTHING. A browser's endpoint belongs to the browser and the VAPID key, not to whoever
+// is signed in — so on a shared iPad the second parent to turn reminders on collided with
+// the first parent's row, changed nothing, got no error, and was told "Notifications on".
+// They then never received one. Worse, the first parent's weekly reminder still arrived
+// on that device, and it reads "<child>'s week is ready" on the lock screen.
+//
+// RLS lets a guardian delete only their own row, so the person leaving is the only one who
+// can clear it. This must therefore run BEFORE signOut(), while there is still a token to
+// authorize the delete.
+//
+// getRegistration() rather than .ready: ready never resolves when nothing is registered,
+// which would hang a logout on a browser that had never installed the worker.
+async function releasePushOnThisDevice(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if(!sub) return;
+    const { error } = await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+    if(error) console.error(error);
+    // Drop the browser-side subscription too. Leaving it live would have the push service
+    // still holding a delivery channel for a device with no row behind it.
+    try{ await sub.unsubscribe(); }catch(e){ console.error(e); }
+  }catch(e){ console.error(e); }
+}
+
 async function enablePush(){
   if(pushNeedsInstall()){ showIosPushHelp(); return false; }
   if(!pushSupported()){ toast('Notifications aren’t supported on this device'); return false; }
@@ -86,6 +115,18 @@ async function enablePush(){
       { user_id:state.user.id, endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth },
       { onConflict:'endpoint', ignoreDuplicates:true });
     if(error){ console.error(error); reportError(error,'push:subscribe'); toast('Could not turn on notifications'); return false; }
+    // ON CONFLICT DO NOTHING reports success whether it wrote a row or silently declined
+    // to. Read it back: the select policy only returns rows whose user_id is ours, so an
+    // empty result means another account on this browser still holds the endpoint and
+    // nothing will ever be delivered here. Saying "Notifications on" to that is a lie.
+    const { data:mine, error:readBack } = await sb.from('push_subscriptions')
+      .select('id').eq('endpoint', sub.endpoint).limit(1);
+    if(readBack){ console.error(readBack); reportError(readBack,'push:subscribe'); }
+    else if(!mine || !mine.length){
+      reportError(new Error('push endpoint still held by another account'),'push:subscribe');
+      toast('Another account on this device still has reminders on. Log out of it first.');
+      return false;
+    }
     toast('Notifications on 🔔');
     return true;
   }catch(e){ console.error(e); reportError(e,'push:subscribe'); toast('Could not turn on notifications'); return false; }

@@ -68,7 +68,7 @@ async function openTeamConnect(subject){
         ${updates.map(u=>H`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
             <b style="font-size:13px">${esc(senderName.get(u.sender_id) || 'A coach')}</b>
-            <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(u.created_at.slice(0,10)))}</span>
+            <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(localDay(new Date(u.created_at))))}</span>
           </div>
           ${u.kind==='announcement'?H`<span class="pill" style="background:var(--amber-pale,#FCEEDA);
             color:var(--amber-ink,#8A5A16);margin:4px 0;display:inline-block">Announcement</span>`
@@ -136,8 +136,9 @@ async function screenCoach(){
   const a = state.active;
   const [{ data: sports }, { data: measRows }, { data: updates }] = await Promise.all([
     sb.from('athlete_sports').select('sport_key,positions,level,is_primary').eq('athlete_id', a.id),
-    sb.from('measurements').select('metric_key,value,unit,measured_on')
-      .eq('athlete_id', a.id).order('measured_on', { ascending:false }).limit(100),
+    sb.from('measurements').select('id,metric_key,value,unit,measured_on,created_at')
+      .eq('athlete_id', a.id).order('measured_on', { ascending:false })
+      .order('created_at', { ascending:false }).order('id', { ascending:false }).limit(100),
     sb.from('coach_updates').select('id,sender_id,kind,body,created_at')
       .eq('athlete_id', a.id).order('created_at', { ascending:false }).limit(30),
   ]);
@@ -202,7 +203,7 @@ async function screenCoach(){
           ${updates.map(u=>H`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
               <b style="font-size:13px">${esc(senderName.get(u.sender_id) || 'A parent')}</b>
-              <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(u.created_at.slice(0,10)))}</span>
+              <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(localDay(new Date(u.created_at))))}</span>
             </div>
             ${u.kind==='announcement'?H`<span class="pill" style="background:var(--amber-pale,#FCEEDA);
               color:var(--amber-ink,#8A5A16);margin:4px 0;display:inline-block">Announcement</span>`
@@ -292,7 +293,7 @@ async function openTeamConnectSafety(){
 
   const flaggedCards = flagged.map(u => H`<div class="card app-pad" style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">Auto-flagged</b>
-      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(u.created_at.slice(0,10)))}</span></div>
+      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(localDay(new Date(u.created_at))))}</span></div>
     <p style="font-size:12.5px;color:var(--muted);margin:4px 0">${esc(athleteName(u.athlete_id))} · from ${esc(senderName(u.sender_id))}</p>
     <p style="font-size:14px;margin:6px 0;white-space:pre-wrap">${esc(u.body)}</p>
     <button class="btn sm ghost" data-clearflag="${esc(u.id)}">Reviewed — clear flag</button>
@@ -300,7 +301,7 @@ async function openTeamConnectSafety(){
 
   const reportCards = reports.map(r => { const u = reportUpdates[r.update_id]; return H`<div class="card app-pad" style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:13px">Reported by a parent</b>
-      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(r.created_at.slice(0,10)))}</span></div>
+      <span style="font-size:11.5px;color:var(--muted)">${esc(fmtDate(localDay(new Date(r.created_at))))}</span></div>
     ${u?H`<p style="font-size:12.5px;color:var(--muted);margin:4px 0">${esc(athleteName(u.athlete_id))} · from ${esc(senderName(u.sender_id))}</p>
       <p style="font-size:14px;margin:6px 0;white-space:pre-wrap">${esc(u.body)}</p>`
       :H`<p style="font-size:12.5px;color:var(--muted);margin:4px 0">Original message no longer available.</p>`}

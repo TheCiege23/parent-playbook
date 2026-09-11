@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const EXPECTED_CACHE = 'pp-v104';
+const EXPECTED_CACHE = 'pp-v105';
 const required = [
   ['/', /Parent Playbook/i],
   ['/sw.js', new RegExp(`const CACHE = ['"]${EXPECTED_CACHE}['"]`)],
@@ -28,6 +28,14 @@ const required = [
   ['/sdk-demo.mjs', /createBodyScanner/],
 ];
 const forbidden = [
+  // AUDIT.md is named here rather than left to the *.md rule in .dockerignore because it
+  // is the one that mattered: it was reachable at playbook.chimaura.com/AUDIT.md, 60-odd KB
+  // describing every vulnerability found in this app and how each was fixed, which is a
+  // roadmap for anyone probing it. The .vercelignore comment records that it served 200
+  // before that file existed. One line of ignore config is now the only thing standing
+  // between that file and the public, so the smoke asserts the outcome rather than trusting
+  // the config.
+  '/AUDIT.md',
   '/BODY-SDK.md',
   '/supabase/migrations/20260910014500_company_body_active_consent_rpc.sql',
   '/supabase/migrations/20260910190000_company_composition_results.sql',

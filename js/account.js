@@ -8,7 +8,7 @@ async function screenAccount(){
   logUsageEvent('view_account');
   const a=state.active;
   const [{data:fam},{data:adminRows},{data:prefRows}] = await Promise.all([
-    sb.from('families').select('id,name').limit(1),
+    sb.from('families').select('id,name').eq('id', a.family_id).limit(1),
     sb.from('app_admins').select('guardian_id').limit(1),   // RLS: a row comes back only if the viewer is an admin
     sb.from('notification_prefs').select('*').eq('guardian_id',state.user.id).limit(1),
   ]);
@@ -128,7 +128,7 @@ async function screenAccount(){
   $("#acctBack").onclick=()=>renderApp('profile');
   // Deliberately plain text, not a button: on a shared family phone nobody should hit
   // log out by accident reaching for something else.
-  $("#acctLogout").onclick=async()=>{ await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
+  $("#acctLogout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }

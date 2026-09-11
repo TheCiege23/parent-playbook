@@ -62,7 +62,9 @@ function trainerDeleteService(id){
   bg.querySelector('#no').onclick=()=>bg.remove();
   bg.querySelector('#yes').onclick=async(e)=>{ e.target.disabled=true;
     const { error }=await sb.from('services').delete().eq('id',id);
-    if(error){ console.error(error); toast('Could not delete'); return; }
+    // Give the button back. Leaving it disabled after a failure left the sheet open with
+    // nothing on it to press, so a dropped connection meant closing and reopening.
+    if(error){ console.error(error); toast('Could not delete'); e.target.disabled=false; return; }
     bg.remove(); toast('Deleted'); openTrainerServices();
   };
 }
@@ -96,12 +98,18 @@ function serviceSheet(existing){
     const priceV=bg.querySelector('#svPrice').value;
     if(!title){ errEl.textContent='Give the session a title.'; return; }
     if(priceV===''||isNaN(parseFloat(priceV))){ errEl.textContent='Set a price.'; return; }
+    // Everything below is an `int` column with no check constraint behind it, so this is the
+    // only thing standing between a typed minus sign and a service listed at -$40.00.
+    const priceCents=Math.round(parseFloat(priceV)*100);
+    if(priceCents<0){ errEl.textContent="A price can't be negative."; return; }
+    const durMin=parseInt(bg.querySelector('#svDur').value,10)||60;
+    if(durMin<=0){ errEl.textContent='A session has to be at least a minute long.'; return; }
+    const grpSize=parseInt(bg.querySelector('#svGrp').value,10)||1;
+    if(grpSize<1){ errEl.textContent='A group is at least one athlete.'; return; }
     e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const row={ trainer_id:state.user.id, title,
       sport_key:bg.querySelector('#svSport').value||null, format:fmt,
-      duration_min:parseInt(bg.querySelector('#svDur').value,10)||60,
-      price_cents:Math.round(parseFloat(priceV)*100),
-      max_group_size:parseInt(bg.querySelector('#svGrp').value,10)||1,
+      duration_min:durMin, price_cents:priceCents, max_group_size:grpSize,
       location_text:bg.querySelector('#svLoc').value.trim()||null,
       description:bg.querySelector('#svDesc').value.trim()||null };
     let error;

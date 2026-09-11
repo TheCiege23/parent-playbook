@@ -332,38 +332,57 @@ async function submitTrainerApplication(e){
     const { error:pe }=await sb.from('trainer_profiles').upsert(profRow,{ onConflict:'id' });
     if(pe) throw pe;
 
-    // 2. sports — replace set
-    await sb.from('trainer_sports').delete().eq('trainer_id',uid);
+    // 2. Every upload happens FIRST, before anything is deleted.
+    //
+    // These three sets are replaced by deleting and re-inserting, and there is no
+    // transaction around it — a browser cannot ask PostgREST for one. So the order matters:
+    // anything that can fail has to fail BEFORE the first delete. It used to upload each
+    // credential document inside the loop that re-inserted it, after the delete had already
+    // run, so one failed upload on a phone left the applicant with fewer credentials than
+    // they had when they pressed the button — under a message reading "Could not submit",
+    // which says the opposite. Uploads are the largest requests here and the likeliest to
+    // fail; doing them up front means a failure leaves the saved application untouched.
+    const named=tr.credentials.filter(c=>c.name.trim());
+    if(named.some(c=>c.file)||tr.idFile||tr.bgFile||tr.ssFile)
+      btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…';
+    const credPaths=[];
+    for(const c of named) credPaths.push(c.file?await uploadTrainerDoc('cred',c.file):(c.existing_doc||null));
+    let idPath=null, bgPath=null, ssPath=null;
+    if(tr.idFile) idPath=await uploadTrainerDoc('id',tr.idFile);
+    if(tr.bgFile) bgPath=await uploadTrainerDoc('bg',tr.bgFile);
+    if(tr.ssFile) ssPath=await uploadTrainerDoc('ss',tr.ssFile);
+
+    // 3. sports — replace set. The delete's error was discarded. trainer_sports is unique
+    // on (trainer_id, sport_key), so a delete that quietly did nothing turned the insert
+    // into a 23505 with no explanation of where it came from.
+    { const { error:sd }=await sb.from('trainer_sports').delete().eq('trainer_id',uid); if(sd) throw sd; }
     if(tr.sports.length){
       const rows=tr.sports.map(s=>({ trainer_id:uid, sport_key:s.sport_key,
         specialty:(s.specialty||'').trim()||null, years:s.years?parseInt(s.years,10):null }));
       const { error:se }=await sb.from('trainer_sports').insert(rows); if(se) throw se;
     }
 
-    // 3. credentials — replace set (uploading any new files first)
-    await sb.from('trainer_credentials').delete().eq('trainer_id',uid);
-    for(const c of tr.credentials){
-      if(!c.name.trim()) continue;
-      let doc_path=c.existing_doc||null;
-      if(c.file){ btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…'; doc_path=await uploadTrainerDoc('cred',c.file); }
+    // 4. credentials — replace set, using the paths uploaded above. This table has no
+    // unique constraint, so here a discarded delete error did not raise anything at all:
+    // it duplicated the set instead of replacing it, and a reviewer read the same
+    // certificate listed twice as the applicant having submitted it twice.
+    { const { error:cd }=await sb.from('trainer_credentials').delete().eq('trainer_id',uid); if(cd) throw cd; }
+    for(const [i,c] of named.entries()){
       const { error:ce }=await sb.from('trainer_credentials').insert({ trainer_id:uid, name:c.name.trim(),
         issuer:(c.issuer||'').trim()||null, credential_number:(c.credential_number||'').trim()||null,
-        issued_on:c.issued_on||null, expires_on:c.expires_on||null, doc_path, status:'submitted' });
+        issued_on:c.issued_on||null, expires_on:c.expires_on||null, doc_path:credPaths[i], status:'submitted' });
       if(ce) throw ce;
     }
 
-    // 4. verification records (identity / background / safesport).
+    // 5. verification records (identity / background / safesport).
     // Whatever the applicant supplies is evidence for the reviewer — the database
     // will not let an admin pass a check that has none, so an empty row here means
     // an application that cannot be approved until the document arrives.
-    let idPath=null, bgPath=null, ssPath=null;
-    if(tr.idFile||tr.bgFile||tr.ssFile) btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Uploading…';
-    if(tr.idFile) idPath=await uploadTrainerDoc('id',tr.idFile);
-    if(tr.bgFile) bgPath=await uploadTrainerDoc('bg',tr.bgFile);
-    if(tr.ssFile) ssPath=await uploadTrainerDoc('ss',tr.ssFile);
-    await sb.from('trainer_verifications').delete().eq('trainer_id',uid).in('kind',['identity','background_check','safesport']);
+    { const { error:vd }=await sb.from('trainer_verifications').delete().eq('trainer_id',uid)
+        .in('kind',['identity','background_check','safesport']); if(vd) throw vd; }
     const now=new Date().toISOString();
-    // noon local so the stored instant can't slip back a day in western timezones
+    // noon local so the stored instant can't slip back a day in western timezones. The
+    // admin screen reads it back with localDay(), which round-trips at every offset.
     const expIso=d=>d?new Date(d+'T12:00:00').toISOString():null;
     const checks=[
       { trainer_id:uid, kind:'identity',         status:idPath?'submitted':'pending', doc_path:idPath, submitted_at:now },

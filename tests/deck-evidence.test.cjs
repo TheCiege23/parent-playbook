@@ -176,3 +176,62 @@ test('the recorded archive still describes the payload that would be built today
     'a bundled file changed since the archive was recorded: rebuild the archive, re-run ' +
     'tools/acceptance.cjs against the extracted copy, and update the recorded checksum and digest');
 });
+
+// The JavaScript suite size is checked above by counting declarations. The DATABASE total
+// cannot be derived the same way — tests/db/security-tests.cjs makes 110 add() calls that
+// expand into 159 cases — so the number on the slide is measured by running the suite, and
+// nothing was checking that the four documents quoting it agreed.
+//
+// They stopped agreeing. CLAUDE-CONTINUATION-HANDOFF.md said 154/154 while the deck, the
+// SDK guide and the handoff's own SDK paragraph all said 176/176. A buyer reading two of
+// our documents would have found two different numbers for the same command.
+//
+// This cannot verify the total is right; only running tests/db/run.cjs does that. It can
+// verify that one number was updated everywhere, which is the failure that actually
+// happened.
+const DB_TOTAL = 176;
+const DB_SECURITY = 159;
+const DB_RESTORE = 17;
+
+test('every document quotes the same database total', () => {
+  const sites = [
+    ['CLAUDE-CONTINUATION-HANDOFF.md', /Executable database tests: \*\*(\d+)\/(\d+) passing\*\*/, 'the handoff summary line'],
+    ['CLAUDE-CONTINUATION-HANDOFF.md', /database (\d+)\/(\d+), host serving/, "the handoff's acceptance paragraph"],
+    ['FRIDAY-DECK.md', /\| Database suite \|[^|]*\| (\d+)\/(\d+) on a disposable cluster/, 'the deck evidence table'],
+    ['FRIDAY-DECK.md', /database (\d+)\/(\d+), host serving/, "the deck's buyer-package row"],
+    ['friday-deck.html', /<td>Database suite<\/td><td><code>node tests\/db\/run\.cjs<\/code><\/td><td>(\d+)\/(\d+)<\/td>/, 'the rendered deck'],
+    ['BODY-SDK.md', /(\d+)\/(\d+) database cases/, 'the SDK guide'],
+  ];
+  const disagreements = [];
+  for (const [file, pattern, where] of sites) {
+    const m = fs.readFileSync(path.join(root, file), 'utf8').match(pattern);
+    if (!m) { disagreements.push(where + ' (' + file + '): no database total found at all'); continue; }
+    if (m[1] !== m[2]) disagreements.push(where + ': ' + m[1] + '/' + m[2] + ' is not a clean pass');
+    if (Number(m[1]) !== DB_TOTAL) disagreements.push(where + ': says ' + m[1] + ', expected ' + DB_TOTAL);
+  }
+  assert.deepEqual(disagreements, [],
+    'one number was changed and the others were not. Run node tests/db/run.cjs, then update '
+    + 'DB_TOTAL here and every site listed above together.');
+});
+
+test('the two halves of that total are quoted consistently too', () => {
+  assert.equal(DB_SECURITY + DB_RESTORE, DB_TOTAL,
+    'the split stated in the prose has to add up to the total stated beside it');
+  for (const file of ['CLAUDE-CONTINUATION-HANDOFF.md', 'FRIDAY-DECK.md', 'BODY-SDK.md']) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(text, new RegExp(DB_SECURITY + ' security'),
+      file + ' should name the security half of the total');
+    assert.match(text, new RegExp(DB_RESTORE + '-case restore'),
+      file + ' should name the restore-and-deletion half');
+  }
+});
+
+test('the restore rehearsal really does declare that many cases', () => {
+  // This half IS derivable — every case is a top-level check() call — so it is checked
+  // rather than trusted. The security half is not: its cases expand out of a loop, which is
+  // why the total above has to come from a run.
+  const text = fs.readFileSync(path.join(root, 'tests', 'db', 'restore-deletion.cjs'), 'utf8');
+  const declared = (text.match(/^\s*check\(/gm) || []).length;
+  assert.equal(declared, DB_RESTORE,
+    'the rehearsal declares ' + declared + ' cases; the documents say ' + DB_RESTORE);
+});

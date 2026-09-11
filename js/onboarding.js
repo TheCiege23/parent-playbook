@@ -86,6 +86,7 @@ function obStep(){
   </div>`;
   OB_BIND[name]();
   { const lo=$("#obLogout"); if(lo) lo.onclick=async()=>{
+      await releasePushOnThisDevice();
       await sb.auth.signOut();
       state.user=null; state.athletes=[]; state.active=null;
       renderAuth('login');

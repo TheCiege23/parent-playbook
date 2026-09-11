@@ -121,7 +121,7 @@ function openMediaViewer(id){
     <div class="mv-stage">${body}</div>
     <div class="mv-meta">
       ${m.caption?H`<b>${esc(m.caption)}</b>`:''}
-      <span>${m.taken_on?esc(fmtDate(m.taken_on)):esc(fmtDate((m.created_at||'').slice(0,10)))} · private to your household</span>
+      <span>${m.taken_on?esc(fmtDate(m.taken_on)):esc(m.created_at?fmtDate(localDay(new Date(m.created_at))):'—')} · private to your household</span>
     </div>
     ${strip.length>1?H`<div class="mv-strip">
       ${strip.map(x=>H`<button class="${x.id===m.id?'on':''}" data-jump="${esc(x.id)}">
@@ -616,6 +616,9 @@ function confirmDeleteAccount(){
     }
     // Sign out locally too — the token is dead server-side, but leaving it in storage
     // would show a stale, half-loaded app until the next reload.
+    // The cascade on guardians already removed the push row; this is here for the
+    // browser-side unsubscribe, so a deleted account leaves no live delivery channel.
+    await releasePushOnThisDevice();
     try{ await sb.auth.signOut(); }catch(err){ /* the user is already gone */ }
     state.user=null; state.athletes=[]; state.active=null; state.ref=null;
     bg.remove();

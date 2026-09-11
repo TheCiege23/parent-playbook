@@ -133,7 +133,7 @@ function topBar(sub, extra){
   </div>`;
 }
 function bindTop(){
-  $("#logout").onclick=async()=>{ await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
+  $("#logout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   const sw=$("#switch"); if(sw) sw.onclick=openSwitch;
 }
 

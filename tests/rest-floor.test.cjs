@@ -19,6 +19,9 @@ const base = path.resolve(__dirname, '..');
 function context() {
   const ctx = vm.createContext({ console, Number, Math, String, Date, JSON, Set, Map, Array, Object, isNaN, parseInt, parseFloat });
   vm.runInContext("function esc(v){return String(v??'');}", ctx);
+  // js/dates.js first, exactly as index.html loads it: program.js's isoDay() is
+  // localDay() and nothing else, so a context without it is not the browser.
+  vm.runInContext(fs.readFileSync(path.join(base, 'js', 'dates.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(base, 'js', 'program.js'), 'utf8'), ctx);
   return ctx;
 }

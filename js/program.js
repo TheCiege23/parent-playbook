@@ -1270,7 +1270,11 @@ function mondayOfThisWeek(){
   const n=new Date(); const d=new Date(n.getFullYear(),n.getMonth(),n.getDate());
   d.setDate(d.getDate()-((d.getDay()+6)%7)); return d;
 }
-function isoDay(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Kept as a name because eleven call sites read better with it, but it is localDay() from
+// js/dates.js and nothing else. Two identical copies of "what day is it here" is one
+// copy too many: the sweeps in tests/local-dates.test.cjs and tests/timestamp-day.test.cjs
+// guard that helper, and a second private implementation is exactly what they cannot see.
+function isoDay(d){ return localDay(d); }
 function dateForDayIndex(i){ const d=mondayOfThisWeek(); d.setDate(d.getDate()+i); return isoDay(d); }
 
 // ---- rebalance a missed day ----
