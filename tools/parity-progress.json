@@ -1,6 +1,6 @@
 {
   "scope": "FITMATCH sports-science parity plus acquisition operation; parent/marketplace expansion is secondary",
-  "updated": "2026-09-10",
+  "updated": "2026-09-11",
   "method": "Weighted engineering estimate. Stage 0 = no applicable output; 0.25 = partial implementation; 0.5 = core local workflow integrated with automated checks; 0.75 = demonstrated on intended devices and deployed infrastructure; 1 = agreed feature coverage and supporting acceptance evidence. A local workflow can still have additional feature gaps. Stage assignments are engineering judgments, not measured probabilities or accuracy scores.",
   "categories": [
     {
@@ -14,8 +14,8 @@
       "id": "FM02",
       "name": "Personalized 3D body",
       "weight": 20,
-      "stage": 0.25,
-      "evidence": "SDK 0.13.0 generated an accepted, temporary rotatable surface from one authorized real adult four-photo set after an explicitly selected bounded cleanup removed 14 detached lower-region voxels (0.29%). The adjustment is constrained, recorded and never fills or joins geometry. Main app/SDK integration and automated topology checks pass. Anatomical accuracy, repeatability, intended-device and population validation remain unproven, so this is partial implementation only."
+      "stage": 0.5,
+      "evidence": "The reconstruction workflow now runs end to end under automated checks, against a subject whose true dimensions are known. tests/surface-pipeline.test.cjs builds a synthetic body-shaped solid (head, neck, torso, pelvis and two legs with a gap between them), projects it to four orthographic silhouettes the way the mask reader consumes them, and runs the real reconstruct(): the hull is connected with NO topology adjustment, closed (every edge shared by exactly two triangles), deterministic across runs, correct in height exactly and in width and depth to within one voxel step at three resolutions, monotone under one-pixel dilation and erosion of every view, and body-shaped rather than convex — the gap between the legs survives while the torso stays solid. The containment helper carries a negative control, and two deliberate mutations of js/visual-hull.js (a 5% scale inflation and round-to-floor in the mask reader) are both caught. This replaces a position where the only end-to-end evidence was one manual session that required an operator to select bounded lower-artifact removal before any surface was accepted. THE GROUND TRUTH IS SYNTHETIC. It establishes the geometry and scaling arithmetic, not anatomy: a clothed human silhouette is not a union of boxes, real cameras are not orthographic, and no physical measurement appears anywhere in it. Anatomical accuracy, repeatability across separate real captures, intended-device performance and population validation remain unproven, which is what holds this below 0.75."
     },
     {
       "id": "FM03",
@@ -335,6 +335,11 @@
       "date": "2026-09-10",
       "earned_points": 37.75,
       "note": "Final presentation deployment 18af9078-3b56-4503-9d21-a1b0ee8c0e35 passed 22/22 production checks against cache pp-v85. The Demo Room now has a dated-neutral seven-step sequence and includes the composition gate in its eight-minute run of show. Production browser inspection confirmed the updated sequence and zero console errors. This is presentation polish and does not change a parity stage."
+    },
+    {
+      "date": "2026-09-11",
+      "earned_points": 42.75,
+      "note": "FM02 0.25 -> 0.5. The rubric defines 0.5 as a core local workflow integrated with automated checks. Until now the workflow had unit checks on its pieces (prepareMask rejections, an analytical box, the connectivity refusal, the cleanup bounds) and one manual real-person session, but no automated run of the whole path and no ground-truth comparison of any kind. tests/surface-pipeline.test.cjs adds nine checks that do both, and is mutation-tested against the reconstruction core. No product code changed, and no claim about real people is made or implied: the subject is synthetic and the evidence string says so. Reference measurement studies against real people on intended devices remain what 0.75 requires."
     }
   ]
 }
