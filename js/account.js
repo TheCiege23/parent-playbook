@@ -8,7 +8,7 @@ async function screenAccount(){
   logUsageEvent('view_account');
   const a=state.active;
   const [{data:fam},{data:adminRows},{data:prefRows}] = await Promise.all([
-    sb.from('families').select('id,name').limit(1),
+    sb.from('families').select('id,name').eq('id', a.family_id).limit(1),
     sb.from('app_admins').select('guardian_id').limit(1),   // RLS: a row comes back only if the viewer is an admin
     sb.from('notification_prefs').select('*').eq('guardian_id',state.user.id).limit(1),
   ]);
