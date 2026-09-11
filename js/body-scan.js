@@ -1231,7 +1231,7 @@ async function fillScanConsents(){
 
   set(latest.map(r => H`<div class="tgl">
       <div class="gt"><b>${esc(nameOf(r.athlete_id))} · ${esc(engineLabel(r.scan_engine))}</b>
-        <span>Given ${esc(fmtDate(r.granted_at.slice(0, 10)))} · deletes
+        <span>Given ${esc(fmtDate(localDay(new Date(r.granted_at))))} · deletes
           ${esc(fmtDate(r.retention_until))}</span></div>
       <button class="btn sm ghost" data-revoke="${esc(r.athlete_id)}" data-engine="${esc(r.scan_engine)}">Withdraw</button>
     </div>`).join(''));
