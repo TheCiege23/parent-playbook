@@ -174,7 +174,7 @@ function obChild(){ return H`
   </div>`:H`<p class="muted-note" style="text-align:left;margin:0 2px 14px">
     Got a code from your coach? <a href="#" id="obWelcomeCode" style="color:var(--green-d)">Enter it</a> and we'll fill in the team's schedule.</p>`}
   <div class="field"><label>First name</label><input id="cf" placeholder="Marcus" value="${esc(ob.athlete.first)}"/></div>
-  <div class="field"><label>Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${new Date().toISOString().slice(0,10)}"/></div>
+  <div class="field"><label>Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${todayISO()}"/></div>
   <div class="err" id="oberr"></div>
   <div style="margin-top:8px"><button class="btn" id="n">Continue</button></div>
   ${state.user?'':`<p class="muted-note" style="margin-top:14px">Already have an account? <a href="#" id="obLogin" style="color:var(--green-d)">Log in</a></p>`}`; }
@@ -746,7 +746,7 @@ async function finishOnboarding(){
     }
     // Seed the growth chart with whatever they gave us. Best-effort — a failure here
     // must never cost them the profile they just created.
-    const today=new Date().toISOString().slice(0,10);
+    const today=todayISO();
     const seed=[];
     // source MUST be a value of the measure_source enum: manual | guided | photo | import.
     // This used to say 'onboarding', which is not one of them, so every single height and

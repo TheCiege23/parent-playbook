@@ -30,7 +30,7 @@ function oversize(files){ return [...files].find(f=>f.size>MEDIA_MAX); }
 // commits at the end of step 1 so stats and photos can be skipped without losing it.
 
 function openAddMilestone(onDate){
-  const today=onDate||new Date().toISOString().slice(0,10);
+  const today=onDate||todayISO();
   const bg=sheet(H`<h3>Add a milestone</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">A moment worth remembering — a first, a personal best, a big step.</p>
     <div class="field"><label>Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
@@ -57,7 +57,7 @@ function openAddMilestone(onDate){
 }
 
 function openAddMedia(games, preselect){
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayISO();
   // `preselect` is the game whose "＋ Photos" button was tapped — landing on "None"
   // after choosing a specific game is a small betrayal of the tap.
   const gopts=(games||[]).map(g=>`<option value="${g.id}" ${g.id===preselect?'selected':''}>${esc(fmtDate(g.game_date))}${g.opponent?' vs '+esc(g.opponent):''}</option>`).join('');
@@ -458,7 +458,7 @@ function openAddGoal(existing){
 // presetKey preselects a metric so "+ Height" lands on height instead of dropping the
 // parent into a 14-item dropdown defaulted to a 40-yard dash time.
 function openAddMeasure(presetKey){
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayISO();
   const metrics=state.ref?.metrics||[];
   // Guard the empty case: with no reference data the picker renders zero options and
   // `selectedOptions[0]` throws on save. afterLogin() now always loads it, but don't

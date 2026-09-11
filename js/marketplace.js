@@ -153,7 +153,7 @@ function openBookingSheet(service,trainer){
     <div class="field"><label>For which athlete?</label>
       <select id="bkid">${kids.map(k=>`<option value="${k.id}">${esc(k.first_name)}</option>`).join('')}</select></div>
     <div class="row2">
-      <div class="field"><label>Preferred date</label><input id="bkdate" type="date" min="${new Date().toISOString().slice(0,10)}"/></div>
+      <div class="field"><label>Preferred date</label><input id="bkdate" type="date" min="${todayISO()}"/></div>
       <div class="field"><label>Time</label><input id="bktime" type="time"/></div>
     </div>
     <div class="field"><label>Note to the trainer (optional)</label><textarea id="bknote" rows="2" placeholder="Goals, experience, anything helpful."></textarea></div>

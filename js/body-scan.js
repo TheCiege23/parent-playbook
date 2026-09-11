@@ -184,7 +184,7 @@ async function loadScanConsent(athleteId, engineId){
       .select('id, policy_version, scan_engine, retention_until, granted_at')
       .eq('athlete_id', athleteId)
       .is('revoked_at', null)
-      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .gte('retention_until', todayISO())
       .eq('policy_version', SCAN_POLICY_VERSION)
       .eq('scan_engine', engineId || 'none')
       .order('granted_at', { ascending: false })
@@ -404,7 +404,7 @@ function bsRefuse(gate){
 function bsRetentionDate(){
   const d = new Date();
   d.setMonth(d.getMonth() + SCAN_RETENTION_MONTHS);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -1187,7 +1187,7 @@ async function fillScanConsents(){
     const { data, error } = await sb.from('biometric_consents')
       .select('id, athlete_id, granted_at, retention_until, scan_engine, subject_is_minor')
       .is('revoked_at', null)
-      .gte('retention_until', new Date().toISOString().slice(0, 10))
+      .gte('retention_until', todayISO())
       .order('granted_at', { ascending: false });
     if(error) throw error;
     rows = data || [];

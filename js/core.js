@@ -54,7 +54,7 @@ const SCAN_FREE_MONTHLY_CAP = 3;
 async function scanCapOk(athleteId){
   athleteId = athleteId || state.active?.id;
   if(!PREMIUM_ENABLED || isPremium() || !athleteId) return true;
-  const since=new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
+  const since=localDay(new Date(Date.now()-30*24*60*60*1000));
   const { data } = await sb.from('measurements').select('measured_on')
     .eq('athlete_id',athleteId).in('source',['photo','guided']).gte('measured_on',since);
   const days=new Set((data||[]).map(r=>r.measured_on));

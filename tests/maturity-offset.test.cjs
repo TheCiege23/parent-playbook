@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-function setup(extra={}){const c=vm.createContext({Date,Number,Math,isFinite,Map,JSON,...extra});vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/maturity.js'),'utf8'),c);return c;}
+function setup(extra={}){const c=vm.createContext({Date,Number,Math,isFinite,Map,JSON,...extra});for(const f of ['dates.js','maturity.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+f),'utf8'),c);return c;}
 const male={sex:'male',birthdate:'2012-09-09',measuredOn:'2026-09-09',heightIn:68,sittingHeightIn:35,weightLb:140};
 
 test('combined-sample Mirwald equations use documented metric inputs and return bounded provenance',()=>{

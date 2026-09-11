@@ -447,7 +447,7 @@ function openMaturityInputs(athlete,rows,onSaved){
     <div class="err" id="moErr"></div><button class="btn amber" id="moSave">Save measurements and estimate</button>
     <p class="muted-note">The original verification error was about 0.65–0.68 years, and later validation found substantial individual bias for early and late maturers. We display at least ±1 year and do not use the estimate to rank athletes or prescribe training.</p>`);
   bg.querySelector('#moSave').onclick=async e=>{
-    const read=id=>Number(String(bg.querySelector(id).value||'').trim()),measuredOn=new Date().toISOString().slice(0,10);
+    const read=id=>Number(String(bg.querySelector(id).value||'').trim()),measuredOn=todayISO();
     const heightIn=read('#moHeight'),sittingHeightIn=read('#moSitting'),weightLb=read('#moWeight');
     const estimate=maturityOffsetEstimate({sex:athlete&&athlete.sex_at_birth,birthdate:athlete&&athlete.birthdate,measuredOn,heightIn,sittingHeightIn,weightLb});
     if(!estimate){bg.querySelector('#moErr').textContent='Check the profile sex at birth and enter plausible standing height, sitting height and body mass for an athlete age 8–16.';return;}
@@ -542,7 +542,7 @@ function openGrowthInputs(cur, sportRow, onSaved){
       // the percentile track all read that table already.
       const { error }=await sb.from('measurements').insert({
         athlete_id:state.active.id, metric_key:'height', value:hIn, unit:'in',
-        measured_on:new Date().toISOString().slice(0,10), source:'manual',
+        measured_on:todayISO(), source:'manual',
         created_by:state.user.id });
       if(error) console.error(error);   // non-fatal: the rest of the save still stands
     }

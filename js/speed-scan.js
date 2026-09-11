@@ -41,7 +41,7 @@ const SPD_MODE = {
 function spdRetentionDate(){
   const d = new Date();
   d.setMonth(d.getMonth() + SPD_RETENTION_MONTHS);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 
 const SPD_FLAG = 'pp_speed_active';
@@ -431,7 +431,7 @@ function spdResult(result){
     e.target.innerHTML = '<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled = true;
     const { error } = await sb.from('measurements').insert({
       athlete_id: SPD.subject.id, metric_key: metricKey, value, unit,
-      measured_on: new Date().toISOString().slice(0,10), source: 'video', created_by: state.user.id,
+      measured_on: todayISO(), source: 'video', created_by: state.user.id,
       note: isReaction ? 'On-device reaction-time capture' : 'On-device footwork-cadence capture',
     });
     if(error){
