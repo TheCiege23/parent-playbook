@@ -41,7 +41,7 @@ const EXE = process.platform === 'win32' ? '.exe' : '';
 function findBin() {
   const candidates = [];
   if (process.env.PP_PG_BIN) candidates.push(process.env.PP_PG_BIN);
-  const cfg = spawnSync('pg_config' + EXE, ['--bindir'], { encoding: 'utf8' });
+  const cfg = spawnSync('pg_config' + EXE, ['--bindir'], { encoding: 'utf8', windowsHide: true });
   if (cfg.status === 0 && cfg.stdout.trim()) candidates.push(cfg.stdout.trim());
   candidates.push(null); // bare PATH lookup
   for (const dir of ['/usr/local/pgsql/bin', '/usr/lib/postgresql/18/bin', '/usr/lib/postgresql/17/bin',
@@ -49,7 +49,7 @@ function findBin() {
     'C:/Program Files/PostgreSQL/16/bin']) candidates.push(dir);
   for (const dir of candidates) {
     const initdb = dir ? path.join(dir, 'initdb' + EXE) : 'initdb' + EXE;
-    const probe = spawnSync(initdb, ['--version'], { encoding: 'utf8' });
+    const probe = spawnSync(initdb, ['--version'], { encoding: 'utf8', windowsHide: true });
     if (probe.status === 0) return { dir, version: probe.stdout.trim() };
   }
   return null;
@@ -93,7 +93,7 @@ let clusterPort = null;
 function clusterGone() {
   if (!clusterPort) return false;
   const probe = spawnSync(bin('psql'), ['-h', '127.0.0.1', '-p', String(clusterPort), '-U', 'pptest',
-    '-d', 'postgres', '-X', '-A', '-t', '-c', 'select 1'], { encoding: 'utf8', timeout: 10000 });
+    '-d', 'postgres', '-X', '-A', '-t', '-c', 'select 1'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
   return !(probe.status === 0 && String(probe.stdout).trim() === '1');
 }
 
@@ -101,7 +101,7 @@ function stopCluster() {
   if (!started || !dataDir) return;
   try {
     execFileSync(bin('pg_ctl'), ['-D', dataDir, '-m', 'fast', '-w', 'stop'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   } catch { /* already down */ }
   started = false;
 }
@@ -149,22 +149,36 @@ async function main() {
 
   step('initdb');
   execFileSync(bin('initdb'), ['-D', dataDir, '-U', user, '--auth=trust', '--encoding=UTF8', '--locale=C'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   console.log('cluster created');
 
   step('start');
-  // `pg_ctl -w start` does not return under a Git Bash/Windows shell even though the server comes
-  // up, so start it detached and poll for readiness ourselves.
-  const launcher = spawn(bin('pg_ctl'), ['-D', dataDir, '-l', logFile, '-o',
-    '-p ' + port + ' -c listen_addresses=127.0.0.1 -c fsync=off -c full_page_writes=off', 'start'],
-    { detached: true, stdio: 'ignore', windowsHide: true });
+  // Start the postmaster DIRECTLY rather than through `pg_ctl start`, and hand it the log
+  // file as its own stdout/stderr.
+  //
+  // Two reasons. `pg_ctl -w start` does not return under a Git Bash/Windows shell even
+  // though the server comes up. More importantly, on Windows pg_ctl launches postgres in a
+  // way that leaves it attached to the calling console, and every process on a console
+  // receives that console's control events: a stray Ctrl+C anywhere in the session
+  // terminates a backend — or an internal background worker — with STATUS_CONTROL_C_EXIT
+  // (0xC000013A), after which the postmaster kills every other process and shuts down
+  // mid-run. That produced failures that looked like migration errors and were not.
+  //
+  // Spawning the postmaster as our own detached child gives it DETACHED_PROCESS, so it has
+  // no console to receive those events. `pg_ctl stop` still works against it: it finds the
+  // server through postmaster.pid, not through who started it.
+  const logFd = fs.openSync(logFile, 'a');
+  const launcher = spawn(bin('postgres'), ['-D', dataDir, '-p', String(port),
+    '-c', 'listen_addresses=127.0.0.1', '-c', 'fsync=off', '-c', 'full_page_writes=off'],
+    { detached: true, stdio: ['ignore', logFd, logFd], windowsHide: true });
   launcher.unref();
+  fs.closeSync(logFd);
   started = true;
   const deadline = Date.now() + 60000;
   let ready = false;
   while (Date.now() < deadline) {
     const probe = spawnSync(bin('psql'), ['-h', '127.0.0.1', '-p', String(port), '-U', user,
-      '-d', 'postgres', '-X', '-A', '-t', '-c', 'select 1'], { encoding: 'utf8', timeout: 10000 });
+      '-d', 'postgres', '-X', '-A', '-t', '-c', 'select 1'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
     if (probe.status === 0 && String(probe.stdout).trim() === '1') { ready = true; break; }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
   }
@@ -176,13 +190,13 @@ async function main() {
   console.log('server started and accepting connections');
 
   execFileSync(bin('createdb'), ['-h', '127.0.0.1', '-p', String(port), '-U', user, database],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
   const conn = ['-h', '127.0.0.1', '-p', String(port), '-U', user, '-d', database];
   const env = { ...process.env, PP_DB_PSQL: bin('psql'), PP_DB_CONN: JSON.stringify(conn), PP_DB_OUT: os.tmpdir() };
   if (MIGRATIONS_FROM) env.PP_DB_MIGRATIONS = path.resolve(MIGRATIONS_FROM);
   const child = (script, label) => {
-    const result = spawnSync(process.execPath, [path.join(HERE, script)], { env, encoding: 'utf8', stdio: 'inherit' });
+    const result = spawnSync(process.execPath, [path.join(HERE, script)], { env, encoding: 'utf8', stdio: 'inherit', windowsHide: true });
     if (result.status !== 0) throw new Error(label + ' failed (exit ' + result.status + ')');
   };
 
@@ -192,7 +206,7 @@ async function main() {
   if (INVENTORY_AT) {
     step('capture schema inventory');
     const out = execFileSync(env.PP_DB_PSQL, [...conn, '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1',
-      '-f', path.join(HERE, 'inventory.sql')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      '-f', path.join(HERE, 'inventory.sql')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     const inventory = JSON.parse(out.trim());
     fs.mkdirSync(path.dirname(path.resolve(INVENTORY_AT)), { recursive: true });
     fs.writeFileSync(INVENTORY_AT, JSON.stringify(inventory, null, 2) + String.fromCharCode(10), 'utf8');
@@ -205,11 +219,22 @@ async function main() {
 
   step('load synthetic fixtures');
   execFileSync(env.PP_DB_PSQL, [...conn, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '--single-transaction',
-    '-f', path.join(HERE, '10-fixtures.sql')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    '-f', path.join(HERE, '10-fixtures.sql')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   console.log('synthetic fixtures loaded');
 
   step('security tests');
   child('security-tests.cjs', 'security tests');
+
+  // The rehearsals need pg_dump/pg_restore and the ability to create a second database
+  // on this cluster, so they get the bin directory and connection parts rather than the
+  // assembled psql argument list the security suite uses.
+  env.PP_DB_BINDIR = found.dir || '';
+  env.PP_DB_PORT = String(port);
+  env.PP_DB_USER = user;
+  env.PP_DB_NAME = database;
+
+  step('restore and deletion rehearsal');
+  child('restore-deletion.cjs', 'restore and deletion rehearsal');
 
   if (KEEP) {
     console.log('\n--keep: leaving the cluster up for inspection.');

@@ -50,13 +50,24 @@ named in any file that ships in the buyer package.
 | `run.cjs` | Creates the cluster, orchestrates, disposes |
 | `00-preamble.sql` | Supabase-compatible emulation: `anon` / `authenticated` / `service_role` roles, `auth.users`, `auth.uid()`, storage and vault stubs, and **stubs for pg_cron and pg_net** |
 | `05-post-identity-seed.sql` | Synthetic guardian row so the marketplace migration's hard-coded `app_admins` seed can replay |
-| `replay.cjs` | Applies all 77 real migrations in order, each in its own transaction, recording failures rather than stopping |
+| `replay.cjs` | Applies all 79 real migrations in order, each in its own transaction, recording failures rather than stopping |
 | `10-fixtures.sql` | Two synthetic organizations, three synthetic accounts, three synthetic athletes, six synthetic provider registrations (active, revoked, expired, narrow, other-study), and payload builders |
-| `security-tests.cjs` | 147 cases, each in its own transaction, rolled back |
+| `security-tests.cjs` | 159 cases, each in its own transaction, rolled back |
+| `restore-deletion.cjs` | 17 cases that must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact |
 
-Expected result: **76 of 77 migrations applied** and **147/147 tests pass**. The single migration
-failure is `20260812174514_enable_cron_and_net.sql`, which needs the pg_cron and pg_net binaries that
-only exist inside Supabase.
+Expected result: **78 of 79 migrations applied**, **159/159 security cases** and **17/17 rehearsal
+cases** pass. The single migration failure is `20260812174514_enable_cron_and_net.sql`, which needs
+the pg_cron and pg_net binaries that only exist inside Supabase.
+
+The two suites answer different questions and are deliberately separate. `security-tests.cjs` rolls
+every case back, which is what makes it safe to run hundreds of them; but a rolled-back DELETE
+proves nothing about deletion, and a transaction cannot observe a dump and restore. Anything that
+needs committed state lives in `restore-deletion.cjs`, which cleans up after itself and runs against
+a cluster that is destroyed either way.
+
+Two of the restore cases (R09, R10) damage the restored copy on purpose and require the comparison
+to notice, then undo the damage. Without them "row-level security survived the restore" could mean
+the query matched nothing on both sides and passed for the wrong reason.
 
 ## Coverage
 

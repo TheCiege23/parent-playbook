@@ -24,7 +24,7 @@ function psqlFile(file, { single = true } = {}) {
   if (single) args.push('--single-transaction');
   args.push('-f', file);
   try {
-    const out = execFileSync(PSQL, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = execFileSync(PSQL, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     return { ok: true, out };
   } catch (error) {
     return { ok: false, out: (error.stdout || '') + (error.stderr || '') };

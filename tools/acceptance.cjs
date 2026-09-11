@@ -142,12 +142,22 @@ function checkDatabase() {
     const tail = run.out.trim().split('\n').slice(-4).join(' | ');
     return record('database', 'fail', 'the database suite did not complete: ' + tail.slice(0, 400), { retried });
   }
-  const m = run.out.match(/TOTAL: (\d+)\/(\d+) pass, (\d+) fail/);
-  if (!m) return record('database', 'fail', 'the database suite produced no total line', { retried });
-  if (Number(m[3])) return record('database', 'fail', `${m[3]} database security cases failed`, { retried });
+  // The run reports one TOTAL per suite — the security cases and the restore/deletion
+  // rehearsal. Read every one of them: taking only the first silently drops a whole
+  // suite from the result while still printing a pass.
+  const totals = [...run.out.matchAll(/TOTAL: (\d+)\/(\d+) pass, (\d+) fail/g)]
+    .map(m => ({ passed: Number(m[1]), total: Number(m[2]), failed: Number(m[3]) }));
+  if (!totals.length) return record('database', 'fail', 'the database suite produced no total line', { retried });
+  if (totals.length < 2) return record('database', 'fail',
+    `only ${totals.length} database suite reported a total; the security cases and the restore/deletion rehearsal should both run`, { retried, totals });
+  const failedCases = totals.reduce((n, t) => n + t.failed, 0);
+  if (failedCases) return record('database', 'fail', `${failedCases} database cases failed`, { retried, totals });
+  const passed = totals.reduce((n, t) => n + t.passed, 0);
+  const total = totals.reduce((n, t) => n + t.total, 0);
   return record('database', 'pass',
-    `${m[1]}/${m[2]} security cases pass on a disposable cluster built from this package's migrations (${version})${suffix}`,
-    { passed: Number(m[1]), total: Number(m[2]), retried });
+    `${passed}/${total} cases pass on a disposable cluster built from this package's migrations — ` +
+    totals.map(t => `${t.passed}/${t.total}`).join(' security, ') + ' rehearsal' + ` (${version})${suffix}`,
+    { passed, total, totals, retried });
 }
 
 // --- 6. host --------------------------------------------------------------
@@ -201,7 +211,7 @@ const NOT_ESTABLISHED = [
   'Anatomical validity. The surface perimeters are clothed-surface contours, not girths.',
   'Body composition. No model ships and no composition value is ever produced.',
   'FITMATCH equivalence, DEXA equivalence and clinical validity are not claimed or tested.',
-  'Restore and deletion. Standing the schema up is proven; restoring data from backup is not.',
+  'Provider backup restore. A logical dump and restore is rehearsed here, including that row-level security and table privileges survive it. Restoring from the hosting provider\u2019s own backups, and point-in-time recovery, are not rehearsed.',
   'Buyer-host deployment and physical-device capture have not been performed.',
   'The checksum manifest is unsigned: it detects accidental change, not substitution.',
 ];

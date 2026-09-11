@@ -82,7 +82,7 @@ const BUNDLE_VERIFICATION = Object.freeze([
   'tools/sdk-files.cjs','tools/sdk-verify.cjs','tools/sdk-host.cjs','tools/package-scan.cjs','tools/acceptance.cjs','tools/schema-parity.cjs','tools/operations-check.cjs',
   'tests/db/run.cjs','tests/db/replay.cjs','tests/db/inventory.sql','tests/db/posture.sql',
   'tests/db/00-preamble.sql','tests/db/05-post-identity-seed.sql','tests/db/10-fixtures.sql',
-  'tests/db/security-tests.cjs','tests/db/README.md',
+  'tests/db/security-tests.cjs','tests/db/restore-deletion.cjs','tests/db/README.md',
 ]);
 
 const BUNDLE_FILES = Object.freeze([

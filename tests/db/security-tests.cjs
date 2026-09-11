@@ -85,15 +85,34 @@ function run(testCase) {
   const file = path.join(os.tmpdir(), 'pp-case-' + Math.random().toString(36).slice(2) + '.sql');
   fs.writeFileSync(file, script, 'utf8');
   try {
-    const out = execFileSync(PSQL, [...CONN, '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-f', file],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    return { errored: false, out: out.trim() };
-  } catch (error) {
-    const text = ((error.stdout || '') + (error.stderr || '')).trim();
-    const line = text.split('\n').find(l => /ERROR:/.test(l)) || text.split('\n')[0] || '';
-    return { errored: true, out: text, error: line.replace(/^.*ERROR:\s*/, '').trim() };
+    // Not being able to reach the server is not a verdict about the policy under test.
+    // On Windows a stray console control event kills a backend (0xC000013A); the
+    // postmaster then crash-recovers, and any case in flight comes back as "server
+    // closed the connection" or "the database system is in recovery mode". Counting
+    // that as a security failure reports a breach that did not happen, so wait for the
+    // server and run the case again. A genuine policy rejection arrives as an ERROR
+    // from a live connection and is never retried.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const out = execFileSync(PSQL, [...CONN, '-X', '-A', '-t', '-q', '-v', 'ON_ERROR_STOP=1', '-f', file],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+        return { errored: false, out: out.trim() };
+      } catch (error) {
+        const text = ((error.stdout || '') + (error.stderr || '')).trim();
+        if (attempt < 20 && CONNECTION_FAULT.test(text)) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+          continue;
+        }
+        const line = text.split('\n').find(l => /ERROR:/.test(l)) || text.split('\n')[0] || '';
+        return { errored: true, out: text, error: line.replace(/^.*ERROR:\s*/, '').trim() };
+      }
+    }
   } finally { try { fs.unlinkSync(file); } catch {} }
 }
+
+// Failures that mean "the connection went away", never "the database said no".
+// Matched against psql's own wording, which is why these are phrases and not codes.
+const CONNECTION_FAULT = /connection to server|server closed the connection unexpectedly|is in recovery mode|not yet accepting connections|Connection refused|could not connect/i;
 
 const CASES = [];
 const add = (id, group, desc, spec) => CASES.push({ id, group, desc, ...spec });

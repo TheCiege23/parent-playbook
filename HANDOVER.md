@@ -145,7 +145,7 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
 | `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
-| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 159 security cases pass as restricted roles |
+| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 176 cases pass as restricted roles: 159 security cases plus a 17-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
 | `node --test tests/<name>.test.cjs` | 107 contract and adapter checks against the shipped modules. The full 283-check suite covers app code that is not part of this package and runs in the source repository, not here |
@@ -156,7 +156,11 @@ package that reached you over an untrusted path.
 
 ## Honest limits of this document
 
-Standing the database up is proven. **Restoring data is not** — backup deletion and point-in-time
-restore remain unverified, and are listed as open in `CLAUDE-CONTINUATION-HANDOFF.md`. Deployment to
+Standing the database up is proven, and so is a logical dump-and-restore: `tests/db/restore-deletion.cjs`
+dumps this schema, restores it into an empty database, and checks that the object counts, the rows, the
+set of tables with row-level security enabled, and the table privileges all come back unchanged — then
+damages the restored copy on purpose to prove those last two checks can fail. **Restoring from a hosting
+provider’s own backups is not proven**, and neither is point-in-time recovery or backup deletion; those
+remain open in `CLAUDE-CONTINUATION-HANDOFF.md`. Deployment to
 a buyer-controlled host has not been performed. Nothing here establishes any FITMATCH parity claim,
 and running these commands successfully proves reproducibility, not scientific validity.
