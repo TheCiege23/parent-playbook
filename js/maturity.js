@@ -63,11 +63,24 @@ function pctAdultHeight(currentIn, predicted){
   const c = Number(currentIn);
   if(!predicted || !isFinite(c) || !predicted.mid) return null;
   const pct = (c / predicted.mid) * 100;
-  if(!(pct > 20 && pct <= 100.5)) return null;   // nonsense guard
+  // A child taller than the midpoint of their own prediction is ordinary, not nonsense.
+  // The midpoint is a mean, so about half of children finish above it, and a sixteen- or
+  // seventeen-year-old sitting above it is the common case rather than the strange one.
+  // The old ceiling of 100.5 returned null there, and the caller renders this card only
+  // `if(pred && pct)` — so a parent who had entered both their own heights watched the
+  // whole card vanish with nothing said. Silence is the one answer this file is not
+  // allowed to give.
+  //
+  // 125 is still a guard, against a mistyped parent height rather than against a tall
+  // child: no real child is a quarter taller than their own predicted adult height.
+  if(!(pct > 20 && pct <= 125)) return null;
   return { pct,
            // The same spread carried through, so the reader sees a range not a point.
            lo: (c / predicted.hi) * 100,
-           hi: (c / predicted.lo) * 100 };
+           hi: (c / predicted.lo) * 100,
+           // Lets the card say "already past the middle of this estimate" instead of the
+           // nonsense phrasing "about 102% of the way there".
+           atOrAbovePrediction: pct >= 100 };
 }
 
 // ---- 3. Relative age ---------------------------------------------------------
@@ -385,7 +398,10 @@ function growthCard(mat, a){
       </div>
       <div class="ph-body" id="phBody" hidden>
         <div class="rng">${esc(fmtHeightIn(pred.lo))} – ${esc(fmtHeightIn(pred.hi))}</div>
-        <p>${nm} is about ${Math.round(pct.pct)}% of the way there. Mid-parental method — the parents' own
+        <p>${pct.atOrAbovePrediction
+            ? H`${nm} has already passed the middle of this estimate. That is common — the midpoint is an
+                average, so about half of children finish above it, and it was never a ceiling.`
+            : H`${nm} is about ${Math.round(pct.pct)}% of the way there.`} Mid-parental method — the parents' own
           heights, nothing measured off your child. Two children with identical parents can finish more than six
           inches apart, and the range above is the honest width of that. It is not a target, and not a prediction
           of what your child can do.</p>
