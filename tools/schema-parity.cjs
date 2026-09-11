@@ -35,7 +35,7 @@ function capture(outPath) {
   // Reuse the disposable-cluster harness rather than reimplementing it. --inventory tells run.cjs
   // to emit the inventory instead of running the security suite.
   const result = spawnSync(process.execPath, [path.join(DB_DIR, 'run.cjs'), '--inventory', outPath],
-    { encoding: 'utf8', stdio: 'inherit' });
+    { encoding: 'utf8', stdio: 'inherit', windowsHide: true });
   if (result.status !== 0) fail('Building the restored cluster failed.');
   if (!fs.existsSync(outPath)) fail('The harness did not write ' + outPath);
   const inv = JSON.parse(fs.readFileSync(outPath, 'utf8'));

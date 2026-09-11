@@ -82,7 +82,7 @@ function checkContracts() {
   // Enumerate the files rather than passing a glob: --test glob support varies by
   // Node version, and an unmatched glob is another way to report zero tests as success.
   const run = spawnSync(process.execPath, ['--test', ...files],
-    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true });
   const out = (run.stdout || '') + (run.stderr || '');
   const number = label => { const m = out.match(new RegExp('^# ?' + label + ' (\\d+)', 'm')) || out.match(new RegExp('\\b' + label + ' (\\d+)')); return m ? Number(m[1]) : null; };
   const total = number('tests'), pass = number('pass'), fail = number('fail');
@@ -98,7 +98,7 @@ function postgresAvailable() {
   const dirs = [process.env.PP_PG_BIN, null].filter(d => d !== undefined);
   for (const dir of dirs) {
     const initdb = dir ? path.join(dir, 'initdb' + exe) : 'initdb' + exe;
-    const probe = spawnSync(initdb, ['--version'], { encoding: 'utf8' });
+    const probe = spawnSync(initdb, ['--version'], { encoding: 'utf8', windowsHide: true });
     if (probe.status === 0) return (probe.stdout || '').trim();
   }
   return null;
@@ -119,7 +119,7 @@ function checkDatabase() {
   // security failure that did not happen — but never silently, and never more than once.
   const attempt = () => {
     try {
-      const out = execFileSync(process.execPath, [runner], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+      const out = execFileSync(process.execPath, [runner], { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true });
       return { out };
     } catch (e) { return { out: (e.stdout || '') + (e.stderr || ''), error: e }; }
   };
@@ -181,7 +181,7 @@ async function checkHost() {
   const host = path.join(root, 'tools/sdk-host.cjs');
   if (!fs.existsSync(host)) return record('host', 'skip', 'tools/sdk-host.cjs is not in this package');
   const port = await freePort();
-  const child = spawn(process.execPath, [host, '--port', String(port)], { cwd: root, stdio: 'ignore' });
+  const child = spawn(process.execPath, [host, '--port', String(port)], { cwd: root, stdio: 'ignore', windowsHide: true });
   try {
     // Poll rather than sleep a fixed amount: a slow machine should not fail this.
     let health = { status: 0 };

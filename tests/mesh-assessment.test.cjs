@@ -73,9 +73,9 @@ test('CLI executes a complete synthetic mesh-to-report experiment and rejects a 
     const mesh=path.join(folder,'mesh.obj'),config=path.join(folder,'protocol.json'),out=path.join(folder,'result');
     fs.writeFileSync(mesh,text);fs.writeFileSync(config,JSON.stringify(p));
     const args=[path.join(__dirname,'../tools/reconstruction/mesh-assessment.cjs'),mesh,config,out];
-    const run=spawnSync(process.execPath,args,{encoding:'utf8'});assert.equal(run.status,0,run.stderr);assert.equal(JSON.parse(run.stdout).computed,2);
+    const run=spawnSync(process.execPath,args,{encoding:'utf8',windowsHide:true});assert.equal(run.status,0,run.stderr);assert.equal(JSON.parse(run.stdout).computed,2);
     assert.equal(JSON.parse(run.stdout).rejected,1);
     assert.equal(fs.readFileSync(mesh,'utf8'),text);assert.ok(fs.readFileSync(path.join(out,'report.html'),'utf8').includes('Perimeter through the synthetic cube'));
-    assert.equal(spawnSync(process.execPath,args,{encoding:'utf8'}).status,1);
+    assert.equal(spawnSync(process.execPath,args,{encoding:'utf8',windowsHide:true}).status,1);
   }finally{fs.rmSync(folder,{recursive:true,force:true});}
 });
