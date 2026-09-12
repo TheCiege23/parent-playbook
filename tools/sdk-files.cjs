@@ -67,6 +67,12 @@ const BUNDLE_CONTRACT_TESTS = Object.freeze([
   'tests/body-composition-reference.test.cjs',
   'tests/composition-import.test.cjs',
   'tests/composition-import-store.test.cjs',
+  'tests/nhanes-xport.test.cjs',
+  'tests/nhanes-replicates.test.cjs',
+  'tests/nhanes-cohort.test.cjs',
+  'tests/nhanes-baselines.test.cjs',
+  'tests/nhanes-models.test.cjs',
+  'tests/nhanes-frozen-model.test.cjs',
   'tests/body-sdk-surface.test.cjs',
   'tests/body-sdk.test.cjs',
   'tests/body-surface-repeat.test.cjs',
@@ -93,12 +99,48 @@ const BUNDLE_VERIFICATION = Object.freeze([
   'tests/db/security-tests.cjs','tests/db/restore-deletion.cjs','tests/db/README.md',
 ]);
 
+// The owned-model research: the frozen question, what the source data turned out to contain, the
+// baselines, the candidates, the holdout result, and every tool that produced them.
+//
+// Shipped because the claim about this work is that a model was built, evaluated against a
+// standard written before the results existed, and NOT released -- and a claim of that shape is
+// worth nothing unless the person hearing it can check it. That means the preregistration with its
+// four dated amendments, the artifact that failed, and the report that failed it.
+//
+// The artifact is included deliberately even though it must never be used. It carries
+// status:"not_released", tools/nhanes/frozen-predict.mjs refuses to produce an estimate from it
+// unless a caller explicitly opts in for research, and what comes back then says FAILED
+// VALIDATION. Shipping the evidence for an honest negative result is worth more than withholding
+// a model that refuses to run.
+//
+// NOT shipped: the NHANES source files themselves. They are 130 MB of NCHS public-use data, they
+// belong to NCHS, and tools/nhanes/acquire.cjs downloads and hash-verifies them from the CDC on
+// demand. sources.lock.json records what this study read so a buyer can prove they have the same
+// bytes rather than take our word for it.
+const BUNDLE_RESEARCH = Object.freeze([
+  'research/NHANES-PREREGISTRATION.md',
+  'research/NHANES-DATA-STRUCTURE.md',
+  'research/NHANES-BASELINES.md',
+  'research/NHANES-CANDIDATES.md',
+  'research/NHANES-HOLDOUT.md',
+  'research/model/MODEL-CARD.md',
+  'research/model/bodyfat-candidate-v0.1.0.json',
+  'research/model/bodyfat-candidate-v0.1.0.sha256',
+  'research/model/holdout-report.json',
+  'tools/nhanes/xport.mjs', 'tools/nhanes/replicates.mjs', 'tools/nhanes/cohort.mjs',
+  'tools/nhanes/baselines.mjs', 'tools/nhanes/models.mjs', 'tools/nhanes/frozen-predict.mjs',
+  'tools/nhanes/acquire.cjs', 'tools/nhanes/build-cohort.cjs', 'tools/nhanes/run-baselines.cjs',
+  'tools/nhanes/run-candidates.cjs', 'tools/nhanes/freeze-model.cjs', 'tools/nhanes/read-holdout.cjs',
+  'tools/nhanes/sources.json', 'tools/nhanes/sources.lock.json',
+]);
+
 const BUNDLE_FILES = Object.freeze([
   ...SDK_FILES.map(name=>'js/'+name),
   'tools/sdk-demo.cjs','tools/sdk-demo.html','tools/sdk-demo.mjs','company-persistence-demo.html','tools/company-persistence-demo.mjs',
   ...BUNDLE_VERIFICATION,
   ...BUNDLE_CONTRACT_TESTS,
   ...BUNDLE_MIGRATIONS,
+  ...BUNDLE_RESEARCH,
   'HANDOVER.md','REFERENCE-COHORTS.md','BODY-SDK.md','HEIC-IMPORT.md','README.md',
 ]);
-module.exports={SDK_FILES,BUNDLE_FILES,BUNDLE_MIGRATIONS,BUNDLE_VERIFICATION,BUNDLE_CONTRACT_TESTS};
+module.exports={SDK_FILES,BUNDLE_FILES,BUNDLE_MIGRATIONS,BUNDLE_VERIFICATION,BUNDLE_CONTRACT_TESTS,BUNDLE_RESEARCH};
