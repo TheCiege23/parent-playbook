@@ -1,0 +1,186 @@
+{
+  "schema": "PP_NHANES_SOURCE_INVENTORY_V1",
+  "note": [
+    "Public-use files for the owned body-composition study. These URLs were first written from",
+    "memory -- which is exactly the kind of knowledge that should not be trusted about a filename --",
+    "and then checked against the server. See `checked` below: all eighteen were fetchable on",
+    "2026-09-12, so they are recorded facts rather than claims. Re-run",
+    "`node tools/nhanes/acquire.cjs --check` after any edit here; NHANES renames and re-releases",
+    "components, and a wrong filename looks exactly like a discontinued survey item.",
+    "",
+    "Nothing downloaded through this manifest is committed. The lockfile records sizes and SHA-256",
+    "hashes so a later run can prove it read the same bytes; the bytes themselves stay outside the",
+    "repository and outside the public web package, and acquire.cjs refuses a download directory",
+    "inside either.",
+    "",
+    "Read `risks` before building anything on top of these files."
+  ],
+  "listingPage": "https://wwwn.cdc.gov/nchs/nhanes/search/datapage.aspx?Component=Examination",
+  "cycles": [
+    {
+      "cycle": "1999-2000",
+      "suffix": "",
+      "role": "development",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/DEMO.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/BMX.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/DXX.xpt"
+        }
+      ]
+    },
+    {
+      "cycle": "2001-2002",
+      "suffix": "_B",
+      "role": "development",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_B",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/DEMO_B.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_B",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/BMX_B.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_B",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/DXX_B.xpt"
+        }
+      ]
+    },
+    {
+      "cycle": "2003-2004",
+      "suffix": "_C",
+      "role": "development",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_C",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/DEMO_C.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_C",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/BMX_C.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_C",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/DXX_C.xpt"
+        }
+      ]
+    },
+    {
+      "cycle": "2011-2012",
+      "suffix": "_G",
+      "role": "development",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_G",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/DEMO_G.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_G",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/BMX_G.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_G",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/DXX_G.xpt"
+        }
+      ]
+    },
+    {
+      "cycle": "2013-2014",
+      "suffix": "_H",
+      "role": "development",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_H",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/DEMO_H.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_H",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/BMX_H.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_H",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/DXX_H.xpt"
+        }
+      ]
+    },
+    {
+      "cycle": "2017-2018",
+      "suffix": "_J",
+      "role": "candidate-final-holdout",
+      "note": "Reserved as the final holdout under research/NHANES-PREREGISTRATION.md if it proves usable. Not opened during development.",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_J",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DEMO_J.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_J",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/BMX_J.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_J",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DXX_J.xpt"
+        }
+      ]
+    }
+  ],
+  "checked": {
+    "at": "2026-09-12",
+    "how": "node tools/nhanes/acquire.cjs --check",
+    "result": "All 18 candidate files were fetchable at the recorded URLs. The URLs below are no longer claims.",
+    "sizes": {
+      "DXX (1999-2000)": "23.6 MB",
+      "DXX_B (2001-2002)": "31.2 MB",
+      "DXX_C (2003-2004)": "29.0 MB",
+      "DXX_G (2011-2012)": "4.1 MB",
+      "DXX_H (2013-2014)": "4.3 MB",
+      "DXX_J (2017-2018)": "3.6 MB"
+    }
+  },
+  "risks": [
+    {
+      "id": "MULTIPLE_IMPUTATION_ROWS",
+      "severity": "high",
+      "status": "suspected, not yet confirmed",
+      "what": "The 1999-2004 DXA files are six to eight times larger than the 2011-2018 ones while covering a similar number of participants.",
+      "why": "NCHS released the early whole-body DXA data with multiply imputed values for records that could not be measured, as several replicate rows per participant. If that is what the size difference is, a naive join on the participant identifier multiplies the cohort by the number of imputations and treats replicates of one person as independent observations -- which shrinks every standard error and makes a model look better than it is.",
+      "beforeUse": "Read the codebook for the early cycles and count rows per participant before joining anything. If replicates are present, either use a single imputation consistently or combine them by the published rules, and record which was done in the cohort flow. Do not average them into one row without saying so.",
+      "note": "This is inferred from file sizes alone and may be wrong. It is written down now because it is the kind of thing that is obvious in hindsight and invisible in a result."
+    },
+    {
+      "id": "DXA_AGE_COVERAGE_DIFFERS",
+      "severity": "medium",
+      "status": "to confirm per cycle",
+      "what": "DXA eligibility ages are not the same across cycles.",
+      "why": "The preregistration fixes the population at 18-69. If a cycle stops at 59, that cycle contributes nothing above 59 and the age distribution of the training set is not what the cohort table suggests.",
+      "beforeUse": "Record the actual eligible age range per cycle from the codebooks and report the per-cycle age histogram in the cohort flow."
+    }
+  ]
+}

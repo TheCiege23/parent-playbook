@@ -1,0 +1,170 @@
+{
+  "schema": "PP_NHANES_SOURCE_LOCK_V1",
+  "note": "Sizes and SHA-256 of the files this study read. The files themselves are not committed; this is what lets a later run prove it read the same bytes.",
+  "recordedAt": "2026-09-12T18:06:01.573Z",
+  "directory": "C:\\Users\\Guap_\\nhanes-data",
+  "files": [
+    {
+      "cycle": "1999-2000",
+      "role": "development",
+      "component": "demographics",
+      "name": "DEMO",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/DEMO.xpt",
+      "bytes": 11500560,
+      "sha256": "a17bd1ebfd6007b8dc93f16259cb090678eb6c467a39363b7e932bba15febf89"
+    },
+    {
+      "cycle": "1999-2000",
+      "role": "development",
+      "component": "body-measures",
+      "name": "BMX",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/BMX.xpt",
+      "bytes": 2827840,
+      "sha256": "6b9bc4d998c0004fc42b213cc7f5bf347df937707f46d6d25fab926723a60500"
+    },
+    {
+      "cycle": "1999-2000",
+      "role": "development",
+      "component": "dxa-whole-body",
+      "name": "DXX",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/1999/DataFiles/DXX.xpt",
+      "bytes": 24737440,
+      "sha256": "9567c94c4a2efd3bb67817f051bec4e778c648c9a2dd222a894fe0ca78598d37"
+    },
+    {
+      "cycle": "2001-2002",
+      "role": "development",
+      "component": "demographics",
+      "name": "DEMO_B",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/DEMO_B.xpt",
+      "bytes": 3273520,
+      "sha256": "6458dc2307cee244ab6ba26f70ec78c7b842ffc68e668bc43f0ab6b9737937d9"
+    },
+    {
+      "cycle": "2001-2002",
+      "role": "development",
+      "component": "body-measures",
+      "name": "BMX_B",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/BMX_B.xpt",
+      "bytes": 2183680,
+      "sha256": "55715d4387960f88e48a2adf44da0b270a83290b1edf7c8e4ecc0eb2c29c59cf"
+    },
+    {
+      "cycle": "2001-2002",
+      "role": "development",
+      "component": "dxa-whole-body",
+      "name": "DXX_B",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2001/DataFiles/DXX_B.xpt",
+      "bytes": 32695200,
+      "sha256": "6eeb2dabff1fc4a33df2dfe2b46e86eb6f0986319f238f1cb8066e7d695852f6"
+    },
+    {
+      "cycle": "2003-2004",
+      "role": "development",
+      "component": "demographics",
+      "name": "DEMO_C",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/DEMO_C.xpt",
+      "bytes": 3569840,
+      "sha256": "2a2fdb88263337bfa06f0516bfb419631595f0a0ee88fb96069bed13d1857c6f"
+    },
+    {
+      "cycle": "2003-2004",
+      "role": "development",
+      "component": "body-measures",
+      "name": "BMX_C",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/BMX_C.xpt",
+      "bytes": 2551120,
+      "sha256": "b3d3e431b5964ea8b5807035044322fcf32f3878d814d4a844204e51c793f090"
+    },
+    {
+      "cycle": "2003-2004",
+      "role": "development",
+      "component": "dxa-whole-body",
+      "name": "DXX_C",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2003/DataFiles/DXX_C.xpt",
+      "bytes": 30371680,
+      "sha256": "8840fcaa518d7ee0c3c64e826dfb512cf0ac9be5cd00b1895a9782cb885c91df"
+    },
+    {
+      "cycle": "2011-2012",
+      "role": "development",
+      "component": "demographics",
+      "name": "DEMO_G",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/DEMO_G.xpt",
+      "bytes": 3753760,
+      "sha256": "eaf0525d1952626885af3e935415a1f66ad62c18698080e7354789c125af252d"
+    },
+    {
+      "cycle": "2011-2012",
+      "role": "development",
+      "component": "body-measures",
+      "name": "BMX_G",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/BMX_G.xpt",
+      "bytes": 1946720,
+      "sha256": "4814bfc3047ed400b9d43d285f8c3ea7c940ac6489404a9b699579715d158ec3"
+    },
+    {
+      "cycle": "2011-2012",
+      "role": "development",
+      "component": "dxa-whole-body",
+      "name": "DXX_G",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/DXX_G.xpt",
+      "bytes": 4248640,
+      "sha256": "df4a9741ef55866ca039b0a01f55ab4d3dd55f83f4ee845ca03e8bfca9a65099"
+    },
+    {
+      "cycle": "2013-2014",
+      "role": "development",
+      "component": "demographics",
+      "name": "DEMO_H",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/DEMO_H.xpt",
+      "bytes": 3833200,
+      "sha256": "f8f0cbb3085a323d4cde22349b164878fea1e64dbc404e65b5815c7816b547d7"
+    },
+    {
+      "cycle": "2013-2014",
+      "role": "development",
+      "component": "body-measures",
+      "name": "BMX_H",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/BMX_H.xpt",
+      "bytes": 2045520,
+      "sha256": "fd5e9fc6e6aab0a4aee6e699f51497bbc9b62101f7f43aee924c473e38fd9442"
+    },
+    {
+      "cycle": "2013-2014",
+      "role": "development",
+      "component": "dxa-whole-body",
+      "name": "DXX_H",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2013/DataFiles/DXX_H.xpt",
+      "bytes": 4502320,
+      "sha256": "792ebf3791156367832a01be0c96286ef8da1f540a1d674077f5af12951e99e5"
+    },
+    {
+      "cycle": "2017-2018",
+      "role": "candidate-final-holdout",
+      "component": "demographics",
+      "name": "DEMO_J",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DEMO_J.xpt",
+      "bytes": 3412720,
+      "sha256": "c0b46e0345ea19404928656277c8b0d10b0cca348a9b2fe4fc3c67e8b7ee73ec"
+    },
+    {
+      "cycle": "2017-2018",
+      "role": "candidate-final-holdout",
+      "component": "body-measures",
+      "name": "BMX_J",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/BMX_J.xpt",
+      "bytes": 1466000,
+      "sha256": "8d675e42d8826ac98714b2c3dd4c5138a5e353fb4424f7eff5e6db4a01ce838a"
+    },
+    {
+      "cycle": "2017-2018",
+      "role": "candidate-final-holdout",
+      "component": "dxa-whole-body",
+      "name": "DXX_J",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DXX_J.xpt",
+      "bytes": 3818640,
+      "sha256": "de16420ff3f978f72dbcc6a83c64de041440f29ad1f516f5e1cc5476af994ff1"
+    }
+  ]
+}
