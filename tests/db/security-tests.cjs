@@ -714,6 +714,367 @@ add('M09', 'service-values', 'an UPDATE cannot smuggle a negative price past the
     sql: "update public.services set price_cents = -4000 where trainer_id='" + TRAINER + "';",
     expect: 'error', expectError: /services_price_cents_not_negative/ });
 
+// ================================================ N-R. external body composition records
+// Imported DEXA / BIA / smart-scale results. These are evidence inputs, not model outputs, so the
+// questions are different from the company table's: can a source claim more than it measured, can
+// a child's result arrive without a live release, and can an organization write to a clinical
+// record it did not create.
+const GUARDIAN  = MEMBER_C;                // family owner: can edit every synthetic athlete
+const C_LIVE    = 'e0000000-0000-4000-8000-00000000000e';
+const C_REVOKED = 'e0000000-0000-4000-8000-00000000001e';
+const C_EXPIRED = 'e0000000-0000-4000-8000-00000000002e';
+const C_OFF     = 'e0000000-0000-4000-8000-00000000003e';  // live, but for the off-roster athlete
+
+// The SQL-side payload gate, called directly so a rejection comes back as a value rather than an
+// exception and the test can tell "refused" from "crashed".
+const payloadFor = (source, outputsJson) =>
+  "public.test_reference_payload('synthetic-reference-001','synthetic-subject-001','adult_reference','"
+  + source + "','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z'"
+  + (outputsJson ? ",'" + outputsJson + "'::jsonb" : '') + ')';
+const refAllow = (expr, source) =>
+  'select private.external_composition_payload_is_allowed(' + expr
+  + ",'synthetic-reference-001','synthetic-subject-001','adult_reference','" + (source || 'dexa')
+  + "','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z');";
+const refBase = payloadFor('dexa');
+const one = (key, status, value, unit) =>
+  '[{"key":"' + key + '","status":"' + status + '","value":' + value + ',"unit":"' + unit + '"}]';
+
+add('N00', 'external-payload', 'a DXA payload measuring body fat and lean mass is accepted',
+  { sql: refAllow(refBase), expect: 'ok', expectOut: 't' });
+
+// What each source is allowed to say it did. A machine that derives a number through the
+// manufacturer's equation did not measure it, and a record saying otherwise overstates the
+// evidence a parent is looking at.
+const claims = [
+  ['N01', 'dexa',           'body_fat_percent',        'measured',        18,  'percent', 't', 'DXA measures body fat'],
+  ['N02', 'dexa',           'skeletal_muscle_mass_kg', 'measured',        30,  'kg',      'f', 'DXA does not isolate skeletal muscle from lean soft tissue'],
+  ['N03', 'dexa',           'visceral_fat_index',      'measured',        5,   'index',   'f', 'DXA does not produce a visceral-fat index'],
+  ['N04', 'bia_clinical',   'body_fat_percent',        'device_estimated',18,  'percent', 't', 'bioimpedance derives body fat'],
+  ['N05', 'bia_clinical',   'body_fat_percent',        'measured',        18,  'percent', 'f', 'bioimpedance measures impedance, not fat'],
+  ['N06', 'bia_clinical',   'weight_kg',               'measured',        70,  'kg',      't', 'the scale really does weigh you'],
+  ['N07', 'smart_scale',    'lean_mass_kg',            'measured',        60,  'kg',      'f', 'a smart scale does not measure lean mass'],
+  ['N08', 'smart_scale',    'skeletal_muscle_mass_kg', 'device_estimated',30,  'kg',      't', 'but it may estimate it'],
+  ['N09', 'health_platform','body_fat_percent',        'device_estimated',18,  'percent', 't', 'a platform relays another app estimate'],
+  ['N10', 'dexa',           'bmi',                     'measured',        22,  'kg_m2',   'f', 'nothing measures BMI'],
+  ['N11', 'dexa',           'bmi',                     'calculated',      22,  'kg_m2',   't', 'BMI is arithmetic'],
+  ['N12', 'dexa',           'bone_mineral_content_kg', 'measured',        2.5, 'kg',      't', 'DXA measures bone mineral content'],
+  ['N13', 'bia_clinical',   'bone_mass_kg',            'device_estimated',3,   'kg',      't', 'bioimpedance estimates bone mass'],
+  ['N14', 'manual_report',  'body_fat_percent',        'measured',        18,  'percent', 't', 'a transcription is no better than its document, and no worse'],
+];
+for (const [id, source, key, status, value, unit, want, why] of claims)
+  add(id, 'external-payload', source + ' ' + status + ' ' + key + ': ' + why,
+    { sql: refAllow(payloadFor(source, one(key, status, value, unit)), source),
+      expect: 'ok', expectOut: want });
+
+const ranges = [
+  ['N20', 'body fat of 140% is refused',        one('body_fat_percent', 'measured', 140, 'percent'), 'f'],
+  ['N21', 'body fat of 0.5% is refused',        one('body_fat_percent', 'measured', 0.5, 'percent'), 'f'],
+  ['N22', 'a 500 kg weight is refused',         one('weight_kg', 'measured', 500, 'kg'), 'f'],
+  ['N23', 'a plausible body fat is kept',       one('body_fat_percent', 'measured', 18, 'percent'), 't'],
+  ['N24', 'the wrong unit is refused',          one('weight_kg', 'measured', 154, 'lb'), 'f'],
+  ['N25', 'a quoted number is refused',         '[{"key":"weight_kg","status":"measured","value":"70","unit":"kg"}]', 'f'],
+  ['N26', 'a JSON null value is refused',       '[{"key":"weight_kg","status":"measured","value":null,"unit":"kg"}]', 'f'],
+  ['N27', 'an undeclared metric is refused',    one('vo2max', 'measured', 55, 'ml_kg_min'), 'f'],
+  ['N28', 'the same metric twice is refused',
+    '[{"key":"weight_kg","status":"measured","value":70,"unit":"kg"},{"key":"weight_kg","status":"measured","value":71,"unit":"kg"}]', 'f'],
+  ['N29', 'an empty output list is refused',    '[]', 'f'],
+];
+for (const [id, desc, json, want] of ranges)
+  add(id, 'external-payload', desc, { sql: refAllow(payloadFor('dexa', json)), expect: 'ok', expectOut: want });
+
+// A model estimate must never be storable here, whatever else it claims about itself.
+const notAnEstimate = [
+  ['N30', 'a payload carrying a provider block',   refBase + " || '" + '{"provider":{"id":"x"}}' + "'::jsonb"],
+  ['N31', 'a payload carrying a model manifest',   refBase + " || '" + '{"modelManifest":{"schema":"x"}}' + "'::jsonb"],
+  ['N32', 'a payload claiming status estimated',   refBase + " || '" + '{"status":"estimated"}' + "'::jsonb"],
+  ['N33', 'the company result schema',             "jsonb_set(" + refBase + ",'{schema}','\"PP_COMPANY_COMPOSITION_RESULT_V1\"')"],
+  ['N34', 'a payload claiming model_estimate origin', "jsonb_set(" + refBase + ",'{origin}','\"model_estimate\"')"],
+];
+for (const [id, desc, expr] of notAnEstimate)
+  add(id, 'external-payload', desc + ' is refused', { sql: refAllow('(' + expr + ')'), expect: 'ok', expectOut: 'f' });
+
+const disagrees = [
+  ['N40', 'recordId',    "jsonb_set(" + refBase + ",'{recordId}','\"other\"')"],
+  ['N41', 'subjectId',   "jsonb_set(" + refBase + ",'{subjectId}','\"other\"')"],
+  ['N42', 'scope',       "jsonb_set(" + refBase + ",'{scope}','\"child_athlete\"')"],
+  ['N43', 'sourceClass', "jsonb_set(" + refBase + ",'{sourceClass}','\"smart_scale\"')"],
+  ['N44', 'measuredAt',  "jsonb_set(" + refBase + ",'{measuredAt}','\"2020-01-01T00:00:00.000Z\"')"],
+];
+for (const [id, field, expr] of disagrees)
+  add(id, 'external-payload', 'payload ' + field + ' disagreeing with the column is refused',
+    { sql: refAllow('(' + expr + ')'), expect: 'ok', expectOut: 'f' });
+add('N45', 'external-payload', 'a malformed instant is refused rather than raising a cast error',
+  { sql: refAllow("jsonb_set(" + refBase + ",'{measuredAt}','\"not-a-date\"')"), expect: 'ok', expectOut: 'f' });
+
+// ------------------------------------------------------------------------------------ consent
+const seedChild = (consent) =>
+  "select public.test_seed_external('synthetic-child-ref-001','" + GUARDIAN + "','child_athlete','"
+  + ATH_A + "','" + ATH_A + "','" + consent + "');";
+const insertChild = (consentExpr, guardian) =>
+  "insert into public.external_composition_records(record_id, subject_reference, subject_scope,"
+  + " athlete_id, guardian_id, consent_id, source_class, facility, measured_at, saved_at,"
+  + " retention_until, record) values ('synthetic-child-ref-002','" + ATH_A + "','child_athlete','"
+  + ATH_A + "','" + (guardian || GUARDIAN) + "'," + consentExpr + ",'dexa','Synthetic Clinic',"
+  + "'2026-09-10T04:00:00Z','2026-09-10T04:05:00Z','2030-01-01T00:00:00Z',"
+  + "public.test_reference_payload('synthetic-child-ref-002','" + ATH_A + "','child_athlete','dexa',"
+  + "'2026-09-10T04:00:00Z','2026-09-10T04:05:00Z'));";
+const q = (id) => "'" + id + "'";
+const countRecords = 'select count(*)::text from public.external_composition_records;';
+const NOT_LIVE = /not live for this athlete|violates row-level security/;
+
+add('P00', 'external-consent', 'a child record with a live release is stored',
+  { claims: GUARDIAN, role: 'authenticated', sql: insertChild(q(C_LIVE)) + countRecords,
+    expect: 'ok', expectOut: '1' });
+add('P01', 'external-consent', 'a child record naming a WITHDRAWN release is refused',
+  { claims: GUARDIAN, role: 'authenticated', sql: insertChild(q(C_REVOKED)),
+    expect: 'error', expectError: NOT_LIVE });
+add('P02', 'external-consent', 'a child record naming an EXPIRED release is refused',
+  { claims: GUARDIAN, role: 'authenticated', sql: insertChild(q(C_EXPIRED)),
+    expect: 'error', expectError: NOT_LIVE });
+add('P03', 'external-consent', 'a release belonging to a different athlete does not authorise this one',
+  { claims: GUARDIAN, role: 'authenticated', sql: insertChild(q(C_OFF)),
+    expect: 'error', expectError: NOT_LIVE });
+add('P04', 'external-consent', 'a child record naming no release at all is refused',
+  { claims: GUARDIAN, role: 'authenticated', sql: insertChild('null'),
+    expect: 'error', expectError: /not live for this athlete|violates check constraint|violates row-level security/ });
+// The trigger, not only the policy. The service role bypasses RLS, so an import running with the
+// service key must not become the way a record arrives for a child whose family withdrew.
+add('P05', 'external-consent', 'the OWNER, who bypasses RLS, is still refused a withdrawn release',
+  { sql: seedChild(C_REVOKED), expect: 'error', expectError: /not live for this athlete/ });
+add('P06', 'external-consent', 'the owner is still refused another athlete release',
+  { sql: seedChild(C_OFF), expect: 'error', expectError: /not live for this athlete/ });
+add('P07', 'external-consent', 'an adult reference needs no release',
+  { claims: GUARDIAN, role: 'authenticated',
+    sql: "insert into public.external_composition_records(record_id,subject_reference,subject_scope,"
+      + "guardian_id,source_class,facility,measured_at,saved_at,retention_until,record) values "
+      + "('synthetic-adult-ref-001','synthetic-subject-001','adult_reference','" + GUARDIAN
+      + "','dexa','Synthetic Clinic','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z',"
+      + "'2030-01-01T00:00:00Z',public.test_reference_payload('synthetic-adult-ref-001'));" + countRecords,
+    expect: 'ok', expectOut: '1' });
+// Withdrawal is retroactive. A release that stops being live takes its records with it, because a
+// record the family no longer agrees to is not one we are entitled to keep.
+// The sweep and the count are separate statements on purpose. A single statement sees one
+// snapshot, so a count taken alongside the call reports the rows as they stood BEFORE the delete,
+// and a working sweep reads as a sweep that did nothing.
+const sweepThen = (tail) => 'select private.sweep_external_composition_retention(); ' + tail;
+add('P08', 'external-consent', 'the sweep removes records whose release was later withdrawn',
+  { setup: seedChild(C_LIVE) + "update public.biometric_consents set revoked_at = now() where id='" + C_LIVE + "';",
+    sql: sweepThen(countRecords), expect: 'ok', expectOut: '0' });
+add('P08b', 'external-consent', 'and reports that it removed exactly one',
+  { setup: seedChild(C_LIVE) + "update public.biometric_consents set revoked_at = now() where id='" + C_LIVE + "';",
+    sql: 'select private.sweep_external_composition_retention()::text;', expect: 'ok', expectOut: '1' });
+add('P09', 'external-consent', 'the sweep leaves a record whose release is still live',
+  { setup: seedChild(C_LIVE), sql: sweepThen(countRecords), expect: 'ok', expectOut: '1' });
+
+const seedOld = "select public.test_seed_external('synthetic-adult-old','" + GUARDIAN
+  + "','adult_reference','synthetic-subject-001',null,null,null,"
+  + "'2020-01-01T00:00:00Z','2021-01-01T00:00:00Z','2020-01-01T00:05:00Z');";
+add('P10', 'external-consent', 'the sweep removes a record past its retention date',
+  { setup: seedOld, sql: sweepThen(countRecords), expect: 'ok', expectOut: '0' });
+
+// ------------------------------------------------------------------------------------- access
+const seedShared = "select public.test_seed_external('synthetic-child-ref-001','" + GUARDIAN
+  + "','child_athlete','" + ATH_A + "','" + ATH_A + "','" + C_LIVE + "','" + ORG_A + "');";
+const seedPrivate = seedChild(C_LIVE);
+
+add('Q00', 'external-access', 'the importing guardian reads their own record',
+  { setup: seedPrivate, claims: GUARDIAN, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '1' });
+add('Q01', 'external-access', 'an organization admin cannot read a record that was not shared',
+  { setup: seedPrivate, claims: ADMIN_A, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '0' });
+add('Q02', 'external-access', 'an organization admin reads a record the guardian shared with them',
+  { setup: seedShared, claims: ADMIN_A, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '1' });
+add('Q03', 'external-access', 'a different organization still cannot read it',
+  { setup: seedShared, claims: ADMIN_B, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '0' });
+add('Q04', 'external-access', 'anon holds no reach at all',
+  { setup: seedShared, role: 'anon', sql: countRecords, expect: 'error', expectError: /permission denied/ });
+add('Q05', 'external-access', 'a caller with no claim reads nothing',
+  { setup: seedShared, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '0' });
+// Read, and only read. An organization that could write to a clinical record it did not create
+// could alter somebody's medical history.
+add('Q06', 'external-access', 'the shared-with organization cannot change the source',
+  { setup: seedShared, claims: ADMIN_A, role: 'authenticated',
+    sql: "with u as (update public.external_composition_records set source_class='smart_scale' returning 1) select count(*)::text from u;",
+    expect: 'ok', expectOut: '0' });
+add('Q07', 'external-access', 'the shared-with organization cannot delete it',
+  { setup: seedShared, claims: ADMIN_A, role: 'authenticated',
+    sql: 'with d as (delete from public.external_composition_records returning 1) select count(*)::text from d;',
+    expect: 'ok', expectOut: '0' });
+add('Q08', 'external-access', 'a caller cannot import a record in another guardian name',
+  { claims: ADMIN_A, role: 'authenticated', sql: insertChild(q(C_LIVE), GUARDIAN),
+    expect: 'error', expectError: /violates row-level security/ });
+add('Q09', 'external-access', 'a stranger cannot import a record about an athlete they cannot edit',
+  { claims: ADMIN_A, role: 'authenticated', sql: insertChild(q(C_LIVE), ADMIN_A),
+    expect: 'error', expectError: /violates row-level security/ });
+add('Q10', 'external-access', 'the guardian can delete their own record',
+  { setup: seedPrivate, claims: GUARDIAN, role: 'authenticated',
+    sql: 'with d as (delete from public.external_composition_records returning 1) select count(*)::text from d;',
+    expect: 'ok', expectOut: '1' });
+
+// ---------------------------------------------------------------------------------- integrity
+add('R00', 'external-integrity', 'importing the same reading twice is refused, under a new record id',
+  { setup: seedPrivate,
+    sql: seedPrivate.replace('synthetic-child-ref-001', 'synthetic-child-ref-009'),
+    expect: 'error', expectError: /external_composition_reading_idx/ });
+add('R01', 'external-integrity', 'two people whose subject label is both "me" do not collide',
+  { setup: "select public.test_seed_external('synthetic-adult-a','" + GUARDIAN + "','adult_reference','me');",
+    sql: "select public.test_seed_external('synthetic-adult-b','" + ADMIN_A
+      + "','adult_reference','me',null,null,null,'2026-09-11T04:00:00Z');" + countRecords,
+    expect: 'ok', expectOut: '2' });
+add('R02', 'external-integrity', 'retention beyond five years from the day we took custody is refused',
+  { sql: "select public.test_seed_external('synthetic-adult-long','" + GUARDIAN
+      + "','adult_reference','synthetic-subject-001',null,null,null,'2026-09-10T04:00:00Z','2040-01-01T00:00:00Z');",
+    expect: 'error', expectError: /violates check constraint/ });
+// Retention runs from custody, not from the measurement, so a scan from years ago is importable
+// rather than instantly expired.
+add('R03', 'external-integrity', 'a scan measured years ago is still importable',
+  { sql: "select public.test_seed_external('synthetic-adult-2019','" + GUARDIAN
+      + "','adult_reference','synthetic-subject-001',null,null,null,'2019-01-01T00:00:00Z','2030-01-01T00:00:00Z');"
+      + countRecords, expect: 'ok', expectOut: '1' });
+add('R04', 'external-integrity', 'a DXA record with no facility is refused',
+  { sql: "insert into public.external_composition_records(record_id,subject_reference,subject_scope,"
+      + "guardian_id,source_class,measured_at,saved_at,retention_until,record) values "
+      + "('synthetic-adult-nofac','synthetic-subject-001','adult_reference','" + GUARDIAN
+      + "','dexa','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z','2030-01-01T00:00:00Z',"
+      + "public.test_reference_payload('synthetic-adult-nofac'));",
+    expect: 'error', expectError: /violates check constraint/ });
+add('R05', 'external-integrity', 'an adult reference carrying an athlete id is refused',
+  { sql: "select public.test_seed_external('synthetic-adult-mix','" + GUARDIAN
+      + "','adult_reference','synthetic-subject-001','" + ATH_A + "','" + C_LIVE + "');",
+    expect: 'error', expectError: /violates check constraint/ });
+add('R06', 'external-integrity', 'a child record whose subject label is not the athlete id is refused',
+  { sql: "select public.test_seed_external('synthetic-child-mismatch','" + GUARDIAN
+      + "','child_athlete','not-the-athlete','" + ATH_A + "','" + C_LIVE + "');",
+    expect: 'error', expectError: /violates check constraint/ });
+
+const ATTACH_ID = 'dddddddd-0000-4000-8000-00000000000d';
+const attach = (record, status) =>
+  "insert into public.external_composition_attachments(id, record_uuid, storage_key, content_type,"
+  + " verification_status" + (status ? ', verified_by, verified_at' : '') + ") select '" + ATTACH_ID + "', r.id,"
+  + " r.id::text || '/report.pdf', 'application/pdf', '" + (status || 'unverified') + "'"
+  + (status ? ", '" + ADMIN_A + "', now()" : '')
+  + " from public.external_composition_records r where r.record_id='" + record + "';";
+const VERIFIED = 'verified_against_report';
+
+add('R10', 'external-integrity', 'a verified record refuses a change of source',
+  { setup: seedPrivate + attach('synthetic-child-ref-001', VERIFIED),
+    sql: "update public.external_composition_records set source_class='smart_scale';",
+    expect: 'error', expectError: /verified against its report/ });
+add('R11', 'external-integrity', 'a verified record refuses a change of measured value',
+  { setup: seedPrivate + attach('synthetic-child-ref-001', VERIFIED),
+    sql: "update public.external_composition_records set record = jsonb_set(record,'{outputs,0,value}','99');",
+    expect: 'error', expectError: /verified against its report/ });
+add('R12', 'external-integrity', 'an unverified record can still be corrected',
+  { setup: seedPrivate + attach('synthetic-child-ref-001'),
+    sql: "update public.external_composition_records set facility='Corrected Clinic';"
+      + ' select facility from public.external_composition_records;',
+    expect: 'ok', expectOut: 'Corrected Clinic' });
+add('R13', 'external-integrity', 'a verified record can still be shared with an organization',
+  { setup: seedPrivate + attach('synthetic-child-ref-001', VERIFIED),
+    sql: "update public.external_composition_records set team_id='" + ORG_A + "';"
+      + ' select team_id::text from public.external_composition_records;',
+    expect: 'ok', expectOut: ORG_A });
+
+// Verification is a claim that a person compared the typed numbers against the document, so it is
+// not something the person who typed them can assert about themselves.
+add('R20', 'external-integrity', 'a guardian cannot certify their own transcription',
+  { setup: seedPrivate + attach('synthetic-child-ref-001'), claims: GUARDIAN, role: 'authenticated',
+    sql: "select (public.verify_composition_attachment('" + ATTACH_ID + "'))->>'verified';",
+    expect: 'error', expectError: /platform verifier/ });
+add('R21', 'external-integrity', 'a guardian cannot write the verified column directly either',
+  { setup: seedPrivate + attach('synthetic-child-ref-001'), claims: GUARDIAN, role: 'authenticated',
+    sql: "update public.external_composition_attachments set verification_status='" + VERIFIED + "';",
+    expect: 'error', expectError: /permission denied/ });
+add('R22', 'external-integrity', 'a platform verifier can mark it verified',
+  { setup: seedPrivate + attach('synthetic-child-ref-001')
+      + "insert into public.app_admins(guardian_id) values ('" + ADMIN_A + "') on conflict do nothing;",
+    claims: ADMIN_A, role: 'authenticated',
+    sql: "select (public.verify_composition_attachment('" + ATTACH_ID + "'))->>'verified';",
+    expect: 'ok', expectOut: 'true' });
+const asAdmin = (body) => "insert into public.app_admins(guardian_id) values ('" + ADMIN_A + "') on conflict do nothing;" + body;
+add('R22b', 'external-integrity', 'a platform verifier can find the document they are asked to verify',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + asAdmin(''),
+    claims: ADMIN_A, role: 'authenticated',
+    sql: 'select count(*)::text from public.external_composition_attachments;', expect: 'ok', expectOut: '1' });
+add('R22c', 'external-integrity', 'and read the typed numbers they are comparing it against',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + asAdmin(''),
+    claims: ADMIN_A, role: 'authenticated', sql: countRecords, expect: 'ok', expectOut: '1' });
+add('R22d', 'external-integrity', 'an organization admin who is not a verifier still cannot',
+  { setup: seedShared + attach('synthetic-child-ref-001'), claims: ADMIN_A, role: 'authenticated',
+    sql: 'select count(*)::text from public.external_composition_attachments;', expect: 'ok', expectOut: '0' });
+add('R22e', 'external-integrity', 'verifying is written to the audit trail',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + asAdmin(''),
+    claims: ADMIN_A, role: 'authenticated',
+    sql: "select public.verify_composition_attachment('" + ATTACH_ID + "');"
+      + " reset role; select count(*)::text from public.access_log where action='external_composition_attachment_verified';",
+    expect: 'ok', expectOut: '1' });
+add('R23', 'external-integrity', 'an attachment cannot be inserted already claiming to be verified',
+  { setup: seedPrivate, claims: GUARDIAN, role: 'authenticated',
+    sql: attach('synthetic-child-ref-001', VERIFIED),
+    expect: 'error', expectError: /violates row-level security/ });
+// The shared numbers are what the organization was given. The source document carries a name, a
+// date of birth and a referring physician, and was not.
+add('R24', 'external-integrity', 'the shared-with organization cannot see the source document',
+  { setup: seedShared + attach('synthetic-child-ref-001'), claims: ADMIN_A, role: 'authenticated',
+    sql: 'select count(*)::text from public.external_composition_attachments;', expect: 'ok', expectOut: '0' });
+add('R25', 'external-integrity', 'the guardian can see their own source document',
+  { setup: seedPrivate + attach('synthetic-child-ref-001'), claims: GUARDIAN, role: 'authenticated',
+    sql: 'select count(*)::text from public.external_composition_attachments;', expect: 'ok', expectOut: '1' });
+
+// An expired record must not leave a clinical PDF in the bucket with nothing left to say whose it
+// was. The foreign key cascade reaches the attachment row; only the trigger reaches the object.
+const putObject = "insert into storage.objects(bucket_id,name) select 'composition-reports', storage_key from public.external_composition_attachments;";
+const objectCount = "(select count(*) from storage.objects where bucket_id='composition-reports')::text";
+add('R30', 'external-integrity', 'deleting the record deletes the attachment and the stored object',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject,
+    sql: 'delete from public.external_composition_records;'
+      + " select (select count(*) from public.external_composition_attachments)::text || '|' || " + objectCount + ';',
+    expect: 'ok', expectOut: '0|0' });
+add('R31', 'external-integrity', 'the retention sweep takes the stored object with it',
+  { setup: seedOld + attach('synthetic-adult-old') + putObject,
+    sql: sweepThen('select ' + objectCount + ';'), expect: 'ok', expectOut: '0' });
+
+// The audit trail records that a health record moved, without becoming one itself.
+add('R40', 'external-integrity', 'an insert is audited',
+  { sql: seedPrivate + "select count(*)::text from public.access_log where action='external_composition_record_insert';",
+    expect: 'ok', expectOut: '1' });
+add('R41', 'external-integrity', 'a delete is audited',
+  { setup: seedPrivate,
+    sql: 'delete from public.external_composition_records;'
+      + " select count(*)::text from public.access_log where action='external_composition_record_delete';",
+    expect: 'ok', expectOut: '1' });
+add('R42', 'external-integrity', 'no measured value reaches the audit trail',
+  { sql: seedPrivate + "select count(*)::text from public.access_log where action like 'external_composition_record_%'"
+      + " and (detail ?| array['outputs','record','body_fat_percent','lean_mass_kg','value']"
+      + " or detail::text like '%body_fat%' or detail::text like '%lean_mass%');",
+    expect: 'ok', expectOut: '0' });
+
+// One answer to "what is this record", so that no screen has to work it out from the columns.
+add('R50', 'external-integrity', 'an imported measurement is never labelled a Parent Playbook estimate',
+  { sql: "select (public.describe_composition_origin(public.test_reference_payload()))->>'isParentPlaybookEstimate';",
+    expect: 'ok', expectOut: 'false' });
+add('R51', 'external-integrity', 'a model result is labelled a Parent Playbook estimate',
+  { sql: 'select (public.describe_composition_origin(\'{"schema":"PP_BODY_COMPOSITION_ESTIMATE_V1"}\'::jsonb))->>\'isParentPlaybookEstimate\';',
+    expect: 'ok', expectOut: 'true' });
+add('R52', 'external-integrity', 'an unrecognised payload is labelled unknown, not estimated',
+  { sql: 'select (public.describe_composition_origin(\'{"schema":"SOMETHING_ELSE"}\'::jsonb))->>\'origin\';',
+    expect: 'ok', expectOut: 'unknown' });
+add('R53', 'external-integrity', 'a device-estimated record is labelled device estimated',
+  { sql: 'select (public.describe_composition_origin(' + payloadFor('smart_scale', one('body_fat_percent', 'device_estimated', 18, 'percent')) + "))->>'label';",
+    expect: 'ok', expectOut: 'Device estimated' });
+
+add('R60', 'external-integrity', 'anon holds no privilege on the records table',
+  { sql: grantsFor('external_composition_records', 'anon'), expect: 'ok', expectOut: '(none)' });
+add('R61', 'external-integrity', 'anon holds no privilege on the attachments table',
+  { sql: grantsFor('external_composition_attachments', 'anon'), expect: 'ok', expectOut: '(none)' });
+add('R62', 'external-integrity', 'authenticated holds no UPDATE on attachments',
+  { sql: grantsFor('external_composition_attachments', 'authenticated'), expect: 'ok', expectOut: 'DELETE,INSERT,SELECT' });
+add('R63', 'external-integrity', 'the retention job is registered with the scheduler',
+  { sql: "select count(*)::text from cron.job where jobname='external-composition-retention';",
+    expect: 'ok', expectOut: '1' });
+add('R64', 'external-integrity', 'the report bucket is private',
+  { sql: "select public::text from storage.buckets where id='composition-reports';",
+    expect: 'ok', expectOut: 'false' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
