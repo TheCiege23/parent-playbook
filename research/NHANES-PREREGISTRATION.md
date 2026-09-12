@@ -46,15 +46,17 @@ DXA result and the required body measurements.
 
 **Excluded, with every exclusion counted and reported in the cohort flow:**
 
-| Rule | Reason |
-|---|---|
-| Age < 18 | Out of intended use for this release. |
-| Age > 59 | DXA eligibility stops at 59 from the 2011 cycle onward, so the final holdout has nobody above it. Amendment 2. |
-| DXA value imputed rather than measured | A model meant to approximate a DXA measurement should not be trained on somebody else's imputation of one. Amendment 1. |
-| Pregnant at examination | Body composition during pregnancy is not the quantity being modelled. |
-| No valid whole-body DXA | Nothing to learn from and nothing to check against. |
-| Missing height, weight or sex | These are the inputs; a row without them cannot be used and must not be imputed into existence. |
-| DXA exclusion flagged by NCHS | The survey's own validity rules are authoritative over ours. |
+Each rule names the test that implements it, because for three of them the obvious implementation
+is wrong in a way that yields a plausible cohort rather than an error.
+
+| Rule | How it is tested | Reason |
+|---|---|---|
+| Age < 18 | `RIDAGEYR < 18` | Out of intended use for this release. |
+| Age > 59 | `RIDAGEYR > 59` | DXA eligibility stops at 59 from the 2011 cycle onward, so the final holdout has nobody above it. Amendment 2. |
+| No usable whole-body DXA | `DXDTOPF` is null | Nothing to learn from and nothing to check against. **Not** `DXAEXSTS ≠ 1`: 678 completed 2017–2018 exams carry no total at all. Amendment 3. |
+| DXA value imputed rather than measured | `DXITOT ≠ 0`, early cycles only | A model meant to approximate a DXA measurement should not be trained on somebody else's imputation of one. Amendment 1. |
+| Pregnant, or possibly pregnant | `RIDEXPRG` is 1 or 3 | Body composition during pregnancy is not the quantity being modelled. **Not** "keep where `RIDEXPRG = 2`": the question is asked only of women aged 20–44, so that reading discards about 70% of the cohort. Amendment 3. |
+| Missing height, weight or sex | `BMXHT`, `BMXWT` or `RIAGENDR` is null | These are the inputs; a row without them cannot be used and must not be imputed into existence. Costs about 0.4%. |
 
 Exclusions are applied in a fixed, recorded order, and the count surviving each step is reported.
 A rule that removes an unexpectedly large share is a finding to investigate, not a number to pass
@@ -249,6 +251,55 @@ exclusions: **14,348 development, 2,452 holdout.**
 **Consequence for the product:** the owned model, if it is ever released, refuses rather than
 estimates for anyone aged 60 or over. That refusal is a supported-population rule under §4, not an
 error, and it must be visible to the person asking rather than returned as a default.
+
+---
+
+### 3 — 2026-09-12 — how "valid DXA" and "pregnant" are actually tested
+
+**What was known when this was made:** the last three open questions in
+research/NHANES-DATA-STRUCTURE.md had been answered by counting. **Still no analysis dataset, no
+model, no outcome.**
+
+**What prompted it:** §2 excludes "no valid whole-body DXA" and "pregnant at examination". Both
+phrases turn out to name something the data does not offer directly, and the obvious implementation
+of each is wrong in a way that produces a plausible cohort rather than an error.
+
+**Rule A — validity is era-specific, and exam status is not it.**
+
+A scan counts only when the **total body fat value is present**, and additionally, in 1999-2004,
+when the participant is **unimputed**.
+
+`DXAEXSTS = 1` ("exam status complete") is not a validity test and must not be used as one. In
+2017-2018, 678 of the 4,336 rows with that status carry no total body fat at all — the exam
+finished, a region was flagged invalid, and NCHS suppressed the total rather than imputing it.
+Using exam status alone would admit those 678 empty rows, and in the early cycles it would admit
+1,201 imputed ones.
+
+The two halves each do nothing in the other era, and both are required: in 1999-2004 everyone has a
+value so presence tests nothing, and after 2004 nothing is imputed so the imputation filter has
+nothing to act on. The eras handle an unusable scan in opposite ways — the early one imputes it,
+the later one leaves it blank — and a single simple filter cannot express that.
+
+**Rule B — pregnancy is an exclusion, not a requirement.**
+
+Exclude participants where `RIDEXPRG = 1` (pregnant) or `RIDEXPRG = 3` (cannot determine).
+**Do not require `RIDEXPRG = 2`.**
+
+The variable is asked only of women aged 20-44. Every man is null, as is every woman outside that
+range: 2,596 of 3,706 adults 18-59 in the 2017-2018 cycle. Requiring "not pregnant" rather than
+excluding "pregnant" would discard about 70% of the cohort for not answering a question they were
+never asked, and would leave a study population made almost entirely of women aged 20 to 44. It
+would not error, and the resulting cohort would look reasonable.
+
+"Cannot determine" is excluded as well as "pregnant", because the quantity being modelled is body
+composition outside pregnancy and possibly-pregnant is not a category this study can use. Cost: 89
+participants in that cycle.
+
+**What this costs overall:** nothing beyond what §2 already intended. These are corrections to how
+two existing exclusions are tested, not new exclusions. The body measures they interact with are
+essentially complete — 99.6% of eligible participants have both height and weight, and 99% have
+waist — so the input-completeness exclusion remains negligible and the with-and-without-waist
+comparison is well powered.
 
 ---
 

@@ -151,10 +151,72 @@ Cohort after both amendments, before the remaining exclusions in §2:
 | Development (1999–2004, 2011–2014) | **14,348** |
 | Final holdout (2017–2018) | **2,452** |
 
-## What is still unchecked
+## The last three questions, answered
 
-- Pregnancy status, which §2 excludes, and which variable carries it in each cycle.
-- Whether `BMXWT`, `BMXHT` and `BMXWAIST` are measured identically across eras, and their
-  missingness among participants who have a valid DXA.
-- Whether the 2011-2018 valid-DXA fraction (around 76%) reflects the same exclusions as the early
-  cycles' `DXITOT`, or a different mechanism wearing the same shape.
+### 5. Pregnancy status is only asked of some people — and the obvious rule drops 70% of the cohort
+
+`RIDEXPRG` exists in every cycle, labelled "Pregnancy Status at Exam". Among adults 18–59 in
+2017–2018:
+
+| | count |
+|---|---:|
+| female, `RIDEXPRG = 1` (pregnant) | 55 |
+| female, `RIDEXPRG = 2` (not pregnant) | 966 |
+| female, `RIDEXPRG = 3` (cannot determine) | 89 |
+| female, **null** | 845 |
+| male, **null** | 1,751 |
+
+The variable is populated only for women aged **20–44** — 1,110 of 1,955 women in the band. Every
+man is null, and so is every woman outside those ages.
+
+**So the exclusion has to be written as "exclude where `RIDEXPRG = 1`", never as "keep where
+`RIDEXPRG = 2`".** The second reading drops 2,596 of 3,706 adults — about 70% of the cohort — for
+not answering a question they were never asked. It would not error. It would produce a smaller
+cohort that still looks reasonable, made almost entirely of women aged 20 to 44.
+
+`RIDEXPRG = 3` is "cannot determine", which is not "not pregnant". Those 89 are excluded too: the
+quantity being modelled is body composition outside pregnancy, and possibly-pregnant is not a
+category this study can use.
+
+### 6. Body measures are consistent and nearly complete — checked, fine
+
+`BMXWT`, `BMXHT`, `BMXBMI` and `BMXWAIST` carry identical names and labels in 1999–2000,
+2003–2004 and 2017–2018. Among adults 18–59 with a valid measured DXA:
+
+| | 1999–2000 | 2017–2018 |
+|---|---:|---:|
+| no body-measures row at all | 0 | 0 |
+| missing weight | 6 | 8 |
+| missing height | 7 | 9 |
+| missing waist | 11 (0.4%) | 23 (0.9%) |
+| **have both height and weight** | **2,450 (99.7%)** | **2,442 (99.6%)** |
+
+The "missing height, weight or sex" exclusion costs almost nothing, and the optional waist input is
+available for about 99% — so the with-and-without-waist comparison the preregistration requires is
+well powered rather than a footnote.
+
+### 7. DXA validity works in opposite ways in the two eras — **and one filter cannot serve both**
+
+This is the important one.
+
+| | 1999–2004 | 2011–2018 |
+|---|---|---|
+| Unusable scan is… | **imputed** | **left blank** |
+| Flagged by | `DXITOT` | per-region tissue invalidity codes |
+| Imputation apparatus | `_MULT_`, 5 replicates | **none at all** |
+| Everyone has a value? | yes — a fifth of them are model output | no — a blank is a blank |
+
+In 2017–2018, **678 of the 4,336 rows with `DXAEXSTS = 1` — exam status complete — have no total
+body fat value.** The scan happened and finished; one or more regions carried a tissue invalidity
+code (most often 1 or 5), and NCHS suppressed the total rather than imputing it. Fifty rows have no
+invalidity code set and still no total.
+
+**So `DXAEXSTS = 1` is not a validity criterion.** It is the obvious one to reach for, and it is
+what "DXA exclusion flagged by NCHS" in the preregistration sounds like it means. Using it alone
+would admit 678 rows with no data in the later cycles, and 1,201 imputed rows in the early ones.
+
+The rule that works for both eras is stated in amendment 3: the total body fat value must be
+**present**, and in the early cycles the participant must additionally be **unimputed**. Neither
+half is redundant — the first does nothing in 1999–2004, where everyone has a value, and the second
+has nothing to act on after 2004, where nothing is imputed.
+

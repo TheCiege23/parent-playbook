@@ -197,3 +197,30 @@ test('the body-fat definition the study predicts is written down, not assumed', 
   assert.match(findings, /including the head/);
   assert.match(findings, /0\.9 pp|0\.025 pp/);
 });
+
+test('the exclusion rules name the test that implements them, not just the intent', () => {
+  // For three of these the obvious implementation is wrong and produces a plausible cohort rather
+  // than an error, so the preregistration has to carry the test and not only the intention.
+  const fs = require('node:fs'), path = require('node:path');
+  const prereg = fs.readFileSync(path.join(__dirname, '..', 'research', 'NHANES-PREREGISTRATION.md'), 'utf8');
+  const section = prereg.slice(prereg.indexOf('## 2. Population'), prereg.indexOf('## 3. Inputs'));
+
+  // Validity is the presence of the value, and explicitly NOT the exam status flag.
+  assert.match(section, /DXDTOPF` is null/);
+  assert.match(section, /\*\*Not\*\* `DXAEXSTS/);
+  // Pregnancy is an exclusion, not a requirement. The inverted reading drops most of the cohort.
+  assert.match(section, /`RIDEXPRG` is 1 or 3/);
+  assert.match(section, /\*\*Not\*\* "keep where `RIDEXPRG = 2`"/);
+  // And the imputation filter is scoped to the era that has imputation at all.
+  assert.match(section, /DXITOT ≠ 0`, early cycles only/);
+});
+
+test('the findings record why exam status cannot be the validity test', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const findings = fs.readFileSync(path.join(__dirname, '..', 'research', 'NHANES-DATA-STRUCTURE.md'), 'utf8');
+  assert.match(findings, /678 of the 4,336/, 'completed exams with no total');
+  assert.match(findings, /opposite ways/, 'the two eras handle an unusable scan differently');
+  // The pregnancy trap, with the number that makes it concrete.
+  assert.match(findings, /2,596 of 3,706/);
+  assert.match(findings, /never asked/);
+});
