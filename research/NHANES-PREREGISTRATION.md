@@ -34,15 +34,23 @@ they are constraints on what the product may build on top of it.
 
 ## 2. Population
 
-**Included:** NHANES participants aged 18–69 at examination with a valid whole-body DXA result and
-the required body measurements.
+**Included:** NHANES participants aged **18–59** at examination with a valid **measured** whole-body
+DXA result and the required body measurements.
+
+> Both of those bounds were amended after the source files were counted and before any model was
+> fitted. As originally written this said 18–69 and "a valid whole-body DXA result". Amendment 1
+> narrowed "valid" to "measured", excluding imputed scans; amendment 2 narrowed the age range,
+> because no cycle after 2004 has a participant over 59 and the final holdout therefore contains
+> nobody aged 60–69. Both are recorded in full at the end of this document with what was known at
+> the time. The original wording is left visible here rather than quietly replaced.
 
 **Excluded, with every exclusion counted and reported in the cohort flow:**
 
 | Rule | Reason |
 |---|---|
 | Age < 18 | Out of intended use for this release. |
-| Age > 69 | NHANES DXA eligibility ends at 69 in the cycles used; beyond it there is no data, not a shortage of it. |
+| Age > 59 | DXA eligibility stops at 59 from the 2011 cycle onward, so the final holdout has nobody above it. Amendment 2. |
+| DXA value imputed rather than measured | A model meant to approximate a DXA measurement should not be trained on somebody else's imputation of one. Amendment 1. |
 | Pregnant at examination | Body composition during pregnancy is not the quantity being modelled. |
 | No valid whole-body DXA | Nothing to learn from and nothing to check against. |
 | Missing height, weight or sex | These are the inputs; a row without them cannot be used and must not be imputed into existence. |
@@ -200,6 +208,47 @@ insufficient — not that the rule gets revisited.
 
 **Enforcement:** `tools/nhanes/replicates.mjs` refuses to collapse a replicated file unless a
 policy is named, and records which was used. There is no default.
+
+---
+
+### 2 — 2026-09-12 — the supported population narrows to 18-59
+
+**What was known when this was made:** the four open questions in
+research/NHANES-DATA-STRUCTURE.md had been answered by counting the locked files. **Still no
+analysis dataset, no model, no outcome of any kind.**
+
+**What prompted it:** DXA eligibility stopped at age 59 from the 2011 cycle onward. §5 names the
+most recent usable cycle as the final holdout, and that cycle — like every cycle after 2004 —
+**contains no participant aged 60-69 at all.**
+
+| | 18-69 | 18-59 | 60-69 |
+|---|---:|---:|---:|
+| Development (1999-2004, 2011-2014) | 15,937 | 14,348 | 1,589 |
+| Final holdout (2017-2018) | 2,452 | 2,452 | **0** |
+
+**The rule, replacing the age bounds in §2:** the population is **18-59**. Participants aged 60 and
+over are excluded and counted in the cohort flow.
+
+**Why:** a release for 18-69 under the original plan would train on 1,589 participants aged 60-69
+and evaluate on none. Every criterion in §8 could pass while saying nothing whatsoever about the
+oldest tenth of the supported population — which is not a gap in the evidence, it is the absence of
+evidence presented as a passing result. §8 already says that when a subgroup cannot be shown to
+work the supported population narrows, and this is that rule applying to itself.
+
+**Alternatives considered and rejected:** holding out an early cycle instead, so the holdout would
+contain 60-69. Rejected because it makes the holdout the oldest data rather than the newest, and a
+model validated only on 1999-2004 scanners and evaluated nowhere recent is a worse claim than a
+narrower one. Reporting 60-69 as "insufficient" while still supporting it. Rejected because zero is
+not insufficient, it is nothing, and an estimate offered to a 65-year-old would be unbacked by any
+measurement whatsoever.
+
+**What it costs:** 1,589 development participants, about a tenth. The holdout is unchanged at 2,452,
+because it never had anyone in that band. Cohort after both amendments, before the remaining §2
+exclusions: **14,348 development, 2,452 holdout.**
+
+**Consequence for the product:** the owned model, if it is ever released, refuses rather than
+estimates for anyone aged 60 or over. That refusal is a supported-population rule under §4, not an
+error, and it must be visible to the person asking rather than returned as a default.
 
 ---
 

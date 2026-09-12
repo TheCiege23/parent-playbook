@@ -156,3 +156,44 @@ test('the counts this module is built around are recorded as measured, not recal
   assert.match(doc, /5\.00/, 'the replicate ratio');
   assert.match(doc, /Rubin/, 'the correct combination rule is named');
 });
+
+// ----------------------------------------------------------------- documents agree
+test('the preregistration and the data-structure findings state the same population and counts', () => {
+  // Two documents now depend on the same measured numbers, and they were written on the same day
+  // by the same person. That is exactly when they start to drift: one gets corrected and the other
+  // keeps a figure nobody rechecks.
+  const fs = require('node:fs'), path = require('node:path');
+  const read = name => fs.readFileSync(path.join(__dirname, '..', 'research', name), 'utf8');
+  const prereg = read('NHANES-PREREGISTRATION.md'), findings = read('NHANES-DATA-STRUCTURE.md');
+
+  for (const doc of [prereg, findings]) {
+    assert.match(doc, /14,348/, 'the development cohort after both amendments');
+    assert.match(doc, /2,452/, 'the holdout cohort');
+    assert.match(doc, /1,589/, 'the participants the age narrowing costs');
+  }
+  // The narrowed population, and the reason, in both places.
+  assert.match(prereg, /18-59|18–59/);
+  assert.match(findings, /18–59|18-59/);
+  assert.match(prereg, /contains no participant aged 60-69/);
+
+  // The population section must STATE the narrowed bound. It may also mention the old one -- the
+  // document deliberately shows what changed rather than quietly replacing it -- so the check is
+  // that no ordinary line still asserts 18-69, while a quoted change note may say what it used to be.
+  const populationSection = prereg.slice(prereg.indexOf('## 2. Population'), prereg.indexOf('## 3. Inputs'));
+  assert.match(populationSection, /\*\*Included:\*\*[^\n]*18[–-]59/,
+    'the population section has to state the narrowed bound, not only reference the amendment');
+  const asserting = populationSection.split('\n')
+    .filter(line => !line.trimStart().startsWith('>') && /18[–-]69/.test(line));
+  assert.deepEqual(asserting, [],
+    'a line outside the change note still asserts 18-69: ' + asserting.join(' | '));
+});
+
+test('the body-fat definition the study predicts is written down, not assumed', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const findings = fs.readFileSync(path.join(__dirname, '..', 'research', 'NHANES-DATA-STRUCTURE.md'), 'utf8');
+  // Fat over total mass INCLUDING bone and head. The plausible alternative is off by about 0.9 pp,
+  // against a 3.5 pp release threshold -- small enough to look like noise and large enough to matter.
+  assert.match(findings, /fat \+ lean \+ bone mineral/);
+  assert.match(findings, /including the head/);
+  assert.match(findings, /0\.9 pp|0\.025 pp/);
+});
