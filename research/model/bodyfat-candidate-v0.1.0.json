@@ -20,8 +20,210 @@
     "medications"
   ],
   "frozenAt": "2026-09-12T19:59:47.236Z",
-  "holdoutRead": false,
-  "holdoutReport": null,
+  "holdoutRead": true,
+  "holdoutReport": {
+    "baselines": {
+      "BMI regression": {
+        "bias": 0.390023592056873,
+        "mae": 3.3119215573287217,
+        "n": 2442
+      },
+      "linear: age, sex, height, weight": {
+        "bias": 0.4497937924196354,
+        "mae": 3.2884783089720027,
+        "n": 2442
+      },
+      "mean by age and sex band": {
+        "bias": -0.47267527244788543,
+        "mae": 5.170168675733763,
+        "n": 2442
+      },
+      "waist-enhanced": {
+        "bias": 0.33315842720820393,
+        "mae": 3.0982416488107694,
+        "n": 2426
+      }
+    },
+    "cohort": 2442,
+    "criteria": [
+      {
+        "id": "mae",
+        "label": "Holdout MAE ≤ 3.5",
+        "pass": true,
+        "value": 2.7260511129431184
+      },
+      {
+        "id": "bias",
+        "label": "Holdout signed bias within ±1.0",
+        "pass": true,
+        "value": 0.3480626545754327
+      },
+      {
+        "id": "slope",
+        "label": "Calibration slope 0.85–1.15",
+        "pass": true,
+        "value": 0.9737957412759279
+      },
+      {
+        "id": "beats_baselines",
+        "label": "Beats every baseline on holdout MAE",
+        "pass": true,
+        "value": "2.7260511129431184 vs best baseline 3.098"
+      },
+      {
+        "id": "subgroup_mae",
+        "label": "Worst subgroup MAE ≤ 1.25× overall",
+        "pass": true,
+        "value": 1.0864549932733476
+      },
+      {
+        "id": "subgroup_bias",
+        "label": "Each subgroup bias within ±1.0 (amendment 4)",
+        "pass": false,
+        "value": 1.1875536480686701
+      }
+    ],
+    "cycle": "2017-2018",
+    "overall": {
+      "bias": 0.3480626545754327,
+      "calibrationIntercept": 0.5307186565734199,
+      "calibrationSlope": 0.9737957412759279,
+      "mae": 2.7260511129431184,
+      "maxAbsError": 20,
+      "n": 2426,
+      "refusalRate": 0.006552006552006552,
+      "refused": 16,
+      "rmse": 3.5043254393436416
+    },
+    "readAt": "2026-09-12T20:11:41.917Z",
+    "refusalReasons": {
+      "MISSING_INPUT": 16
+    },
+    "statisticianReview": {
+      "completed": false,
+      "note": "Not satisfiable by this tool. §8 requires a qualified reviewer to approve thresholds and sample adequacy.",
+      "required": true
+    },
+    "subgroups": {
+      "ageBand": {
+        "18-29": {
+          "bias": 0.20134408602150558,
+          "insufficient": false,
+          "mae": 2.7400537634408617,
+          "maeRatio": 1.0051366059980533,
+          "n": 744
+        },
+        "30-39": {
+          "bias": 0.4581784386617103,
+          "insufficient": false,
+          "mae": 2.854089219330853,
+          "maeRatio": 1.0469683439829203,
+          "n": 538
+        },
+        "40-49": {
+          "bias": 0.25549450549450525,
+          "insufficient": false,
+          "mae": 2.63241758241758,
+          "maeRatio": 0.9656523202808003,
+          "n": 546
+        },
+        "50-59": {
+          "bias": 0.5160535117056853,
+          "insufficient": false,
+          "mae": 2.6789297658862856,
+          "maeRatio": 0.9827144301025378,
+          "n": 598
+        }
+      },
+      "bmiBand": {
+        "18.5-24.9": {
+          "bias": 0.3963687150837984,
+          "insufficient": false,
+          "mae": 2.9617318435754174,
+          "maeRatio": 1.0864549932733476,
+          "n": 716
+        },
+        "25.0-29.9": {
+          "bias": 0.1844,
+          "insufficient": false,
+          "mae": 2.760133333333332,
+          "maeRatio": 1.0125024142901773,
+          "n": 750
+        },
+        "30.0-34.9": {
+          "bias": 0.47731958762886584,
+          "insufficient": false,
+          "mae": 2.5136082474226797,
+          "maeRatio": 0.9220693755477388,
+          "n": 485
+        },
+        "35 and over": {
+          "bias": 0.5474820143884892,
+          "insufficient": false,
+          "mae": 2.436690647482014,
+          "maeRatio": 0.8938536170186834,
+          "n": 417
+        },
+        "under 18.5": {
+          "insufficient": true,
+          "n": 58
+        }
+      },
+      "raceEthnicityAudit": {
+        "RIDRETH1=1": {
+          "bias": 0.38076923076923064,
+          "insufficient": false,
+          "mae": 2.4761538461538453,
+          "maeRatio": 0.9083299408427169,
+          "n": 390
+        },
+        "RIDRETH1=2": {
+          "bias": 0.8406639004149379,
+          "insufficient": false,
+          "mae": 2.92448132780083,
+          "maeRatio": 1.0727903500838916,
+          "n": 241
+        },
+        "RIDRETH1=3": {
+          "bias": 0.43369127516778566,
+          "insufficient": false,
+          "mae": 2.7306040268456377,
+          "maeRatio": 1.0016701498665606,
+          "n": 745
+        },
+        "RIDRETH1=4": {
+          "bias": 1.1875536480686701,
+          "insufficient": false,
+          "mae": 2.810729613733906,
+          "maeRatio": 1.031062697389913,
+          "n": 466
+        },
+        "RIDRETH1=5": {
+          "bias": -0.6561643835616441,
+          "insufficient": false,
+          "mae": 2.7376712328767114,
+          "maeRatio": 1.0042626199774543,
+          "n": 584
+        }
+      },
+      "sex": {
+        "female": {
+          "bias": 0.6157392686804445,
+          "insufficient": false,
+          "mae": 2.845627980922102,
+          "maeRatio": 1.0438644996094315,
+          "n": 1258
+        },
+        "male": {
+          "bias": 0.05976027397260274,
+          "insufficient": false,
+          "mae": 2.5972602739726036,
+          "maeRatio": 0.9527555303864171,
+          "n": 1168
+        }
+      }
+    }
+  },
   "id": "parent-playbook-nhanes-bodyfat",
   "inputs": [
     {
@@ -17994,9 +18196,9 @@
     "A predicted body-fat percentage outside 1-75, which is refused rather than clamped: a clamped value looks measured and is not.",
     "The artifact has not passed a holdout, for any caller asking for a released estimate."
   ],
-  "releaseDecision": null,
+  "releaseDecision": "not_released",
   "schema": "PP_BODY_COMPOSITION_MODEL_V1",
-  "status": "candidate",
+  "status": "not_released",
   "supportedPopulation": {
     "ageYears": {
       "max": 59,

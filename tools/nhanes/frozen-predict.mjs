@@ -94,8 +94,26 @@ export function estimateBodyComposition(artifact, person = {}, { allowCandidate 
     limitations: artifact.limitations,
     // Repeated in the result rather than left in the artifact, because the caller that displays
     // this is not necessarily the caller that loaded it.
-    validated: artifact.holdoutRead ? 'Validated against a held-out survey cycle.' : 'NOT VALIDATED. No holdout has been read against this model.',
+    //
+    // Keyed on the DECISION, not on whether a holdout was read. The first version said
+    // "Validated" as soon as holdoutRead became true — which it did the moment this model was
+    // read and FAILED, so the result would have announced validation for a model that had just
+    // been refused. Reading a holdout is not passing one.
+    validated: validationStatement(artifact),
   });
+}
+
+function validationStatement(artifact) {
+  if (!artifact.holdoutRead) return 'NOT VALIDATED. No holdout has been read against this model.';
+  if (artifact.releaseDecision === 'not_released') {
+    const failed = (artifact.holdoutReport?.criteria ?? []).filter(c => !c.pass).map(c => c.label);
+    return 'FAILED VALIDATION. The holdout was read and this model did not meet its release criteria'
+      + (failed.length ? ': ' + failed.join('; ') : '') + '.';
+  }
+  if (artifact.releaseDecision === 'criteria_met_review_pending') {
+    return 'Criteria met on a held-out survey cycle; qualified reviewer approval still outstanding.';
+  }
+  return 'Validated against a held-out survey cycle.';
 }
 
 function scoreEnsemble(model, row) {

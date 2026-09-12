@@ -1,0 +1,203 @@
+{
+  "readAt": "2026-09-12T20:11:41.917Z",
+  "cycle": "2017-2018",
+  "cohort": 2442,
+  "overall": {
+    "n": 2426,
+    "bias": 0.3480626545754327,
+    "mae": 2.7260511129431184,
+    "rmse": 3.5043254393436416,
+    "maxAbsError": 20,
+    "calibrationSlope": 0.9737957412759279,
+    "calibrationIntercept": 0.5307186565734199,
+    "refused": 16,
+    "refusalRate": 0.006552006552006552
+  },
+  "refusalReasons": {
+    "MISSING_INPUT": 16
+  },
+  "subgroups": {
+    "ageBand": {
+      "18-29": {
+        "n": 744,
+        "mae": 2.7400537634408617,
+        "bias": 0.20134408602150558,
+        "maeRatio": 1.0051366059980533,
+        "insufficient": false
+      },
+      "30-39": {
+        "n": 538,
+        "mae": 2.854089219330853,
+        "bias": 0.4581784386617103,
+        "maeRatio": 1.0469683439829203,
+        "insufficient": false
+      },
+      "40-49": {
+        "n": 546,
+        "mae": 2.63241758241758,
+        "bias": 0.25549450549450525,
+        "maeRatio": 0.9656523202808003,
+        "insufficient": false
+      },
+      "50-59": {
+        "n": 598,
+        "mae": 2.6789297658862856,
+        "bias": 0.5160535117056853,
+        "maeRatio": 0.9827144301025378,
+        "insufficient": false
+      }
+    },
+    "sex": {
+      "female": {
+        "n": 1258,
+        "mae": 2.845627980922102,
+        "bias": 0.6157392686804445,
+        "maeRatio": 1.0438644996094315,
+        "insufficient": false
+      },
+      "male": {
+        "n": 1168,
+        "mae": 2.5972602739726036,
+        "bias": 0.05976027397260274,
+        "maeRatio": 0.9527555303864171,
+        "insufficient": false
+      }
+    },
+    "bmiBand": {
+      "18.5-24.9": {
+        "n": 716,
+        "mae": 2.9617318435754174,
+        "bias": 0.3963687150837984,
+        "maeRatio": 1.0864549932733476,
+        "insufficient": false
+      },
+      "25.0-29.9": {
+        "n": 750,
+        "mae": 2.760133333333332,
+        "bias": 0.1844,
+        "maeRatio": 1.0125024142901773,
+        "insufficient": false
+      },
+      "30.0-34.9": {
+        "n": 485,
+        "mae": 2.5136082474226797,
+        "bias": 0.47731958762886584,
+        "maeRatio": 0.9220693755477388,
+        "insufficient": false
+      },
+      "35 and over": {
+        "n": 417,
+        "mae": 2.436690647482014,
+        "bias": 0.5474820143884892,
+        "maeRatio": 0.8938536170186834,
+        "insufficient": false
+      },
+      "under 18.5": {
+        "n": 58,
+        "insufficient": true
+      }
+    },
+    "raceEthnicityAudit": {
+      "RIDRETH1=1": {
+        "n": 390,
+        "mae": 2.4761538461538453,
+        "bias": 0.38076923076923064,
+        "maeRatio": 0.9083299408427169,
+        "insufficient": false
+      },
+      "RIDRETH1=2": {
+        "n": 241,
+        "mae": 2.92448132780083,
+        "bias": 0.8406639004149379,
+        "maeRatio": 1.0727903500838916,
+        "insufficient": false
+      },
+      "RIDRETH1=3": {
+        "n": 745,
+        "mae": 2.7306040268456377,
+        "bias": 0.43369127516778566,
+        "maeRatio": 1.0016701498665606,
+        "insufficient": false
+      },
+      "RIDRETH1=4": {
+        "n": 466,
+        "mae": 2.810729613733906,
+        "bias": 1.1875536480686701,
+        "maeRatio": 1.031062697389913,
+        "insufficient": false
+      },
+      "RIDRETH1=5": {
+        "n": 584,
+        "mae": 2.7376712328767114,
+        "bias": -0.6561643835616441,
+        "maeRatio": 1.0042626199774543,
+        "insufficient": false
+      }
+    }
+  },
+  "baselines": {
+    "mean by age and sex band": {
+      "n": 2442,
+      "mae": 5.170168675733763,
+      "bias": -0.47267527244788543
+    },
+    "linear: age, sex, height, weight": {
+      "n": 2442,
+      "mae": 3.2884783089720027,
+      "bias": 0.4497937924196354
+    },
+    "BMI regression": {
+      "n": 2442,
+      "mae": 3.3119215573287217,
+      "bias": 0.390023592056873
+    },
+    "waist-enhanced": {
+      "n": 2426,
+      "mae": 3.0982416488107694,
+      "bias": 0.33315842720820393
+    }
+  },
+  "criteria": [
+    {
+      "id": "mae",
+      "label": "Holdout MAE ≤ 3.5",
+      "value": 2.7260511129431184,
+      "pass": true
+    },
+    {
+      "id": "bias",
+      "label": "Holdout signed bias within ±1.0",
+      "value": 0.3480626545754327,
+      "pass": true
+    },
+    {
+      "id": "slope",
+      "label": "Calibration slope 0.85–1.15",
+      "value": 0.9737957412759279,
+      "pass": true
+    },
+    {
+      "id": "beats_baselines",
+      "label": "Beats every baseline on holdout MAE",
+      "value": "2.7260511129431184 vs best baseline 3.098",
+      "pass": true
+    },
+    {
+      "id": "subgroup_mae",
+      "label": "Worst subgroup MAE ≤ 1.25× overall",
+      "value": 1.0864549932733476,
+      "pass": true
+    },
+    {
+      "id": "subgroup_bias",
+      "label": "Each subgroup bias within ±1.0 (amendment 4)",
+      "value": 1.1875536480686701,
+      "pass": false
+    }
+  ],
+  "statisticianReview": {
+    "required": true,
+    "completed": false,
+    "note": "Not satisfiable by this tool. §8 requires a qualified reviewer to approve thresholds and sample adequacy."
+  }
+}

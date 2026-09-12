@@ -1,11 +1,14 @@
-# Model card — `parent-playbook-nhanes-bodyfat` v0.1.0-candidate
+# Model card — `parent-playbook-nhanes-bodyfat` v0.1.0
 
-**Status: CANDIDATE. Not released. No holdout has been read against it.**
+**Status: NOT RELEASED. The holdout was read on 2026-09-12 and the model failed one of six
+release criteria.**
 
-This card describes a frozen artifact awaiting its single final evaluation. It has no validated
-performance, and nothing may present its output to a person as an estimate. The runtime enforces
-that: `estimateBodyComposition` refuses by default and requires a caller to pass `allowCandidate`
-explicitly.
+Five criteria passed, including every accuracy criterion: holdout MAE 2.726 against a limit of 3.5,
+beating the best baseline's 3.098. It failed the subgroup bias criterion — systematically **1.19
+percentage points high** for one race/ethnicity audit group, against a limit of 1.0.
+
+It is not a released model and must not be presented to anyone as an estimate. The runtime enforces
+that: `estimateBodyComposition` refuses by default. See `research/NHANES-HOLDOUT.md`.
 
 | | |
 |---|---|
@@ -66,7 +69,24 @@ The fit is fully deterministic: no subsampling, no random initialisation, no see
 the same sources are byte-identical, which is why `--verify` can reproduce the artifact rather than
 take its word for it.
 
-## Performance — calibration only, and optimistic
+## Performance — holdout
+
+Read once, against this frozen artifact, on the 2017-2018 cycle (2,442 participants, 2,426 scored,
+16 refused for a missing waist measurement).
+
+| Metric | Holdout | Limit | |
+|---|---:|---|---|
+| MAE | 2.726 | ≤ 3.5 | pass |
+| Signed bias | 0.348 | ±1.0 | pass |
+| Calibration slope | 0.974 | 0.85–1.15 | pass |
+| Best baseline MAE | 3.098 | must beat | pass |
+| Worst subgroup MAE ratio | 1.086 | ≤ 1.25 | pass |
+| **Worst subgroup bias** | **1.188** | **±1.0** | **fail** |
+
+The failure is not imprecision. For the affected group the MAE is 1.03x overall — the model is as
+precise for them as for anyone, and consistently wrong in one direction.
+
+## Performance — calibration, and optimistic
 
 | Metric | Value |
 |---|---|
@@ -86,7 +106,8 @@ model is about 0.36 pp.
 
 ## Known limitations
 
-- **No validated performance.** The holdout is unread.
+- **Failed its release criteria.** One of six, on subgroup bias. Recorded in full in
+  research/NHANES-HOLDOUT.md.
 - **The fairness margin is thin.** 0.865 against a limit of 1.0, on the partition it was tuned
   against. A different survey cycle could move it past the line, and the interpretable alternative
   sits at 1.036 — the wrong side of the same line.
@@ -110,6 +131,11 @@ Playbook. **NCHS does not endorse this work.**
 
 ## What would change this card
 
-One thing: reading the holdout. That would set `holdoutRead`, fill `holdoutReport`, and record a
-release decision either way. If the holdout puts the worst subgroup bias above 1.0, the model is
-not released, and that outcome is publishable rather than hidden.
+Nothing about this artifact. Its holdout is read, its decision is recorded, and 2017-2018 is spent
+— reading it again against a revised model would measure the revision against data that shaped it.
+
+A second attempt would be a new model with a new holdout. NHANES 2015-2016 is untouched by this
+work, though by omission rather than by foresight. What it would have to address is the bias
+itself: either by widening the uncertainty interval until it honestly covers the group-level error,
+or by finding further inputs that capture what the audit variable stands in for. Not by relaxing
+the criterion, which was set before the number was known.

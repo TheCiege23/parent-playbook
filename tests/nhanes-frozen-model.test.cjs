@@ -50,13 +50,25 @@ test('the recorded checksum matches the file it names', () => {
   assert.notEqual(asCrlf, recorded, 'if these ever matched, the normalization would be proving nothing');
 });
 
-test('the artifact declares itself a candidate with no holdout read', () => {
-  // These two fields are what stop it being treated as a released model, so they are asserted
-  // rather than assumed. Changing them is the act that a holdout read would perform.
-  assert.equal(artifact.status, 'candidate');
-  assert.equal(artifact.holdoutRead, false);
-  assert.equal(artifact.holdoutReport, null);
-  assert.equal(artifact.releaseDecision, null);
+test('the artifact records that it was read and that it failed', () => {
+  // The holdout was read on 2026-09-12 and the model failed one of six criteria. These fields
+  // are what stop it being treated as released, so they are asserted rather than assumed.
+  assert.equal(artifact.status, 'not_released');
+  assert.equal(artifact.holdoutRead, true);
+  assert.equal(artifact.releaseDecision, 'not_released');
+  assert.ok(artifact.holdoutReport, 'the report has to be there, whatever it says');
+
+  // Five passed and exactly one failed, and the one that failed is the subgroup bias criterion.
+  const criteria = artifact.holdoutReport.criteria;
+  assert.equal(criteria.length, 6);
+  assert.equal(criteria.filter(c => c.pass).length, 5);
+  const failed = criteria.find(c => !c.pass);
+  assert.equal(failed.id, 'subgroup_bias');
+  assert.ok(failed.value > 1.0, 'the failing value has to exceed the limit it failed');
+
+  // And the review that no tool can perform is recorded as outstanding rather than quietly
+  // dropped now that it no longer gates anything.
+  assert.equal(artifact.holdoutReport.statisticianReview.completed, false);
 });
 
 test('waist is declared required, and the artifact says why there is no fallback', () => {
@@ -83,11 +95,17 @@ test('a candidate artifact refuses to produce an estimate for a caller that has 
   assert.match(refused.message, /must not be shown to anyone/);
 });
 
-test('a research caller can opt in, and what comes back still says it is not validated', () => {
+test('a research caller can opt in, and what comes back says the model FAILED validation', () => {
+  // Not merely "not validated". The first version of this keyed the message on whether a holdout
+  // had been read, so the moment this model was read and refused it would have started announcing
+  // validation. Reading a holdout is not passing one.
   const result = estimate(adult());
   assert.equal(result.ok, true);
-  assert.equal(result.modelStatus, 'candidate');
-  assert.match(result.validated, /NOT VALIDATED/);
+  assert.equal(result.modelStatus, 'not_released');
+  assert.match(result.validated, /FAILED VALIDATION/);
+  assert.match(result.validated, /did not meet its release criteria/);
+  assert.match(result.validated, /subgroup bias/i);
+  assert.ok(!/^Validated/.test(result.validated));
 });
 
 // ----------------------------------------------------------------- refusals
@@ -157,9 +175,9 @@ test('the same inputs give the same answer every time', () => {
 // ----------------------------------------------------------------- describing it
 test('an artifact describes itself honestly to someone deciding whether to trust it', () => {
   const described = P.describeArtifact(artifact);
-  assert.equal(described.releasable, false, 'a candidate with no holdout is not releasable');
-  assert.equal(described.holdoutRead, false);
-  assert.equal(described.holdoutReport, null);
+  assert.equal(described.releasable, false, 'a model that failed its holdout is not releasable');
+  assert.equal(described.holdoutRead, true);
+  assert.ok(described.holdoutReport, 'the report travels with the description');
   assert.deepEqual([...described.requiredInputs], ['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm']);
   assert.equal(described.calibrationMae, 2.627);
   assert.ok(described.refusalConditions.length >= 5);
@@ -169,8 +187,10 @@ test('the model card and the artifact agree, and the card leads with the status'
   // A card that says something different from the artifact is the version people will read.
   const card = fs.readFileSync(path.join(__dirname, '..', 'research', 'model', 'MODEL-CARD.md'), 'utf8');
   const flat = card.replace(/\s+/g, ' ');
-  assert.match(card.split('\n').slice(0, 6).join(' '), /Status: CANDIDATE\. Not released/,
+  assert.match(card.split('\n').slice(0, 6).join(' '), /Status: NOT RELEASED/,
     'the status belongs at the top, not in a limitations section further down');
+  assert.match(flat, /failed one of six[\s\S]{0,40}release criteria/);
+  assert.match(flat, /1\.19/, 'the size of the failure, not just the fact of it');
   assert.match(flat, new RegExp(String(artifact.training.fittedOn).replace(/(\d)(?=(\d{3})+$)/g, '$1,')));
   assert.match(flat, /2\.627/);
   assert.match(flat, /0\.865/);
@@ -179,4 +199,31 @@ test('the model card and the artifact agree, and the card leads with the status'
   assert.match(flat, /Waist is required, not optional/);
   assert.match(flat, /Lean mass is not skeletal muscle mass/);
   assert.match(flat, /NCHS does not endorse this work/);
+});
+
+// ----------------------------------------------------------------- the holdout is spent
+test('the holdout cannot be read a second time', () => {
+  // "Read once" is only a rule if something enforces it, and the thing most likely to break it is
+  // someone re-running a command to see the output again. The tool checks holdoutRead and exits.
+  const source = fs.readFileSync(path.join(__dirname, '..', 'tools', 'nhanes', 'read-holdout.cjs'), 'utf8');
+  assert.match(source, /if \(artifact\.holdoutRead\)/);
+  assert.match(source, /There is no second read/);
+  // And it cannot be reached by tab-completing something shorter.
+  assert.match(source, /--i-am-making-the-release-decision/);
+});
+
+test('the holdout record states the failure and refuses the obvious next move', () => {
+  const doc = fs.readFileSync(path.join(__dirname, '..', 'research', 'NHANES-HOLDOUT.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(doc, /NOT RELEASED/);
+  assert.match(doc, /1\.188/);
+  assert.match(doc, /2\.726/);
+  // The criterion that caught it was added after seeing calibration, and the record says so
+  // rather than presenting it as having been there all along.
+  assert.match(doc, /added after seeing results/i);
+  // The tempting move, named and refused.
+  assert.match(doc, /Not a reason to remove the criterion/);
+  assert.match(doc, /it came back inconvenient/);
+  // And that the holdout is spent, with the honest account of why another one is available.
+  assert.match(doc, /2017–2018 is spent|2017-2018 is spent/);
+  assert.match(doc, /omitted from the candidate source list by oversight/);
 });
