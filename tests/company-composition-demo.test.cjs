@@ -14,5 +14,11 @@ test('production allowlist and smoke checks include every composition integratio
   const docker=read('Dockerfile'),smoke=read('tools/deployment-smoke.cjs'),worker=read('sw.js');
   for(const name of ['company-composition-demo.html','company-composition-demo.mjs'])assert.match(docker,new RegExp(name.replace('.','\\.')));
   for(const route of ['/company-composition-demo','/company-composition-demo.mjs','/js/body-composition-contract.mjs','/js/body-composition-validation.mjs'])assert.ok(smoke.includes(route));
-  assert.match(worker,/pp-v110/);assert.ok(worker.includes('/company-composition-demo'));
+  // Read from deployment-smoke.cjs rather than written here. A second copy of the cache version
+  // means every release breaks a test that has no opinion about the version at all -- it only
+  // wants the worker and the smoke check to agree, which is exactly what this now asserts.
+  const {EXPECTED_CACHE}=require('../tools/deployment-smoke.cjs');
+  assert.ok(worker.includes(`const CACHE = '${EXPECTED_CACHE}'`),
+    `sw.js should declare ${EXPECTED_CACHE}, the version deployment-smoke.cjs expects`);
+  assert.ok(worker.includes('/company-composition-demo'));
 });
