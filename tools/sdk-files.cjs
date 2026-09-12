@@ -1,6 +1,6 @@
 // Explicit release allowlist. Never traverse the repository to collect SDK files.
 const SDK_FILES = Object.freeze([
-  'body-section-worker.js','mesh-section.js','surface-section.js','body-surface-report.mjs','body-surface-repeat.mjs','body-sdk-report.mjs','body-sdk-record.mjs','body-sdk-supabase.mjs','body-sdk-reference-import.mjs','body-sdk-reference-supabase.mjs','body-sdk-reference-history.mjs','body-composition-contract.mjs','body-composition-reference.mjs','body-composition-validation.mjs','body-composition-record.mjs','body-composition-supabase.mjs','reference-cohort.mjs',
+  'body-section-worker.js','mesh-section.js','surface-section.js','body-surface-report.mjs','body-surface-repeat.mjs','body-sdk-report.mjs','body-sdk-record.mjs','body-sdk-supabase.mjs','body-sdk-reference-import.mjs','body-sdk-reference-supabase.mjs','body-sdk-reference-history.mjs','body-composition-contract.mjs','body-composition-reference.mjs','composition-import.mjs','composition-import-supabase.mjs','body-composition-validation.mjs','body-composition-record.mjs','body-composition-supabase.mjs','reference-cohort.mjs',
   'body-sdk.mjs','body-sdk-worker.js','body-sdk-surface.mjs','surface-review.mjs',
   'surface-worker.js','visual-hull.js','device-evidence.js','body-outputs.js','photo-identity.js',
   'photo-quality.js','pose-measure.js','photo-import.mjs','photo-import-worker.js','heic-decode.js',
@@ -65,6 +65,8 @@ const BUNDLE_MIGRATIONS = Object.freeze([
 const BUNDLE_CONTRACT_TESTS = Object.freeze([
   'tests/body-composition-contract.test.cjs',
   'tests/body-composition-reference.test.cjs',
+  'tests/composition-import.test.cjs',
+  'tests/composition-import-store.test.cjs',
   'tests/body-sdk-surface.test.cjs',
   'tests/body-sdk.test.cjs',
   'tests/body-surface-repeat.test.cjs',
