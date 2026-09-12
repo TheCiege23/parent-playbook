@@ -55,7 +55,7 @@ named in any file that ships in the buyer package.
 | `security-tests.cjs` | 187 cases, each in its own transaction, rolled back |
 | `restore-deletion.cjs` | 17 cases that must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact |
 
-Expected result: **80 of 81 migrations applied**, **187/187 security cases** and **17/17 rehearsal
+Expected result: **81 of 82 migrations applied**, **281/281 security cases** and **17/17 rehearsal
 cases** pass. The single migration failure is `20260812174514_enable_cron_and_net.sql`, which needs
 the pg_cron and pg_net binaries that only exist inside Supabase.
 

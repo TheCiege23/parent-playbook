@@ -63,7 +63,7 @@ function bundleDigest(){
     const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
     // createdAt is deliberately not in the hash: it changes every build and describes when
     // the package was made, not what is in it.
-    return digest(Buffer.from(manifest.files.map(f=>f.path+' '+f.sha256).join('\n')));
+    return digest(Buffer.from(manifest.files.map(f=>f.path+'\u0000'+f.sha256).join('\n')));
   }finally{ fs.rmSync(tmp,{recursive:true,force:true}); }
 }
 module.exports={buildBundle,bundleDigest};
