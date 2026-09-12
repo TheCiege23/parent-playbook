@@ -90,7 +90,7 @@ function biMarkup(athlete, input, date, baseline){
     ? staturePercentile(Number(height.value),ageMonthsAt(athlete.birthdate,height.measured_on),athlete.sex_at_birth):null;
   const percentile=reference?.pct;
   return `<div class="bi-page">
-    <header class="bi-hero"><div><span class="bi-eyebrow">PARENT PLAYBOOK / BODY INSIGHTS</span><h1>A clearer view of progress.</h1><p>${esc(athlete.first_name||'Your athlete')}'s measurements, movement and growth in one place.</p><div class="bi-actions"><button class="btn amber" id="biScan">New assessment</button><button class="btn ghost" id="biExport" ${rows.length?'':'disabled'}>Export records</button></div></div><div class="bi-summary"><strong>${now.size}</strong><span>recorded metrics</span><strong>${dates.length}</strong><span>recording dates</span></div></header>
+    <header class="bi-hero"><div><span class="bi-eyebrow">PARENT PLAYBOOK / BODY INSIGHTS</span><h1>A clearer view of progress.</h1><p>${esc(athlete.first_name||'Your athlete')}'s measurements, movement and growth in one place.</p><div class="bi-actions"><button class="btn amber" id="biScan">New assessment</button><button class="btn ghost" id="biImport">Import a measurement</button><button class="btn ghost" id="biExport" ${rows.length?'':'disabled'}>Export records</button></div></div><div class="bi-summary"><strong>${now.size}</strong><span>recorded metrics</span><strong>${dates.length}</strong><span>recording dates</span></div></header>
     <div class="bi-controls"><label>View readings through<select id="biDate" ${dates.length?'':'disabled'}>${dates.map(d=>`<option ${d===date?'selected':''}>${d}</option>`).join('')}</select></label><label>Compare with<select id="biBaseline"><option value="">No comparison</option>${dates.filter(d=>d<date).map(d=>`<option ${d===baseline?'selected':''}>${d}</option>`).join('')}</select></label></div>
     <p class="bi-muted">Each card shows the latest reading on or before the selected date. Comparison uses the same units and recorded method; matching methods alone does not guarantee equivalent conditions.</p>
     <section><div class="bi-section-head"><h2>Body measurements</h2><span>Lengths & proportions</span></div>${body.length?`${refNote}<div class="bi-grid">${body.map(card).join('')}</div>`:'<div class="bi-empty">Start with a measured height, then take a four-photo assessment to estimate body lengths.</div>'}</section>
@@ -136,6 +136,20 @@ async function screenBodyInsights(){
     host.querySelector('#biDate').onchange=e=>draw(e.target.value,dates.find(d=>d<e.target.value)||'');
     host.querySelector('#biBaseline').onchange=e=>draw(date,e.target.value);
     host.querySelector('#biScan').onclick=()=>renderApp('scan');
+    // A clinic result belongs to the athlete it was taken from, so the store is built for this
+    // athlete and the live biometric release is resolved inside it. Nothing about ownership or
+    // consent comes from the file or the form.
+    host.querySelector('#biImport').onclick=async()=>{
+      const {createExternalCompositionStore,summarizeSave}=await import('/js/composition-import-supabase.mjs');
+      const store=createExternalCompositionStore(sb,{scope:'child_athlete',athleteId:athlete.id,subjectReference:athlete.id});
+      await openCompositionImport({
+        subjectId:athlete.id, scope:'child_athlete', athleteId:athlete.id,
+        actorId:state.user?.id, consentReference:'biometric-release',
+        save:async records=>summarizeSave(await store.save(records)),
+        attach:(recordUuid,file)=>store.attachReport(recordUuid,file),
+        onDone:()=>renderApp('insights'),
+      });
+    };
     host.querySelector('#biGrowth').onclick=()=>renderApp('growth');
     host.querySelector('#biReport').onclick=()=>assessmentDownload(assessmentReport(athlete,rows,date,baseline),'text/html','body-insights-report-'+date+'.html');
     host.querySelector('#biCSV').onclick=()=>assessmentDownload(assessmentCSV(rows),'text/csv;charset=utf-8','body-insights-'+athlete.id+'.csv');

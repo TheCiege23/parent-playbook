@@ -27,6 +27,11 @@
 
 import { REFERENCE_METRICS, REFERENCE_SOURCES, validateCompositionReference } from './body-composition-reference.mjs';
 
+// Re-exported so a screen has one module to import. Splitting "what a source is" from "how a file
+// is read" across two imports invites a caller to reach past this layer for the dictionary and
+// past the contract for the rules.
+export { REFERENCE_METRICS, REFERENCE_SOURCES };
+
 const fail = (code, message) => { throw Object.assign(new Error(message), { name: 'CompositionImportError', code }); };
 
 /* What a source is allowed to say about a quantity, worked out rather than asked.

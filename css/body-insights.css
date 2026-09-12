@@ -21,3 +21,42 @@
 /* The "no population reference" note. Explanatory, not a warning: nothing is wrong, the
    comparison simply has not been earned yet. */
 .bi-no-reference{margin:0 0 14px;padding:10px 12px;border-left:3px solid rgba(255,255,255,.18);border-radius:6px;background:rgba(255,255,255,.04);font-size:13px;line-height:1.5}
+
+/* Import a measurement. The chips carry the one distinction this flow exists to preserve:
+   a measured value and a device's derivation of one must never read the same. They differ in
+   colour AND in wording, because a colour alone is not a difference for a reader who cannot
+   see it and disappears entirely in a printout. */
+.ci-muted{color:#586761;font-size:12px;line-height:1.6;margin:10px 0 0}
+.ci-sources,.ci-methods{display:grid;gap:10px;margin:16px 0}
+.ci-source,.ci-method{display:block;width:100%;text-align:left;padding:16px;border:1px solid #cad6d0;border-radius:14px;background:#fcfdfb;font:inherit;color:inherit;cursor:pointer}
+.ci-source:hover,.ci-method:hover{border-color:#258873;background:#f2f8f5}
+.ci-source strong,.ci-method strong{display:block;font-size:15px;margin-bottom:4px}
+.ci-source span,.ci-method span{font-size:12px;color:#586761;line-height:1.5}
+.ci-chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:6px;vertical-align:middle;margin-left:6px}
+.ci-chip-measured{background:#d8efe6;color:#0f5c4c;border:1px solid #9fd6c4}
+.ci-chip-device_estimated{background:#fdf0dc;color:#7a4b08;border:1px solid #e8c489}
+.ci-chip-calculated{background:#eceff3;color:#3f4b5c;border:1px solid #c3cbd6}
+.ci-form{display:grid;gap:14px;margin:16px 0}
+.ci-field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700}
+.ci-field input,.ci-field select{padding:11px;border:1px solid #cad6d0;border-radius:10px;background:#fff;color:#172b27;font:inherit;font-weight:400}
+.ci-field small{font-weight:400;color:#586761;line-height:1.5}
+.ci-field em{font-style:normal;font-weight:400;color:#7a8a84}
+.ci-entry{display:flex;gap:8px}.ci-entry input{flex:1;min-width:0}.ci-entry select{width:78px}
+.ci-unit{align-self:center;font-weight:400;color:#586761;min-width:44px}
+.ci-values{display:grid;gap:10px;border-top:1px solid #e3e9e5;padding-top:14px}
+.ci-requirements{font-size:12px;color:#3d4c47;line-height:1.7;padding-left:20px;margin:12px 0}
+.ci-drop{display:block;padding:22px;border:1px dashed #bacbc3;border-radius:14px;text-align:center;font-size:13px;cursor:pointer;margin:14px 0}
+.ci-drop input{display:block;margin:10px auto 0}
+.ci-summary{font-size:13px;font-weight:700;padding:12px 14px;border-radius:10px;margin:12px 0;line-height:1.5}
+.ci-ok{background:#e6f4ee;color:#12503f}.ci-warning{background:#fdf2e0;color:#71460a}.ci-error{background:#fbe9e9;color:#7b1f1f}
+.ci-problems{font-size:12px;margin:12px 0;color:#7b1f1f}
+.ci-problems summary{cursor:pointer;font-weight:700;padding:8px 0}
+.ci-problems ul{padding-left:20px;line-height:1.7;margin:0}
+.ci-table-wrap{overflow:auto;border:1px solid #dce3de;border-radius:12px;max-height:44dvh;margin:12px 0}
+.ci-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.ci-table th{background:#eaf0ed;position:sticky;top:0}
+.ci-table th,.ci-table td{padding:10px 12px;border-bottom:1px solid #e3e9e5;white-space:nowrap}
+.ci-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.ci-attach{margin-top:20px;padding-top:16px;border-top:1px solid #e3e9e5}
+.ci-attach h4{margin:0;font-size:14px}
+.ci-scope{border-top:1px solid #e3e9e5;padding-top:12px;margin-top:16px}
