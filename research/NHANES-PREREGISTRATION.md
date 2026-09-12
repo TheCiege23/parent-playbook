@@ -154,6 +154,7 @@ Set now, in the open, and not adjusted to fit what is found.
 | Calibration slope | 0.85 – 1.15 |
 | Beats every baseline in §6 | on holdout MAE, not by a rounding margin |
 | Worst subgroup MAE | ≤ 1.25 × overall MAE |
+| Signed bias, each reported subgroup | within ±1.0 percentage point, the same limit as overall. Amendment 4, added with results in hand; it tightens. |
 | Each reported subgroup | ≥ 100 participants, or it is reported as insufficient rather than summarized |
 | Statistician review | thresholds and sample adequacy approved by a qualified reviewer before release |
 
@@ -301,6 +302,51 @@ two existing exclusions are tested, not new exclusions. The body measures they i
 essentially complete — 99.6% of eligible participants have both height and weight, and 99% have
 waist — so the input-completeness exclusion remains negligible and the with-and-without-waist
 comparison is well powered.
+
+---
+
+### 4 — 2026-09-12 — a subgroup BIAS criterion, written with results in hand
+
+**What was known when this was made — and this one is different from the first three.** The
+baselines had been fitted and reported on the calibration partition
+(research/NHANES-BASELINES.md). **Results existed and were known.** The final holdout was not read
+and still has not been.
+
+This document says changing it after results exist is allowed and sometimes correct, and that
+hiding the change is not. This is that case, recorded accordingly.
+
+**What prompted it:** §8 judges subgroups by MAE only. On the best baseline every subgroup passes
+that ceiling comfortably — the worst is 1.15x against a limit of 1.25x. But the signed bias by
+race/ethnicity audit group runs from **-1.211 to +1.427 percentage points**, against an *overall*
+bias limit of +/- 1.0. The overall bias is -0.020 because the groups cancel each other out.
+
+The pattern holds across all four baselines with the same sign, and for one group the more
+sophisticated models are worse than the population mean. It is structural: body fat at a given
+height, weight and age differs between population groups, and a model built from those inputs
+cannot represent the difference, so it splits it.
+
+**The rule, added to §8:**
+
+| Criterion | Threshold |
+|---|---|
+| Signed bias, each reported subgroup | within +/- 1.0 percentage point, the same limit as overall |
+
+A subgroup that exceeds it fails, whatever its MAE.
+
+**Why this is not moving the goalposts:** it makes release strictly harder. The best baseline
+passes every criterion as originally written and fails this one. An after-the-fact criterion can
+only be defended when it tightens, and this tightens.
+
+**What it does NOT do:** it does not tell anyone how to pass. §8's existing remedy — narrow the
+supported population — cannot apply to a race/ethnicity subgroup. Narrowing by race would mean
+shipping a product that declares itself accurate for some races and not others and restricting
+access accordingly, which is not a remedy. The honest responses are: do not release; widen the
+uncertainty interval until it covers the group-level bias, at a cost to everyone; or find inputs
+that capture what the audit variable is standing in for. The third must not become "add race as a
+feature" -- §3 forbids it, and it would encode a population difference as a property of a person.
+
+**Consequence, stated now:** on today's evidence the owned model is more likely not to be released
+than to be released. That is a real outcome and this document already says it is publishable.
 
 ---
 
