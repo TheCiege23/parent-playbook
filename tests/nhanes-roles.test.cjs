@@ -55,7 +55,7 @@ test('development is exactly the five cycles attempt 1 trained on', () => {
 
 test('no driver keeps its own copy of the role map', () => {
   // The bug this module exists to prevent. A tool reading roles any other way is a second copy.
-  for (const name of ['build-cohort.cjs', 'run-baselines.cjs', 'run-candidates.cjs', 'freeze-model.cjs', 'read-holdout.cjs']) {
+  for (const name of ['build-cohort.cjs', 'run-baselines.cjs', 'run-candidates.cjs', 'run-intervals.cjs', 'freeze-model.cjs', 'read-holdout.cjs']) {
     const source = fs.readFileSync(path.join(__dirname, '..', 'tools', 'nhanes', name), 'utf8');
     assert.ok(!/const ROLES\s*=/.test(source), name + ' declares its own ROLES map');
     assert.match(source, /roles\.mjs/, name + ' does not read roles from roles.mjs');
