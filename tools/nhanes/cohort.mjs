@@ -25,7 +25,11 @@ const fail = (code, message) => { throw Object.assign(new Error(message), { name
  * encoding a population difference as a property of a person and being able to show the model does
  * not fail some people worse than others.
  */
-export const MODEL_FEATURES = Object.freeze(['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm']);
+// bmi is here because it is arithmetic on height and weight, both of which are permitted. Leaving
+// it out forced any BMI-using model to be fitted on participant rows instead — rows that DO carry
+// race. Those fits did not use race, but "the fit never receives it" stopped being true for them,
+// and a guarantee with an exception is a guarantee nobody can rely on.
+export const MODEL_FEATURES = Object.freeze(['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm', 'bmi']);
 export const MODEL_TARGETS = Object.freeze(['bodyFatPercent', 'fatMassKg', 'leanMassKg', 'totalMassKg']);
 
 /* Keys that must never reach a model-ready row, checked by name rather than trusted.

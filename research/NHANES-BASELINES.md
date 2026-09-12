@@ -1,5 +1,13 @@
 # Baseline results
 
+> **Later correction.** The conclusion at the end of this page — that the model is more likely not
+> to be released than released — was too pessimistic, and research/NHANES-CANDIDATES.md says so
+> with numbers. Adding waist circumference cuts the worst subgroup bias from 1.718 to 0.865,
+> below the limit, without race reaching a model. What this page got right is that a stronger model
+> class does not fix it: the fix came from a better input. This page is left as it was written so
+> the sequence stays legible.
+
+
 `node tools/nhanes/run-baselines.cjs --data <dir>`, 2026-09-12. Fitted on the **training**
 partition (11,417), reported on **calibration** (2,878). **The final holdout was not read**, and
 the command that produced this cannot read it.
