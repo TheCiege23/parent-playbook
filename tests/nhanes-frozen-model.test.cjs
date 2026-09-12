@@ -37,8 +37,17 @@ test('the frozen artifact contains an actual model, not a shell that hashes clea
 test('the recorded checksum matches the file it names', () => {
   const crypto = require('node:crypto');
   const recorded = fs.readFileSync(path.join(__dirname, '..', 'research', 'model', 'bodyfat-candidate-v0.1.0.sha256'), 'utf8').split(/\s+/)[0];
-  const actual = crypto.createHash('sha256').update(fs.readFileSync(ARTIFACT_PATH, 'utf8')).digest('hex');
+  // Normalized before hashing, for the same reason the freeze tool normalizes: with core.autocrlf
+  // a Windows clone rewrites this file to CRLF, and a hash over the raw bytes would fail on a
+  // machine that had changed nothing. Checked here as well so the property is enforced rather than
+  // trusted to the tool that produced it.
+  const content = fs.readFileSync(ARTIFACT_PATH, 'utf8').replace(/\r\n/g, '\n');
+  const actual = crypto.createHash('sha256').update(content, 'utf8').digest('hex');
   assert.equal(actual, recorded);
+
+  // And the hazard itself, so nobody removes the normalization as redundant.
+  const asCrlf = crypto.createHash('sha256').update(content.replace(/\n/g, '\r\n'), 'utf8').digest('hex');
+  assert.notEqual(asCrlf, recorded, 'if these ever matched, the normalization would be proving nothing');
 });
 
 test('the artifact declares itself a candidate with no holdout read', () => {

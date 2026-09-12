@@ -184,7 +184,13 @@ const HYPERPARAMETERS = Object.freeze({
     return value;
   };
   const canonical = JSON.stringify(canonicalize(artifact), null, 2) + '\n';
-  const digest = crypto.createHash('sha256').update(canonical).digest('hex');
+  // Hashed with line endings normalized, so the digest describes the CONTENT rather than the
+  // checkout. With core.autocrlf a Windows clone rewrites this file to CRLF and a hash taken over
+  // the raw bytes would then fail on a machine that had changed nothing — a buyer verifying the
+  // artifact would conclude it had been tampered with. Same lesson as tools/sdk-sign.cjs, which
+  // learned it the same way.
+  const digestOf = text => crypto.createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+  const digest = digestOf(canonical);
 
   // A freeze that produced nothing is worse than a failed one, because it looks like success.
   if (!artifact.model?.ensemble?.length || !artifact.inputs?.length) {
