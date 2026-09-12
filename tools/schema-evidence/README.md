@@ -21,6 +21,53 @@ inventory from `tests/db/inventory.sql`, and destroys the cluster. Then run the 
 node tools/schema-parity.cjs --compare <production.json> tools/schema-evidence/restored-from-migrations.json
 ```
 
+## Result — 2026-09-12
+
+Re-verified after the external body composition tables landed. Same claim, larger schema.
+
+| Kind | Objects | Match |
+|---|---|---|
+| column | 558 | yes |
+| constraint | 277 | yes |
+| event_trigger | 1 | yes |
+| function | 61 | yes |
+| grant | 110 | yes |
+| index | 169 | yes |
+| policy | 175 | yes |
+| table | 55 | yes |
+| trigger | 14 | yes |
+| **total** | **1420** | **all nine kinds identical** |
+
+One fingerprint, the same `inventory.sql` aggregate on both sides, live project
+`xqvqjkdxykowwpcmyudz` (PostgreSQL 17.6) and a restored cluster (PostgreSQL 18.3):
+
+```
+40e9b796e5fe46faa24d2c28c1d1f325
+```
+
+### What this run found
+
+**The check was broken on Windows, and said so as a schema difference.** A first comparison
+reported 33 function bodies differing. None of them did. `prosrc` keeps whatever line endings the
+migration file had, and with `core.autocrlf` a Windows checkout holds CRLF in 11 of the migration
+files — so every multi-line `create function` replayed locally landed with `` in its body, while
+live (applied over the wire, LF) had none. Live carries zero carriage returns in all 61 bodies.
+
+The functions behaved identically; only the comparison was wrong. That is the worst possible
+shape for this check: an acquirer runs it on a Windows machine, sees 33 differences, and concludes
+the repository does not reproduce production. `tests/db/replay.cjs` now normalizes each migration
+to LF before replaying it, so the inventory is a function of the commit rather than of the
+checkout. This is the same defect class as the archive fingerprint in `tools/sdk-sign.cjs`, found
+independently, in a second place.
+
+**A second false alarm, this one self-inflicted.** Chasing the first, a hand-typed copy of the
+aggregate produced a different hash from the same schema. The separators in `inventory.sql` are
+the bytes 0x01 and 0x02, and they were typed in literally — invisible in an editor, so the
+expression reads as `kind||''||identity` and the hand-typed copy used empty separators. Two
+different hash functions over identical data look exactly like drift. The separators are now
+written as `E'\x01'` escapes: same bytes, same fingerprint (verified before and after), and the
+file is no longer binary to git and grep.
+
 ## Result — 2026-09-10
 
 | Kind | Objects | Match |

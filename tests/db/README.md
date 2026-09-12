@@ -52,10 +52,10 @@ named in any file that ships in the buyer package.
 | `05-post-identity-seed.sql` | Synthetic guardian row so the marketplace migration's hard-coded `app_admins` seed can replay |
 | `replay.cjs` | Applies all 81 real migrations in order, each in its own transaction, recording failures rather than stopping |
 | `10-fixtures.sql` | Two synthetic organizations, three synthetic accounts, three synthetic athletes, six synthetic provider registrations (active, revoked, expired, narrow, other-study), and payload builders |
-| `security-tests.cjs` | 187 cases, each in its own transaction, rolled back |
+| `security-tests.cjs` | 281 cases, each in its own transaction, rolled back |
 | `restore-deletion.cjs` | 17 cases that must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact |
 
-Expected result: **81 of 82 migrations applied**, **281/281 security cases** and **17/17 rehearsal
+Expected result: **82 of 83 migrations applied**, **281/281 security cases** and **17/17 rehearsal
 cases** pass. The single migration failure is `20260812174514_enable_cron_and_net.sql`, which needs
 the pg_cron and pg_net binaries that only exist inside Supabase.
 
