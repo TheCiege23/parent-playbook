@@ -70,8 +70,8 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
   const models = [
     { name: '1. mean by age and sex band', model: B.fitMeanByBand(trainFeatures) },
     { name: '2. linear: age, sex, height, weight', model: B.fitLinear(trainFeatures, ['ageYears', 'sexMale', 'heightCm', 'weightKg'], 'bodyFatPercent', 'linear') },
-    { name: '3. BMI regression: bmi, age, sex', model: B.fitLinear(train, ['bmi', 'ageYears', 'sexMale'], 'bodyFatPercent', 'bmi_regression') },
-    { name: '4. waist-enhanced: + waist', model: B.fitLinear(train.filter(p => Number.isFinite(p.waistCm)), ['bmi', 'ageYears', 'sexMale', 'waistCm'], 'bodyFatPercent', 'waist_regression') },
+    { name: '3. BMI regression: bmi, age, sex', model: B.fitLinear(trainFeatures, ['bmi', 'ageYears', 'sexMale'], 'bodyFatPercent', 'bmi_regression') },
+    { name: '4. waist-enhanced: + waist', model: B.fitLinear(trainFeatures.filter(row => Number.isFinite(row.waistCm)), ['bmi', 'ageYears', 'sexMale', 'waistCm'], 'bodyFatPercent', 'waist_regression') },
   ];
 
   console.log('CALIBRATION SET — body fat percentage');
