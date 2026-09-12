@@ -29,7 +29,13 @@ const fail = (code, message) => { throw Object.assign(new Error(message), { name
 // it out forced any BMI-using model to be fitted on participant rows instead — rows that DO carry
 // race. Those fits did not use race, but "the fit never receives it" stopped being true for them,
 // and a guarantee with an exception is a guarantee nobody can rely on.
-export const MODEL_FEATURES = Object.freeze(['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm', 'bmi']);
+//
+// armCircumferenceCm is amendment 5. Hip circumference was the input the literature suggested, and
+// NHANES measured it in one cycle only — the one the first attempt spent. Arm circumference is the
+// only other soft-tissue girth in every development cycle and in 2015-2016. Declaring it here makes
+// it available; a model uses it only if its own feature list names it, so the first attempt's fits
+// are unchanged.
+export const MODEL_FEATURES = Object.freeze(['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm', 'armCircumferenceCm', 'bmi']);
 export const MODEL_TARGETS = Object.freeze(['bodyFatPercent', 'fatMassKg', 'leanMassKg', 'totalMassKg']);
 
 /* Keys that must never reach a model-ready row, checked by name rather than trusted.
@@ -101,6 +107,7 @@ function shape(participant, cycle, role) {
     heightCm: round(bmx.BMXHT, 1),
     weightKg: round(bmx.BMXWT, 1),
     waistCm: round(bmx.BMXWAIST, 1),
+    armCircumferenceCm: round(bmx.BMXARMC, 1),
     bmi: round(bmx.BMXBMI, 2),
     // Targets. DXA reports grams; the product speaks kilograms.
     bodyFatPercent: round(dxa.DXDTOPF, 2),
