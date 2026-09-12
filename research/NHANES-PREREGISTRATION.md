@@ -430,4 +430,98 @@ were the first.
 
 ---
 
+### 6 — 2026-09-12 — attempt 3: an uncertainty interval, judged by coverage, with 2015-2016 still unread
+
+**What was known when this was made.** From attempt 1's holdout result: B+ was accurate (MAE 2.726 on
+2017-2018) and failed amendment 4 at 1.188 for RIDRETH1=4. From attempt 2's calibration result: arm
+circumference moved that group from 0.865 to 0.834. No uncertainty interval of any kind has been
+computed in this study, no model has been evaluated with a survey cycle left out, and 2015-2016
+remains unread. This attempt does not read it.
+
+One thing was foreseeable, and it is written down so the thresholds below can be judged against it.
+B+'s calibration RMSE is 3.29. Under a normal approximation that implies a 90% half-width near 5.4
+percentage points, and a group whose estimates run about 1.2 high would then be covered roughly
+87–88% of the time. The floors below were set from sampling error, not from that projection — and
+on the pooled evaluation the projection falls below them.
+
+**Why an interval.** §4 already requires "the uncertainty interval" to contain the point estimate
+and stay inside the accepted range, but this document never said how the interval is built or how it
+is judged. The first holdout report named widening it as the second honest response to a
+group-level bias the inputs cannot represent. Every estimate becomes less precise, for everyone,
+because the product cannot say whose estimate is off, and nobody is told a number more precise than
+the evidence supports.
+
+**What this attempt does not change.** §8's criteria, including amendment 4, are unchanged. B+'s
+point estimate is expected to fail amendment 4 exactly as it did, and attempt 3 does not claim
+otherwise. It asks a different question: whether a range, rather than a number, keeps its stated
+promise for every subgroup.
+
+Whether a range may be released when the number at its centre fails amendment 4 is a change to what
+is released, proposed after the failure that motivated it. This document therefore does not decide
+it. That question goes to the qualified reviewer §8 already requires, with both results side by side,
+and so does whether the centre should be shown at all.
+
+**The model.** B+ as frozen: age, sex, height, weight and waist; 300 trees, learning rate 0.05,
+depth 3, minimum leaf 20. Not B++: arm circumference moved the failing group by 0.031 and would cost
+every user a second tape measurement.
+
+**The interval.** Split-conformal, symmetric, with one half-width for everyone:
+
+- residuals are |DXA − estimate| on a conformal set the model was not fitted on
+- the half-width is the ⌈(n+1)·0.9⌉-th smallest residual — **nominal coverage 90%** — and is
+  unbounded when the set is too small to support that
+- the interval is the estimate ± the half-width, truncated to the accepted range of 1–75%; an
+  estimate outside that range is refused, as it already is
+- every person gets the same half-width, and no input chooses it
+
+**Two width rules, declared now, with a preference.**
+
+- **W1, race-blind:** the half-width from all conformal residuals pooled.
+- **W2, group-covering:** the largest of the pooled half-width and each subgroup's own half-width —
+  age band, sex, BMI band and race/ethnicity audit group, each with at least 100 conformal
+  participants. It is still one number applied identically to everyone, and race never reaches any
+  individual's estimate. But the audit variable now helps set that number, which §3 did not
+  contemplate. That is stated here rather than discovered later, and it is part of what goes to the
+  reviewer.
+
+W1 is preferred. W2 is considered only if W1 fails. If both fail, attempt 3 fails.
+
+**Evaluation: leave one cycle out.** Attempt 1 passed on calibration and failed on a new cycle, so
+pooled calibration is not the test. The five development cycles are taken in turn:
+
+1. B+ and baseline 1 are fitted on the training partition of the other four cycles.
+2. The half-width is set on those four cycles' calibration partition.
+3. Intervals are produced for every participant of the cycle left out, none of whom took part in
+   that fold.
+
+Each participant receives exactly one out-of-cycle interval. 2015-2016 is not involved.
+
+**Criteria for attempt 3.** With SE(n) = √(0.9 × 0.1 / n):
+
+| Criterion | Threshold |
+|---|---|
+| Overall out-of-cycle coverage | ≥ 90% − 2·SE(n) |
+| Each reported subgroup, pooled over the five folds | ≥ 90% − 2·SE(n) |
+| Each reported subgroup within each left-out cycle | ≥ 90% − 3·SE(n) |
+| Usefulness | in every fold, B+'s half-width is narrower than baseline 1's under the same rule |
+
+A reported subgroup needs at least 100 participants, as in §8. The per-cycle floor is looser because
+up to seventy-five cells are tested there, and at 2·SE a correctly calibrated interval would be
+expected to fail one or two of them by chance.
+
+Also reported, not gated: the half-width itself, and each subgroup's misses split by direction. A
+symmetric interval can reach 90% while every miss falls on the same side, and that side is what a
+group-level bias looks like.
+
+The usefulness criterion exists because the cheapest way to cover everyone is an interval so wide it
+says nothing. An interval no narrower than the one the age-and-sex average gets carries no
+information from the person's own measurements.
+
+**If attempt 3 meets these criteria**, the next steps are each a separate decision: first, whether
+the reviewer accepts an interval product in principle; only then, whether to freeze it and read
+2015-2016 against these same criteria. **If it does not**, the not-released result stands, and the
+finding is that one interval cannot state this model's uncertainty honestly for everyone either.
+
+---
+
 Any further amendment records its date, its reason, and what was already known when it was made.
