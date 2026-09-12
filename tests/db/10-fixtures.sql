@@ -140,3 +140,84 @@ values
    array['lean_mass_kg','fat_mass_kg','body_fat_percent','skeletal_muscle_mass_kg','bone_mineral_content_kg'],
    'aaaaaaaa-0000-4000-8000-00000000000a','2026-01-01T00:00:00Z',null,null,'synthetic fixture')
 on conflict do nothing;
+
+-- ---- SYNTHETIC biometric releases, for the external composition import tests.
+-- A release is what makes a child's imported clinical result storable at all, so the suite needs
+-- one that is live, one that was withdrawn and one that has aged out, to prove the difference.
+insert into public.biometric_consents
+  (id, athlete_id, guardian_id, subject_is_minor, policy_version, scan_engine, retention_until, revoked_at)
+values
+  ('e0000000-0000-4000-8000-00000000000e','a1111111-1111-4111-8111-11111111111a',
+   'cccccccc-0000-4000-8000-00000000000c', true, 'synthetic-policy-v1','external_import', date '2099-01-01', null),
+  ('e0000000-0000-4000-8000-00000000001e','a1111111-1111-4111-8111-11111111111a',
+   'cccccccc-0000-4000-8000-00000000000c', true, 'synthetic-policy-v1','external_import', date '2099-01-01', '2026-08-01T00:00:00Z'),
+  ('e0000000-0000-4000-8000-00000000002e','a1111111-1111-4111-8111-11111111111a',
+   'cccccccc-0000-4000-8000-00000000000c', true, 'synthetic-policy-v1','external_import', date '2026-01-01', null),
+  -- A live release for the off-roster athlete, so "no consent" and "not on the roster" stay
+  -- separate reasons for a refusal.
+  ('e0000000-0000-4000-8000-00000000003e','c1111111-1111-4111-8111-11111111111c',
+   'cccccccc-0000-4000-8000-00000000000c', true, 'synthetic-policy-v1','external_import', date '2099-01-01', null)
+on conflict (id) do nothing;
+
+-- ---- helper that builds a structurally valid SYNTHETIC external reference payload.
+-- The numbers are arbitrary in-range values attributed to a fictional scanner. They are not a
+-- measurement of anybody, are never surfaced in the product, and prove nothing about accuracy.
+create or replace function public.test_reference_payload(
+  p_record text default 'synthetic-reference-001',
+  p_subject text default 'synthetic-subject-001',
+  p_scope text default 'adult_reference',
+  p_source text default 'dexa',
+  p_measured timestamptz default '2026-09-10T04:00:00Z',
+  p_saved timestamptz default '2026-09-10T04:05:00Z',
+  p_outputs jsonb default null)
+returns jsonb language sql immutable as $$
+  select jsonb_build_object(
+    'schema','PP_BODY_COMPOSITION_REFERENCE_V1',
+    'origin','external_measurement',
+    'recordId', p_record,
+    'subjectId', p_subject,
+    'scope', p_scope,
+    'sourceClass', p_source,
+    'sourceLabel','DXA scan',
+    'measuredAt', to_char(p_measured at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+    'savedAt', to_char(p_saved at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+    'device', jsonb_build_object('manufacturer','Synthetic Imaging','model','SYN-1',
+      'facility','Synthetic Clinic'),
+    'outputs', coalesce(p_outputs, jsonb_build_array(
+      jsonb_build_object('key','body_fat_percent','label','Body fat','status','measured','value',18,'unit','percent'),
+      jsonb_build_object('key','lean_mass_kg','label','Lean mass','status','measured','value',60,'unit','kg'))),
+    'limitations','Externally supplied measurement recorded as reported by its source. Parent Playbook did not perform this measurement, has not verified the device calibration, and makes no accuracy claim about it.'
+  )
+$$;
+
+-- Insert an external record bypassing RLS (owner), to set up read/update/delete tests.
+create or replace function public.test_seed_external(
+  p_record text,
+  p_guardian uuid default 'cccccccc-0000-4000-8000-00000000000c',
+  p_scope text default 'adult_reference',
+  p_subject text default 'synthetic-subject-001',
+  p_athlete uuid default null,
+  p_consent uuid default null,
+  p_team uuid default null,
+  p_measured timestamptz default '2026-09-10T04:00:00Z',
+  -- Inside the five-year custody window the table enforces. A far-future default would make
+  -- every seeded row fail the retention constraint instead of the rule under test.
+  p_retention timestamptz default '2030-01-01T00:00:00Z',
+  -- When we took custody, which is what retention is measured from — NOT when the scan happened.
+  -- Deriving this from p_measured would make a scan imported from 2019 arrive already expired,
+  -- and the constraint would refuse it rather than the rule under test.
+  p_saved timestamptz default now())
+returns uuid language plpgsql as $$
+declare new_id uuid;
+begin
+  insert into public.external_composition_records(
+    record_id, subject_reference, subject_scope, athlete_id, guardian_id, team_id, consent_id,
+    source_class, facility, device_manufacturer, device_model,
+    measured_at, saved_at, retention_until, record)
+  values (p_record, p_subject, p_scope, p_athlete, p_guardian, p_team, p_consent,
+    'dexa','Synthetic Clinic','Synthetic Imaging','SYN-1',
+    p_measured, p_saved, p_retention,
+    public.test_reference_payload(p_record, p_subject, p_scope, 'dexa', p_measured, p_saved))
+  returning id into new_id;
+  return new_id;
+end $$;

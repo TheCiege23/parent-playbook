@@ -1,6 +1,6 @@
 // Explicit release allowlist. Never traverse the repository to collect SDK files.
 const SDK_FILES = Object.freeze([
-  'body-section-worker.js','mesh-section.js','surface-section.js','body-surface-report.mjs','body-surface-repeat.mjs','body-sdk-report.mjs','body-sdk-record.mjs','body-sdk-supabase.mjs','body-sdk-reference-import.mjs','body-sdk-reference-supabase.mjs','body-sdk-reference-history.mjs','body-composition-contract.mjs','body-composition-validation.mjs','body-composition-record.mjs','body-composition-supabase.mjs','reference-cohort.mjs',
+  'body-section-worker.js','mesh-section.js','surface-section.js','body-surface-report.mjs','body-surface-repeat.mjs','body-sdk-report.mjs','body-sdk-record.mjs','body-sdk-supabase.mjs','body-sdk-reference-import.mjs','body-sdk-reference-supabase.mjs','body-sdk-reference-history.mjs','body-composition-contract.mjs','body-composition-reference.mjs','body-composition-validation.mjs','body-composition-record.mjs','body-composition-supabase.mjs','reference-cohort.mjs',
   'body-sdk.mjs','body-sdk-worker.js','body-sdk-surface.mjs','surface-review.mjs',
   'surface-worker.js','visual-hull.js','device-evidence.js','body-outputs.js','photo-identity.js',
   'photo-quality.js','pose-measure.js','photo-import.mjs','photo-import-worker.js','heic-decode.js',
@@ -53,6 +53,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260910210000_capture_rls_auto_enable_event_trigger.sql',
   'supabase/migrations/20260911160000_push_subscription_claim.sql',
   'supabase/migrations/20260911160500_service_value_constraints.sql',
+  'supabase/migrations/20260912100000_external_body_composition_records.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.
@@ -62,6 +63,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
 // missing test file is silently reported as success by `node --test`.
 const BUNDLE_CONTRACT_TESTS = Object.freeze([
   'tests/body-composition-contract.test.cjs',
+  'tests/body-composition-reference.test.cjs',
   'tests/body-sdk-surface.test.cjs',
   'tests/body-sdk.test.cjs',
   'tests/body-surface-repeat.test.cjs',
