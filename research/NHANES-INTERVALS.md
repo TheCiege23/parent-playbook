@@ -2,6 +2,9 @@
 
 Status: **FAILED amendment 6. Nothing frozen. 2015-2016 not read.**
 
+> **Followed by attempt 4** (amendment 7, research/NHANES-INTERVALS-BY-SEX.md), which gave each sex
+> its own half-width. Its group-covering rule met every criterion. Its race-blind rule did not.
+
 Run 2026-09-12 under amendment 6 of research/NHANES-PREREGISTRATION.md, which was committed before
 any interval was computed. It declared the model, the interval, two width rules and the order they
 are tried in, the evaluation and the criteria. Nothing below changed any of them.
