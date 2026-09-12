@@ -220,3 +220,38 @@ The rule that works for both eras is stated in amendment 3: the total body fat v
 half is redundant — the first does nothing in 1999–2004, where everyone has a value, and the second
 has nothing to act on after 2004, where nothing is imputed.
 
+## The cohort, built
+
+`node tools/nhanes/build-cohort.cjs --data <dir>`, 2026-09-12, after verifying all eighteen source
+files against `sources.lock.json`. The final holdout is **not** built by default — the
+preregistration says it is read once, at the release decision, and a command that produces it on
+every iteration is how "read once" quietly becomes "read forty times".
+
+| Cycle | Start | Under 18 | Over 59 | Pregnant | No DXA | DXA unusable | Imputed | Missing inputs | **Included** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1999–2000 | 9,965 | 4,409 | 1,668 | 480 | 601 | 0 | 350 | 7 | **2,450** |
+| 2001–2002 | 11,039 | 5,046 | 1,872 | 535 | 665 | 0 | 0 | 11 | **2,910** |
+| 2003–2004 | 10,122 | 4,502 | 1,901 | 445 | 666 | 0 | 0 | 15 | **2,593** |
+| 2011–2012 | 9,756 | 3,892 | 1,791 | 142 | 104 | 862 | 0 | 9 | **2,956** |
+| 2013–2014 | 10,175 | 4,062 | 1,841 | 159 | 86 | 630 | 0 | 11 | **3,386** |
+| **Development total** | | | | | | | | | **14,295** |
+
+Split by a stable hash of the participant identifier: **11,417 train, 2,878 calibration.**
+
+Two things the flow shows that a single total would not:
+
+**The imputed and the unusable trade places between eras.** In 1999–2000 the "DXA unusable"
+column is zero and 350 are excluded as imputed; from 2011 the imputation column is zero and 862
+then 630 are excluded as unusable. Same participants in substance — a scan that could not be
+used — reached by opposite mechanisms. A pipeline with one filter would have kept one group or the
+other, and the cohort would have looked fine either way.
+
+**The pregnancy exclusion costs nothing, and is still right to have.** Checked directly: of the
+445 pregnant-or-undetermined adults in 2003–2004 and the 159 in 2013–2014, **zero** have a usable
+DXA. NHANES does not scan them, so they were never in the usable set. The rule stays because
+"NHANES would not have scanned them anyway" is an undocumented assumption about someone else's
+protocol, and a cohort that depends on it silently is one that breaks silently if it changes.
+
+The outputs — `cohort-flow.txt`, `cohort-flow.json`, `model-ready.csv`, `evaluation.csv` — are
+participant-level survey data and stay outside the repository with the sources. The flow above is
+the part that belongs in the record.

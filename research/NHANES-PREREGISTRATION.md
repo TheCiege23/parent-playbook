@@ -246,7 +246,8 @@ measurement whatsoever.
 
 **What it costs:** 1,589 development participants, about a tenth. The holdout is unchanged at 2,452,
 because it never had anyone in that band. Cohort after both amendments, before the remaining §2
-exclusions: **14,348 development, 2,452 holdout.**
+exclusions: **14,348 development, 2,452 holdout.** After every exclusion in §2 the built development
+cohort is **14,295** (11,417 train, 2,878 calibration); see research/NHANES-DATA-STRUCTURE.md.
 
 **Consequence for the product:** the owned model, if it is ever released, refuses rather than
 estimates for anyone aged 60 or over. That refusal is a supported-population rule under §4, not an
