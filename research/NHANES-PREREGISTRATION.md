@@ -168,4 +168,39 @@ not a claim about any individual's body.
 
 ## Amendments
 
-None. Any amendment records its date, its reason, and what was already known when it was made.
+### 1 — 2026-09-12 — how imputation replicates are handled
+
+**What was known when this was made:** the source files had been downloaded and their structure
+counted (research/NHANES-DATA-STRUCTURE.md). **No analysis dataset had been built, no model had
+been fitted, and no outcome of any kind had been computed.** Nothing in this amendment was chosen
+with knowledge of a result.
+
+**What prompted it:** the 1999-2004 whole-body DXA files carry exactly five rows per participant,
+a variable `_MULT_` labelled "Imputation Version". The original text said the cohort requires "a
+valid whole-body DXA result" and did not anticipate that a fifth of the participants would have an
+imputed one rather than a measured one, or that the file would present five versions of it.
+
+**The rule, added to §2:** the cohort uses **measured DXA only**. A participant is included from
+the early cycles when the overall imputation indicator says nothing was imputed, at which point the
+five replicates are exact duplicates and collapse to one row. Participants with imputed values are
+excluded and counted in the cohort flow as their own exclusion line.
+
+**Why this and not the alternatives:** the model's purpose is to approximate a DXA measurement.
+Training it partly on somebody else's model's imputation of a DXA measurement is a different
+exercise, and the error it would report would not be the error anyone cares about. Taking a single
+imputation for everyone keeps the count up and converts imputation uncertainty into confidence the
+study has not earned. Using all five under Rubin's rules is defensible and is not being ruled out
+for a later analysis, but it is not the primary.
+
+**What it costs, stated before it is convenient to forget:** roughly a fifth of the early-cycle
+participants. For 1999-2000 the cohort goes from 6,235 participants with a row to **4,671** with a
+measurement. That is a real reduction in sample size, and if it turns out to make a subgroup fall
+below the 100-participant reporting floor in §8, the answer is that the subgroup is reported as
+insufficient — not that the rule gets revisited.
+
+**Enforcement:** `tools/nhanes/replicates.mjs` refuses to collapse a replicated file unless a
+policy is named, and records which was used. There is no default.
+
+---
+
+Any further amendment records its date, its reason, and what was already known when it was made.
