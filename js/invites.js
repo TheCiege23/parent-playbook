@@ -18,8 +18,8 @@
 const INVITE_ROLE = {
   family_view: {
     heading:'family view',
-    can:['His games, photos and milestones','The week he\'s working on'],
-    cant:'No editing, and no other children',
+    can:['Games, photos and milestones','Weekly plans and progress'],
+    cant:'No editing or account changes',
   },
   co_parent: {
     heading:'co-parent access',
@@ -62,6 +62,8 @@ async function renderRedeem(token){
   }
 
   const role=inviteRole(info.invite_role);
+  const familyWide=info.invite_scope==='family';
+  const childCount=Math.max(1, Number(info.athlete_count)||1);
   const nm=esc(info.athlete_first_name||'their athlete');
   const who=esc(info.inviter||'A parent');
   const initials=(info.athlete_first_name||'?').trim()[0].toUpperCase();
@@ -74,11 +76,13 @@ async function renderRedeem(token){
 
     <div class="inv-faces">
       <span class="f1">${esc(who.trim()[0].toUpperCase())}</span>
-      <span class="f2">${esc(initials)}</span>
+      <span class="f2">${familyWide&&childCount>1?esc(String(childCount)):esc(initials)}</span>
     </div>
 
-    <h1>${who} wants you to follow ${nm}'s season.</h1>
-    <p class="inv-lead">Parent Playbook is where the family keeps ${nm}'s games, milestones and photos — and the weekly plan ${nm} is working on. Nothing here is public.</p>
+    <h1>${familyWide?`${who} wants you to follow the family's sports journey.`:`${who} wants you to follow ${nm}'s season.`}</h1>
+    <p class="inv-lead">${familyWide
+      ? `This one invite includes ${childCount===1?'the child':`all ${childCount} children`} in the household — their games, milestones, photos and weekly plans. Nothing here is public.`
+      : `Parent Playbook is where the family keeps ${nm}'s games, milestones and photos — and the weekly plan ${nm} is working on. Nothing here is public.`}</p>
 
     <div class="card app-pad inv-perms">
       <div class="sec-title" style="margin:0 0 10px">You'd get ${esc(role.heading)}</div>
@@ -87,7 +91,7 @@ async function renderRedeem(token){
     </div>
 
     <div id="rbox" style="margin-top:18px"></div>
-    <p class="muted-note">${who} can remove your access at any time.${detail?` ${nm} is ${esc(detail)}.`:''}</p>
+    <p class="muted-note">${who} can remove your access at any time.${!familyWide&&detail?` ${nm} is ${esc(detail)}.`:''}</p>
   </div>`;
 
   const box=$("#rbox");
@@ -102,7 +106,7 @@ async function renderRedeem(token){
         <p class="muted-note" style="margin:0 0 2px">Six digits, from ${esc(info.sent_hint||'the message they sent you')}.</p>
         ${codeRow('invCode')}
         <div class="err" id="codeErr" style="text-align:center"></div>`:''}
-      <button class="btn amber" id="accept"${needsCode?' disabled':''}>Accept and follow ${nm}</button>
+      <button class="btn amber" id="accept"${needsCode?' disabled':''}>${familyWide?'Accept family invite':`Accept and follow ${nm}`}</button>
       <p class="muted-note" style="margin-top:10px">You're signed in as ${esc(state.user.email)}. <a href="#" id="skip" style="color:var(--green-d)">Not now</a></p>`;
 
     const btn=$("#accept");
@@ -111,7 +115,7 @@ async function renderRedeem(token){
       read=bindCodeRow('invCode', full=>{ btn.disabled=!full; });
       btn.disabled=true;
     }
-    btn.onclick=()=>acceptAndEnter(token, needsCode?read():null);
+    btn.onclick=()=>acceptAndEnter(token, needsCode?read():null, familyWide);
     $("#skip").onclick=e=>{ e.preventDefault(); history.replaceState({},'',location.pathname); afterLogin(); };
   }else{
     box.innerHTML=H`<button class="btn amber" id="su">Create a free account</button>
@@ -224,9 +228,9 @@ function renderInviteDead(title, why, token, info){
   $("#invLogin").onclick=()=>renderAuth('login');
 }
 
-async function acceptAndEnter(token, code){
+async function acceptAndEnter(token, code, familyWide=false){
   root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
-  const { error } = await sb.rpc('accept_invite',{ p_token:token, p_code:code||null });
+  const { data:acceptedAthleteId, error } = await sb.rpc('accept_invite',{ p_token:token, p_code:code||null });
   if(error){
     const m=error.message||'';
     // A wrong code is a TYPO, not a dead invite. Sending someone to the "ask for a new
@@ -249,14 +253,15 @@ async function acceptAndEnter(token, code){
   // than in a banner she'll dismiss.
   try{
     await Promise.all([ loadAthletes(), loadRef() ]);
-    state.active = state.athletes[0] || null;
+    state.active = state.athletes.find(a=>a.id===acceptedAthleteId) || state.athletes[0] || null;
     if(!state.active) return afterLogin();
-    renderInviteAccepted();
+    renderInviteAccepted(familyWide);
   }catch(e){ console.error(e); try{ await afterLogin(); }catch(_){ bootError(); } }
 }
 
-async function renderInviteAccepted(){
+async function renderInviteAccepted(familyWide=false){
   const a=state.active;
+  const householdCount=(state.athletes||[]).filter(x=>x.family_id===a.family_id).length;
   const [{data:sports},{data:games}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('games').select('*').eq('athlete_id',a.id).order('game_date',{ascending:false}).limit(1),
@@ -272,7 +277,9 @@ async function renderInviteAccepted(){
   <div class="app-pad inv-wrap">
     <div class="inv-tick">✓</div>
     <h1>You're in.</h1>
-    <p class="inv-lead">You can follow ${nm}'s season whenever you like.${bits.length?' '+esc(bits.join(', '))+'.':''}</p>
+    <p class="inv-lead">${familyWide&&householdCount>1
+      ? `You can now follow all ${householdCount} children in this household.`
+      : `You can follow ${nm}'s season whenever you like.${bits.length?' '+esc(bits.join(', '))+'.':''}`}</p>
 
     ${g?H`<div class="card app-pad" style="margin-top:20px">
       <div class="sec-title" style="margin:0 0 8px">Most recent</div>
@@ -287,7 +294,7 @@ async function renderInviteAccepted(){
         <div class="gt"><b>Add it to your phone</b><span>Tap Share, then Add to Home Screen — it opens like an app, no store needed.</span></div></div>
     </div>
 
-    <button class="btn amber" id="invGo" style="margin-top:20px">See ${nm}'s week</button>
+    <button class="btn amber" id="invGo" style="margin-top:20px">${familyWide&&householdCount>1?"See the family's week":`See ${nm}'s week`}</button>
   </div>`;
   $("#invGo").onclick=()=>renderApp('week');
 }

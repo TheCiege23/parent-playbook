@@ -217,15 +217,18 @@ function toE164(raw){
 }
 
 function openInvite(){
-  const kids = state.athletes||[];
+  // Parent-facing invitations cover the household. `state.athletes` can also hold
+  // athletes shared from another family, so only include siblings of the active child.
+  // Coach access stays child-specific and uses the picker below.
+  const kids = (state.athletes||[]).filter(a=>a.family_id===state.active.family_id);
   const multi = kids.length>1;
   const nm=esc(state.active.first_name);
   const bg=sheet(H`<h3>Invite someone to help</h3>
-    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. They create their own login and get access to ${multi?H`whoever you pick below`:H`${nm} only`}.</p>
+    <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. Family and co-parent invites include ${multi?'every child in this household':nm}; coach access stays tied to the child you choose.</p>
     <div class="teach" style="margin-top:12px"><div class="ic">🎓</div><div><h4>You stay in control</h4>
       <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit; Team Connect is for a coach or trainer you already work with — stats only, no games, journey or photos. You can revoke any invite anytime.</p></div></div>
 
-    ${multi?H`<div class="field"><label>Who is this for?</label>
+    ${multi?H`<div class="field" id="kidScope" hidden><label>Which child is the coach helping?</label>
       <div id="kidPick" style="display:flex;flex-direction:column;gap:8px">
         ${kids.map(a=>H`<label class="kidrow" style="display:flex;align-items:center;gap:10px;padding:10px 12px;
           border:1px solid var(--line);border-radius:12px;cursor:pointer">
@@ -234,8 +237,11 @@ function openInvite(){
           <span>${esc(a.first_name)}</span>
         </label>`).join('')}
       </div>
-      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Check as many as you want — one invite goes
-        out for each, so accepting one never hands over a sibling's data too.</p></div>`:''}
+      <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Coach access is separate for each child. Check every child this coach actually trains.</p></div>`:''}
+
+    <div class="teach" id="familyScope" style="margin-top:12px"><div class="ic">👨‍👩‍👧‍👦</div><div>
+      <h4>${multi?'The whole household is included':nm+' is included'}</h4>
+      <p>${multi?`Accepting this one invite adds all ${kids.length} children currently on this household account.`:`This household currently has one child. Any coach invite remains child-specific.`}</p></div></div>
 
     <div class="field"><label>Access level</label>
       <div class="chipgrid" id="role" style="grid-template-columns:1fr 1fr">
@@ -265,7 +271,14 @@ function openInvite(){
     <button class="btn" id="gen">Create invite</button>`);
 
   let role='family_view', chan='text';
-  bg.querySelectorAll('#role .chip').forEach(c=>c.onclick=()=>{ role=c.dataset.r; bg.querySelectorAll('#role .chip').forEach(x=>x.classList.toggle('on',x===c)); });
+  bg.querySelectorAll('#role .chip').forEach(c=>c.onclick=()=>{
+    role=c.dataset.r;
+    bg.querySelectorAll('#role .chip').forEach(x=>x.classList.toggle('on',x===c));
+    const coach=role==='coach';
+    const kp=bg.querySelector('#kidScope'), fs=bg.querySelector('#familyScope');
+    if(kp) kp.hidden=!coach;
+    if(fs) fs.hidden=coach;
+  });
   bg.querySelectorAll('#chan .chip').forEach(c=>c.onclick=()=>{
     chan=c.dataset.c; bg.querySelectorAll('#chan .chip').forEach(x=>x.classList.toggle('on',x===c));
     bg.querySelector('#fPhone').hidden = chan!=='text';
@@ -283,7 +296,8 @@ function openInvite(){
     const errEl=bg.querySelector('#inverr'); errEl.textContent='';
     const stop=msg=>{ errEl.textContent=msg; btn.innerHTML='Create invite'; btn.disabled=false; };
 
-    const kidIds = multi
+    const familyWide=role!=='coach';
+    const kidIds = !familyWide&&multi
       ? Array.from(bg.querySelectorAll('#kidPick input:checked')).map(i=>i.dataset.kid)
       : [state.active.id];
     if(!kidIds.length) return stop('Pick at least one child.');
@@ -300,15 +314,15 @@ function openInvite(){
       if(!/.+@.+\..+/.test(email)) return stop("That email address doesn't look right.");
     }
 
-    // One invite row per child, each with its OWN token and code — the loop is what's
-    // new here, but every invite it produces is exactly as narrow as the single-child
-    // flow always was. Accepting CJ's invite still never touches Savannah's.
+    // One family/co-parent row expands to every sibling inside accept_invite(). Coach
+    // rows remain one per selected child, each with an independent token and code.
     if(chan==='text'||chan==='email') btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span> Sending…';
     const results=[]; // { name, ok, sent, code, link, why, chan }
     for(const kidId of kidIds){
       const kid = kids.find(k=>k.id===kidId) || state.active;
       const { data, error } = await sb.from('athlete_invites')
         .insert({ athlete_id:kidId, role,
+                  scope:familyWide?'family':'athlete',
                   invited_email:email||null, invited_phone:phone||null,
                   sent_via:chan }).select().single();
       if(error){
@@ -367,7 +381,8 @@ function openInvite(){
         }catch(err){ console.error(err); why=err.message||''; }
         if(!sent) reportError(new Error(fn+' failed: '+why),'invite:send');
       }
-      results.push({ name:kid.first_name, ok:true, sent, code, link, why, chan });
+      results.push({ name:familyWide?(multi?'Your family':kid.first_name):kid.first_name,
+        familyWide, ok:true, sent, code, link, why, chan });
     }
 
     const ok = results.filter(r=>r.ok);
@@ -399,7 +414,10 @@ function openInvite(){
     // Everything this run produced, in one paste — the fallback path a gateway failure
     // (or "Just a link") always lands on, for one child or several.
     const share = ok.map(r =>
-      `Follow ${r.name}'s season on Parent Playbook: ${r.link}` + (r.code?`\n\nYour code is ${r.code}`:'')
+      (r.familyWide
+        ? `Follow our family's sports journey on Parent Playbook: ${r.link}`
+        : `Follow ${r.name}'s season on Parent Playbook: ${r.link}`)
+        + (r.code?`\n\nYour code is ${r.code}`:'')
     ).join('\n\n---\n\n');
 
     btn.textContent = ok.length>1 ? 'Copy the messages' : 'Copy the message';

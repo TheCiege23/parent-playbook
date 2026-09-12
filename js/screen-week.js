@@ -243,7 +243,10 @@ async function screenWeek(){
 
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">This week</div>
-        ${loggable>0?`<span class="pill" style="${doneCount>=loggable?'background:#E9F1EF;color:var(--good)':''}">${doneCount} of ${loggable} done</span>`:''}
+        <div style="display:flex;gap:7px;align-items:center">
+          ${hasSchedule&&state.canEdit!==false?'<button class="btn sm ghost" id="editWeekSchedule">Change schedule</button>':''}
+          ${loggable>0?`<span class="pill" style="${doneCount>=loggable?'background:#E9F1EF;color:var(--good)':''}">${doneCount} of ${loggable} done</span>`:''}
+        </div>
       </div>
       ${days.map((w,idx)=>{
         const isDone=done(idx);
@@ -324,6 +327,9 @@ async function screenWeek(){
   { const sc=$("#schedBanner"); if(sc&&primary) clickableCard(sc,()=>openPracticeSchedule(primary.sport_key,
       { practiceDays:primary.practice_days||[], gameDay:primary.game_day,
         seasonStart:primary.season_start, seasonEnd:primary.season_end })); }
+  { const sc=$("#editWeekSchedule"); if(sc&&primary) sc.onclick=()=>openPracticeSchedule(primary.sport_key,
+      { practiceDays:primary.practice_days||[], gameDay:primary.game_day,
+        seasonStart:primary.season_start, seasonEnd:primary.season_end }, ()=>renderApp('week')); }
 
   // context for a day row — shared by the row, the tick, and today's card so the tally
   // can never disagree with whichever one the parent tapped
@@ -344,7 +350,8 @@ async function screenWeek(){
   // Ticking a day is the whole interaction — it must not also open the sheet.
   $("#screen").querySelectorAll('[data-tick]').forEach(btn=>{
     const i=+btn.getAttribute('data-tick'); const ctx=ctxFor(i); if(!ctx) return;
-    btn.onclick=e=>{ e.stopPropagation(); ctx.done?undoSessionDone(ctx,btn):markSessionDone(ctx,btn); };
+    btn.onclick=e=>{ e.preventDefault(); e.stopPropagation();
+      ctx.done?undoSessionDone(ctx,btn):markSessionDone(ctx,btn); };
   });
   // Tapping the row is the common action — ticking the day off — and it must not
   // leave the screen: a parent standing in a kitchen ticking off Tuesday should not

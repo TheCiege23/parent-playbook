@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     const svc = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     const { data: inv, error: ie } = await svc.from('athlete_invites')
-      .select('id, athlete_id, role, token, invited_phone, created_by, expires_at, accepted_at, revoked_at')
+      .select('id, athlete_id, role, scope, token, invited_phone, created_by, expires_at, accepted_at, revoked_at')
       .eq('id', inviteId).maybeSingle();
     if (ie) return json({ error: ie.message }, 500);
     if (!inv) return json({ error: 'not_found' }, 404);
@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
     ]);
     const inviterFirst = ((guardian?.display_name || '').trim() || 'A parent').split(/\s+/)[0];
     const athleteFirst = ath?.first_name || 'their athlete';
+    const familyWide = inv.scope === 'family' && inv.role !== 'coach';
     const siteUrl = Deno.env.get('SITE_URL') || 'https://playbookbp.com';
     const inviteUrl = siteUrl + '/?invite=' + encodeURIComponent(inv.token);
 
@@ -141,7 +142,9 @@ Deno.serve(async (req) => {
     // carriers require it on A2P traffic, and its absence is a reason campaigns get
     // filtered rather than delivered.
     const text =
-      `${inviterFirst} invited you to follow ${athleteFirst}'s season on Parent Playbook.\n\n`
+      `${familyWide
+        ? `${inviterFirst} invited you to follow the family's sports journey on Parent Playbook.`
+        : `${inviterFirst} invited you to follow ${athleteFirst}'s season on Parent Playbook.`}\n\n`
       + `${inviteUrl}\n\nYour code: ${code}\n\n`
       + `Reply STOP to opt out.`;
 

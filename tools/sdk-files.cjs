@@ -55,6 +55,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260911160500_service_value_constraints.sql',
   'supabase/migrations/20260912100000_external_body_composition_records.sql',
   'supabase/migrations/20260912110000_external_composition_covering_indexes.sql',
+  'supabase/migrations/20260912123000_family_wide_parent_invites.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.

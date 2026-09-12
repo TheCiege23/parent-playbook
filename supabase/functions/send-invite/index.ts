@@ -25,6 +25,7 @@ function esc(s: unknown) {
 const ROLE_LABEL: Record<string, string> = {
   family_view: 'family view — they can see games, photos and the week, but cannot change anything',
   co_parent: 'co-parent access — they can log games and mark sessions done, but not change your account',
+  coach: 'Team Connect access — athlete stats and training updates only',
 };
 
 // The template is fetched from the site rather than bundled here: it is 7KB of HTML
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
     const svc = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     const { data: inv, error: ie } = await svc.from('athlete_invites')
-      .select('id, athlete_id, role, token, invited_email, created_by, expires_at, accepted_at, revoked_at')
+      .select('id, athlete_id, role, scope, token, invited_email, created_by, expires_at, accepted_at, revoked_at')
       .eq('id', inviteId).maybeSingle();
     if (ie) return json({ error: ie.message }, 500);
     if (!inv) return json({ error: 'not_found' }, 404);
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
       message: 'RESEND_API_KEY is not set on this project, so the invite email cannot be sent. The link itself still works — copy it instead.' }, 503);
 
     const [{ data: ath }, { data: guardian }] = await Promise.all([
-      svc.from('athletes').select('first_name, birthdate').eq('id', inv.athlete_id).maybeSingle(),
+      svc.from('athletes').select('first_name, birthdate, family_id').eq('id', inv.athlete_id).maybeSingle(),
       svc.from('guardians').select('display_name').eq('id', inv.created_by).maybeSingle(),
     ]);
     const { data: sp } = await svc.from('athlete_sports')
@@ -126,21 +127,47 @@ Deno.serve(async (req) => {
     const inviteUrl = siteUrl + '/?invite=' + encodeURIComponent(inv.token);
     const expires = new Date(inv.expires_at).toLocaleDateString('en-US',
       { weekday: 'long', month: 'long', day: 'numeric' });
+    const familyWide = inv.scope === 'family' && inv.role !== 'coach';
+    let childCount = 1;
+    if (familyWide && ath?.family_id) {
+      const { count } = await svc.from('athletes')
+        .select('id', { count: 'exact', head: true }).eq('family_id', ath.family_id);
+      childCount = Math.max(1, count || 1);
+    }
+    const athleteFirst = ath?.first_name || 'their athlete';
+    const athleteDetails = [age != null ? `${age} years old` : '', sportRow?.name ? `plays ${sportRow.name}` : '']
+      .filter(Boolean).join(' and ');
+    const inviteHeadline = familyWide
+      ? `${inviterFirst} wants you to follow the family's sports journey.`
+      : `${inviterFirst} wants you to follow ${athleteFirst}'s season.`;
+    const inviteIntro = familyWide
+      ? `This one invite includes ${childCount === 1 ? 'the child' : `all ${childCount} children`} in the household — their games, milestones, photos and weekly plans. Nothing here is public.`
+      : `Parent Playbook is where the family keeps ${athleteFirst}'s games, milestones, photos and weekly plan.${athleteDetails ? ` ${athleteFirst} is ${athleteDetails}.` : ''} Nothing here is public.`;
 
     const vars: Record<string, string> = {
-      athlete_first: esc(ath?.first_name || 'their athlete'),
+      athlete_first: esc(athleteFirst),
       athlete_age: age != null ? String(age) : '',
       sport: esc(sportRow?.name || ''),
       inviter_first: esc(inviterFirst),
       inviter_full: esc(inviterFull),
       role_label: esc(ROLE_LABEL[inv.role] || ROLE_LABEL.family_view),
+      invite_headline: esc(inviteHeadline),
+      invite_intro: esc(inviteIntro),
+      access_first: esc(familyWide ? 'Games, photos and milestones for every child' :
+        (inv.role === 'coach' ? 'Age, sport, position and current stats' : 'Games, photos and milestones')),
+      access_second: esc(familyWide ? 'Each child\'s weekly plan and progress' :
+        (inv.role === 'coach' ? 'Growth, scan measurements and training updates' : `${athleteFirst}'s weekly plan and progress`)),
+      access_limit: esc(inv.role === 'coach' ? 'No games, journey, photos or weekly plan' :
+        (inv.role === 'co_parent' ? 'No billing or account changes' : 'No editing or account changes')),
       invite_url: inviteUrl,          // a URL we constructed; escaping would break the href
       expires_human: esc(expires),
     };
     const TEMPLATE = await loadTemplate();
     const html = TEMPLATE.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? '');
 
-    const subject = inviterFirst + ' wants you to follow ' + (ath?.first_name || 'their athlete') + "'s season";
+    const subject = familyWide
+      ? `${inviterFirst} invited you to Parent Playbook for the whole family`
+      : `${inviterFirst} wants you to follow ${athleteFirst}'s season`;
     const from = Deno.env.get('INVITE_FROM') || 'Parent Playbook <hello@send.playbookbp.com>';
 
     const res = await fetch('https://api.resend.com/emails', {

@@ -8,10 +8,11 @@
 async function screenProfile(){
   logUsageEvent('view_profile');
   const a=state.active; const age=ageFrom(a.birthdate);
+  const householdIds=(state.athletes||[]).filter(x=>x.family_id===a.family_id).map(x=>x.id);
   const [{data:sports},{data:access},{data:invites},{data:doneRows}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('athlete_access').select('*').eq('athlete_id',a.id).is('revoked_at',null),
-    sb.from('athlete_invites').select('*').eq('athlete_id',a.id).is('accepted_at',null).is('revoked_at',null),
+    sb.from('athlete_invites').select('*').in('athlete_id',householdIds.length?householdIds:[a.id]).is('accepted_at',null).is('revoked_at',null),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id)
       .gte('done_on',isoDay(mondayOfThisWeek())).lte('done_on',dateForDayIndex(6)),
   ]);
@@ -23,6 +24,7 @@ async function screenProfile(){
   const sportName=state.ref?.sports.find(x=>x.key===_primary?.sport_key)?.name||'';
   const seasonLabel=(typeof seasonMeta==='function'&&_primary?.season_state)
     ? (seasonMeta(_primary.season_state)||{}).label : null;
+  const visibleInvites=(invites||[]).filter(i=>i.scope==='family'||i.athlete_id===a.id);
   const sub=[sportName,(_primary?.positions||[]).join('/'),_primary?.level].filter(Boolean).join(' · ');
 
   $("#screen").innerHTML = H`
@@ -101,8 +103,8 @@ async function screenProfile(){
         <div class="grow"><div class="gi">👤</div><div class="gt"><b>You</b><span>${isOwner?'Owner · full control':esc(myRole)+' access'}</span></div></div>
         ${(access||[]).filter(x=>x.guardian_id!==state.user.id).map(x=>H`
           <div class="grow"><div class="gi">🤝</div><div class="gt"><b>Shared guardian</b><span>${esc(x.role)} · can ${x.role==='editor'?'edit':'view'}</span></div></div>`).join('')}
-        ${(invites||[]).map(i=>H`
-          <div class="grow"><div class="gi">✉️</div><div class="gt"><b>Invite pending</b><span>${esc(i.role)} · expires ${new Date(i.expires_at).toLocaleDateString()}</span></div>
+        ${visibleInvites.map(i=>H`
+          <div class="grow"><div class="gi">✉️</div><div class="gt"><b>${i.scope==='family'?'Family invite pending':'Invite pending'}</b><span>${esc(i.role)} · expires ${new Date(i.expires_at).toLocaleDateString()}</span></div>
             <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button></div>`).join('')}
       </div>
 
