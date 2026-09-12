@@ -16,7 +16,10 @@ function setup(tables=data(),hook=()=>{}){
   }};
   const c=vm.createContext({console,Date,Map,Set,Number,JSON,document,root,sb,state:{user:{id:'owner'}},assessmentDownload:(...args)=>downloads.push(args),openOrgRoster(){}});
   vm.runInContext(`function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}`,c);
-  for(const f of ['dates','maturity','body-outputs','scan-record','body-insights','org-insights'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+f+'.js'),'utf8'),c);
+  // org-composition is loaded here for the same reason index.html loads it first: org-insights
+  // renders the shared-measurements section from it. It is optional at runtime and guarded, so
+  // this also keeps the guard honest -- if it stopped being optional, these tests would say so.
+  for(const f of ['dates','maturity','body-outputs','scan-record','body-insights','org-composition','org-insights'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+f+'.js'),'utf8'),c);
   return {c,calls,downloads,host:()=>mounted,tables};
 }
 test('latest assessment keeps missing outputs missing and distinguishes legacy/empty/future records',()=>{

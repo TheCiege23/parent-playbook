@@ -1,5 +1,5 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v111';
+const CACHE = 'pp-v112';
 // /privacy, /terms, /datadeletion, /coaches and /organizations are standalone pages, not
 // part of the SPA. Precached so an offline navigation to them serves the real page
 // instead of the index.html fallback.
@@ -7,7 +7,7 @@ const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coa
   '/js/org-insights.js','/js/body-sdk.mjs','/js/body-sdk-surface.mjs','/js/body-sdk-record.mjs','/js/body-sdk-report.mjs','/js/body-sdk-supabase.mjs','/js/body-sdk-reference-supabase.mjs','/js/body-sdk-reference-import.mjs','/js/body-sdk-reference-history.mjs','/js/body-composition-contract.mjs','/js/body-composition-validation.mjs','/js/body-composition-record.mjs','/js/body-composition-supabase.mjs','/js/reference-cohort.mjs','/js/body-surface-report.mjs','/js/body-surface-repeat.mjs','/js/surface-section.js','/js/body-section-worker.js','/js/mesh-section.js',
   '/js/surface-review.mjs','/js/surface-worker.js','/js/visual-hull.js','/js/device-evidence.js',
   '/js/photo-import.mjs','/js/photo-import-worker.js','/js/heic-decode.js',
-  '/img/brownpig-logo-ondark.png','/js/landing.js','/css/body-insights.css','/js/dates.js','/js/reference-cohorts.js','/js/reference-cohort.mjs','/js/body-outputs.js','/js/body-insights.js','/js/composition-import-ui.js','/js/composition-import.mjs','/js/composition-import-supabase.mjs','/js/body-composition-reference.mjs','/js/scan-record.js','/js/assessment-report.js','/js/photo-quality.js','/js/scan-camera.js','/js/photo-identity.js',
+  '/img/brownpig-logo-ondark.png','/js/landing.js','/css/body-insights.css','/js/dates.js','/js/reference-cohorts.js','/js/reference-cohort.mjs','/js/body-outputs.js','/js/body-insights.js','/js/composition-import-ui.js','/js/composition-import.mjs','/js/composition-import-supabase.mjs','/js/composition-sharing-ui.js','/js/org-composition.js','/js/body-composition-reference.mjs','/js/scan-record.js','/js/assessment-report.js','/js/photo-quality.js','/js/scan-camera.js','/js/photo-identity.js',
   '/js/monitoring.js','/js/core.js','/js/offline.js','/js/background.js','/js/reference.js','/js/auth.js','/js/onboarding.js',
   '/js/program.js','/js/shell.js','/js/screen-week.js','/js/week-rail.js','/js/cdc-stature.js','/js/maturity.js','/js/pop-warner.js','/js/screen-growth.js','/js/screen-scan.js','/js/screen-coach.js','/js/screen-profile.js','/js/screen-edit.js','/js/screen-activity.js',
   '/js/trainer-onboarding.js','/js/admin.js','/js/admin-drills.js','/js/marketplace.js','/js/camps.js','/js/trainer-services.js',

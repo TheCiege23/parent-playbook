@@ -159,13 +159,40 @@ export function createExternalCompositionStore(client, { scope, athleteId = null
     },
 
     async list() {
-      const response = await scoped(client.from(TABLE).select('id,record_id,measured_at,source_class,record'))
+      const response = await scoped(client.from(TABLE).select('id,record_id,measured_at,source_class,team_id,record'))
         .order('measured_at', { ascending: false }).limit(MAX_ROWS);
       if (response?.error) fail('READ_FAILED', response.error.message || 'Could not read the imported measurements.');
       const rows = response?.data;
       if (rows == null) return [];
       if (!Array.isArray(rows)) fail('READ_FAILED', 'Supabase returned an unusable history.');
-      return Object.freeze(rows.map(row => Object.freeze({ id: row.id, recordId: row.record_id, measuredAt: row.measured_at, sourceClass: row.source_class, record: row.record ? clone(row.record) : null })));
+      return Object.freeze(rows.map(row => Object.freeze({ id: row.id, recordId: row.record_id, measuredAt: row.measured_at, sourceClass: row.source_class, sharedWithTeamId: row.team_id ?? null, record: row.record ? clone(row.record) : null })));
+    },
+
+    /* Share a reading with an organization, or stop.
+     *
+     * Sharing is one column, set by the guardian and clearable by the guardian. There is no
+     * organization-side accept and no organization-side keep: an organization sees the row only
+     * while team_id names it, so withdrawing is immediate and total rather than a request.
+     *
+     * The source document does not travel with it. The attachment policy follows write rights on
+     * the record, and an organization never has those — the shared numbers are what was shared,
+     * and the PDF with a name and a date of birth on it was not.
+     */
+    async share(id, teamId) {
+      const response = await scoped(client.from(TABLE).update({ team_id: uuid(teamId, 'teamId') }))
+        .eq('id', uuid(id, 'id')).select('id,team_id');
+      if (response?.error) fail('SHARE_FAILED', response.error.message || 'Could not share that measurement.');
+      if (!Array.isArray(response?.data) || response.data.length !== 1) {
+        fail('SHARE_FAILED', 'That measurement could not be shared. It may have been deleted, or it may not be yours to share.');
+      }
+      return true;
+    },
+
+    async unshare(id) {
+      const response = await scoped(client.from(TABLE).update({ team_id: null }))
+        .eq('id', uuid(id, 'id')).select('id,team_id');
+      if (response?.error) fail('SHARE_FAILED', response.error.message || 'Could not stop sharing that measurement.');
+      return Array.isArray(response?.data) && response.data.length === 1;
     },
 
     async remove(id) {
