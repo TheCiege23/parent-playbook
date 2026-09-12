@@ -107,6 +107,7 @@ function biMarkup(athlete, input, date, baseline){
     <section class="bi-scope"><h2>What this profile measures</h2><p>Photo assessments estimate joint-based lengths using a recorded height. Video assessments estimate movement results. Changes may include capture and measurement error.</p><div><span>3D body reconstruction · temporary experiment</span><span>Circumferences & composition · not validated</span><span>PHV estimate · separate manual Growth inputs</span></div></section>
     <section><div class="bi-section-head"><h2>Measurement record</h2><span>${selectedRows.length} entries through ${esc(date||'today')}</span></div><div class="bi-table-wrap"><table class="bi-table"><caption class="sr-only">Recorded measurements and methods</caption><thead><tr><th scope="col">Date</th><th scope="col">Measurement</th><th scope="col">Value</th><th scope="col">Method</th></tr></thead><tbody>${selectedRows.slice(0,40).map(r=>`<tr><td>${esc(r.measured_on)}</td><td>${esc(biName(r.metric_key))}</td><td>${esc(biValue(r))}</td><td>${esc(biMethod(r))}</td></tr>`).join('')||'<tr><td colspan="4">No measurements recorded yet.</td></tr>'}</tbody></table></div>${selectedRows.length>40?'<p class="bi-muted">Showing the latest 40 entries. Export includes all loaded records.</p>':''}</section>
     ${biAssessments(selectedRows)}
+    <div id="biImported"></div>
     <section class="bi-scope"><h2>Take your results with you</h2><p>Download a printable report for the selected dates or a spreadsheet of all your measurement records.</p><div class="bi-actions"><button class="btn ghost" id="biReport" ${rows.length?'':'disabled'}>Download report</button><button class="btn ghost" id="biCSV" ${rows.length?'':'disabled'}>Export CSV</button></div></section>
     <footer class="bi-footer"><button class="btn ghost" id="biGrowth">Open Growth</button><span>Photos used for body measurement are processed on-device and discarded.</span></footer>
   </div>`;
@@ -151,6 +152,21 @@ async function screenBodyInsights(){
       });
     };
     host.querySelector('#biGrowth').onclick=()=>renderApp('growth');
+    // The family's own imported readings, and the decision to share one. Painted after the rest:
+    // most athletes have none, and a section nobody has used must not delay the page that has
+    // content. A failure leaves it absent rather than breaking the insights above it.
+    (async()=>{
+      const slot=host.querySelector('#biImported');
+      if(!slot) return;
+      try{
+        // One organization at a time, which is what the roster model supports today. Sharing
+        // names a team on the row, so there has to be exactly one to name.
+        const {data:memberships}=await sb.from('team_memberships').select('team_id,teams(id,name)').eq('athlete_id',athlete.id).limit(2);
+        if(!isCurrent()) return;
+        const teams=(memberships||[]).map(m=>m.teams).filter(Boolean);
+        await renderCompositionSharing(slot,{athleteId:athlete.id,team:teams.length===1?teams[0]:null,onChange:()=>{}});
+      }catch(error){ if(isCurrent()) slot.innerHTML='<section class="bi-reference"><div class="bi-section-head"><h2>Imported measurements</h2></div><p class="bi-muted">Could not load your imported measurements. '+esc(error.message||'Please retry.')+'</p></section>'; }
+    })();
     host.querySelector('#biReport').onclick=()=>assessmentDownload(assessmentReport(athlete,rows,date,baseline),'text/html','body-insights-report-'+date+'.html');
     host.querySelector('#biCSV').onclick=()=>assessmentDownload(assessmentCSV(rows),'text/csv;charset=utf-8','body-insights-'+athlete.id+'.csv');
     host.querySelector('#biExport').onclick=()=>{
