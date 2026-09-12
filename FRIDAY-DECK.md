@@ -14,9 +14,9 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v112`, 28/28 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 697/697 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 706/706 |
 | Database suite | `node tests/db/run.cjs` | 298/298 on a disposable cluster built from the real migrations: 281 security cases plus a 17-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 6/6 checks: manifest 193/193, exclusions clean, contracts 288/288, database 298/298, host serving |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 196/196, exclusions clean, contracts 297/297, database 298/298, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 42.75%, 43% rounded, 0 of 13 categories fully accepted |
 
@@ -94,7 +94,7 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 193 files, checksummed, one command to verify it, and its own
+- **The buyer archive stands alone**: 196 files, checksummed, one command to verify it, and its own
   bundled migrations rebuild the schema and pass all 204 tests on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
