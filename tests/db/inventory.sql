@@ -135,8 +135,20 @@ everything as (
   union all select * from event_triggers
 )
 
+-- Ordered by bytes, not by the database's collation. A plain `order by kind, identity` sorts
+-- through lc_collate, and en_US.UTF-8 orders "public.athletes" against "public.athlete_access" the
+-- opposite way from C -- so two clusters holding byte-for-byte identical objects produced two
+-- different fingerprints, and the parity claim failed for a reason that had nothing to do with the
+-- schema. Per-object comparison was never affected; only this one summary number was, which is
+-- exactly the number a reader looks at first.
+-- The separators below are the bytes 0x01 and 0x02, written as escapes rather than typed in
+-- literally. They are the right choice -- no identity or fingerprint can contain them, so the
+-- concatenation is unambiguous -- but as raw bytes they made this file binary to git and grep, and
+-- they render as nothing, so the expression reads as `kind||''||identity` and invites the reader
+-- to reimplement it with empty separators. That misreading cost real time: a hand-typed copy of
+-- this aggregate produced a different hash from the same schema, which looks exactly like drift.
 select jsonb_build_object(
-  'schema_fingerprint', md5(string_agg(kind||''||identity||''||fingerprint, '' order by kind, identity)),
+  'schema_fingerprint', md5(string_agg(kind||E'\x01'||identity||E'\x01'||fingerprint, E'\x02' order by (kind||''||identity) collate "C")),
   'counts', (select jsonb_object_agg(kind, n) from (select kind, count(*) as n from everything group by kind) c),
   'total', count(*),
   'objects', jsonb_object_agg(kind||' '||identity, fingerprint)

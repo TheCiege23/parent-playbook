@@ -3,6 +3,7 @@
 // so the report can state exactly which migrations could not run here and why.
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 function harnessContext() {
@@ -19,10 +20,29 @@ const REPO = path.resolve(__dirname, '..', '..');
 const MIGRATIONS = process.env.PP_DB_MIGRATIONS || path.join(REPO, 'supabase/migrations');
 const SCRATCH = __dirname;
 
+// Rewritten into a temp directory rather than in place: the working tree is not ours to modify,
+// and a file that already uses LF is handed back untouched so the common case copies nothing.
+const LF_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-replay-lf-'));
+process.on('exit', () => { try { fs.rmSync(LF_DIR, { recursive: true, force: true }); } catch {} });
+function lfCopyOf(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  if (!text.includes('\r\n')) return file;
+  const target = path.join(LF_DIR, path.basename(file));
+  fs.writeFileSync(target, text.replace(/\r\n/g, '\n'), 'utf8');
+  return target;
+}
+
+// A migration is replayed with its line endings normalized to LF, because a function body keeps
+// whatever the file gave it. With core.autocrlf a Windows checkout holds CRLF, so every multi-line
+// `create function` lands in pg_proc with \r in prosrc — and the schema-parity claim, which
+// compares md5(prosrc) against a live project that has none, reports 33 functions as different
+// when nothing about them differs. The bodies still RUN identically; only the comparison breaks,
+// which is the worst shape for a check a buyer is meant to trust. Same lesson as the archive
+// fingerprint in tools/sdk-sign.cjs: hash the content, not the checkout.
 function psqlFile(file, { single = true } = {}) {
   const args = [...CONN, '-v', 'ON_ERROR_STOP=1', '-X', '-q'];
   if (single) args.push('--single-transaction');
-  args.push('-f', file);
+  args.push('-f', lfCopyOf(file));
   try {
     const out = execFileSync(PSQL, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     return { ok: true, out };
