@@ -267,3 +267,24 @@ test('the built cohort numbers are recorded, and the two documents agree on them
   // Whitespace-tolerant: the document is hard-wrapped, so a phrase this long spans a line break.
   assert.match(findings.replace(/\s+/g, ' '), /one filter would have kept one group or the other/);
 });
+
+// ----------------------------------------------------------------- amendment 5
+
+test('arm circumference is carried from BMXARMC, and a missing one is null rather than an exclusion', () => {
+  // A model that needs arm circumference refuses someone without it. The cohort does not drop them:
+  // attempt 1's models do not use it, and they must see exactly the cohort they saw before.
+  const result = build(cycle('2013-2014', 'development', [person(1, { bmx: { BMXARMC: 33.46 } }), person(2)]));
+  assert.equal(result.total, 2);
+  const [withArm, withoutArm] = [...result.participants].sort((a, b) => a.seqn - b.seqn);
+  assert.equal(withArm.armCircumferenceCm, 33.5);
+  assert.equal(withoutArm.armCircumferenceCm, null);
+
+  assert.ok(C.MODEL_FEATURES.includes('armCircumferenceCm'));
+  const rows = C.modelReadyExport(result.participants);
+  assert.ok(rows.every(row => Object.hasOwn(row, 'armCircumferenceCm')));
+});
+
+test('hip circumference is not a model feature, because NHANES measured it in one spent cycle', () => {
+  // The literature's suggestion, refused by the data. See amendment 5's availability table.
+  assert.ok(!C.MODEL_FEATURES.some(key => /hip/i.test(key)));
+});

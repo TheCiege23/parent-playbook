@@ -3,7 +3,7 @@
   "note": [
     "Public-use files for the owned body-composition study. These URLs were first written from",
     "memory -- which is exactly the kind of knowledge that should not be trusted about a filename --",
-    "and then checked against the server. See `checked` below: all eighteen were fetchable on",
+    "and then checked against the server. See `checked` below: all were fetchable when checked on",
     "2026-09-12, so they are recorded facts rather than claims. Re-run",
     "`node tools/nhanes/acquire.cjs --check` after any edit here; NHANES renames and re-releases",
     "components, and a wrong filename looks exactly like a discontinued survey item.",
@@ -128,10 +128,33 @@
       ]
     },
     {
+      "cycle": "2015-2016",
+      "suffix": "_I",
+      "role": "candidate-final-holdout",
+      "note": "Final holdout for attempt 2 under amendment 5. Omitted from the original list by oversight, which is why it is unread. BMX_I variable names were inspected to choose the added input; DEMO_I and DXX_I have not been opened.",
+      "files": [
+        {
+          "component": "demographics",
+          "name": "DEMO_I",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DEMO_I.xpt"
+        },
+        {
+          "component": "body-measures",
+          "name": "BMX_I",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/BMX_I.xpt"
+        },
+        {
+          "component": "dxa-whole-body",
+          "name": "DXX_I",
+          "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DXX_I.xpt"
+        }
+      ]
+    },
+    {
       "cycle": "2017-2018",
       "suffix": "_J",
-      "role": "candidate-final-holdout",
-      "note": "Reserved as the final holdout under research/NHANES-PREREGISTRATION.md if it proves usable. Not opened during development.",
+      "role": "spent-holdout",
+      "note": "Read once, 2026-09-12, as the final holdout for bodyfat-candidate-v0.1.0, which failed (research/NHANES-HOLDOUT.md). Spent: it may never be a holdout again, and under amendment 5 it is not used for development either, so attempt 2 changes its inputs and nothing else.",
       "files": [
         {
           "component": "demographics",
@@ -154,13 +177,14 @@
   "checked": {
     "at": "2026-09-12",
     "how": "node tools/nhanes/acquire.cjs --check",
-    "result": "All 18 candidate files were fetchable at the recorded URLs. The URLs below are no longer claims.",
+    "result": "All 21 candidate files were fetchable at the recorded URLs. The URLs below are no longer claims. The three 2015-2016 files were added and checked on the same day for amendment 5.",
     "sizes": {
       "DXX (1999-2000)": "23.6 MB",
       "DXX_B (2001-2002)": "31.2 MB",
       "DXX_C (2003-2004)": "29.0 MB",
       "DXX_G (2011-2012)": "4.1 MB",
       "DXX_H (2013-2014)": "4.3 MB",
+      "DXX_I (2015-2016)": "4.1 MB",
       "DXX_J (2017-2018)": "3.6 MB"
     }
   },

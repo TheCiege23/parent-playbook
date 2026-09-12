@@ -29,10 +29,6 @@ if (args.includes('--help') || !args.includes('--data')) {
 const DATA = path.resolve(valueFor('--data'));
 const OUT = path.resolve(valueFor('--out') || path.join(DATA, 'candidates'));
 
-const ROLES = {
-  '1999-2000': 'development', '2001-2002': 'development', '2003-2004': 'development',
-  '2011-2012': 'development', '2013-2014': 'development', '2017-2018': 'holdout',
-};
 const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFixed(places));
 
 (async () => {
@@ -40,11 +36,12 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
   const { buildCohort, modelReadyExport } = await import('../../tools/nhanes/cohort.mjs');
   const B = await import('../../tools/nhanes/baselines.mjs');
   const M = await import('../../tools/nhanes/models.mjs');
+  const { cohortRoleFor } = await import('../../tools/nhanes/roles.mjs');
 
   const lock = JSON.parse(fs.readFileSync(LOCKFILE, 'utf8'));
   const cycles = new Map();
   for (const entry of lock.files) {
-    if (ROLES[entry.cycle] !== 'development') continue;
+    if (cohortRoleFor(entry.role, entry.cycle) !== 'development') continue;
     const buffer = fs.readFileSync(path.join(DATA, entry.name + '.xpt'));
     if (crypto.createHash('sha256').update(buffer).digest('hex') !== entry.sha256) {
       console.error('  CHANGED  ' + entry.name); process.exit(1);
@@ -59,7 +56,15 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
   const calibration = cohort.participants.filter(p => p.split === 'calibration');
   const trainFeatures = modelReadyExport(train);
   const withWaist = trainFeatures.filter(row => Number.isFinite(row.waistCm));
-  console.log('train ' + train.length + ', calibration ' + calibration.length + '. The holdout was not read.\n');
+  const withWaistAndArm = withWaist.filter(row => Number.isFinite(row.armCircumferenceCm));
+  console.log('train ' + train.length + ', calibration ' + calibration.length + '. The holdout was not read.');
+  // Reported because an attempt-2 model refuses anyone without an arm measurement, and a refusal
+  // rate that nobody printed is one nobody weighed.
+  const armMissing = {
+    train: withWaist.length - withWaistAndArm.length,
+    calibration: calibration.filter(p => Number.isFinite(p.waistCm) && !Number.isFinite(p.armCircumferenceCm)).length,
+  };
+  console.log('arm circumference missing where waist is present: train ' + armMissing.train + ', calibration ' + armMissing.calibration + '.\n');
 
   const entries = [
     { name: 'baseline 2: linear', predict: B.predict, model: B.fitLinear(trainFeatures, ['ageYears', 'sexMale', 'heightCm', 'weightKg'], 'bodyFatPercent') },
@@ -68,6 +73,10 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
     { name: 'candidate A+: spline + waist', predict: M.predictCandidate, model: M.fitSplineRidge(withWaist, { continuous: ['ageYears', 'heightCm', 'weightKg', 'waistCm'], lambda: 1 }) },
     { name: 'candidate B: boosted trees', predict: M.predictCandidate, model: M.fitBoostedTrees(trainFeatures, { trees: 300, learningRate: 0.05, depth: 3 }) },
     { name: 'candidate B+: boosted + waist', predict: M.predictCandidate, model: M.fitBoostedTrees(withWaist, { features: ['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm'], trees: 300, learningRate: 0.05, depth: 3 }) },
+    // Amendment 5: exactly these two, each A+ or B+ with arm circumference added and nothing else
+    // changed, so an improvement can be attributed to the input rather than to retuning.
+    { name: 'candidate A++: spline + waist + arm', attempt: 2, predict: M.predictCandidate, model: M.fitSplineRidge(withWaistAndArm, { continuous: ['ageYears', 'heightCm', 'weightKg', 'waistCm', 'armCircumferenceCm'], lambda: 1 }) },
+    { name: 'candidate B++: boosted + waist + arm', attempt: 2, predict: M.predictCandidate, model: M.fitBoostedTrees(withWaistAndArm, { features: ['ageYears', 'sexMale', 'heightCm', 'weightKg', 'waistCm', 'armCircumferenceCm'], trees: 300, learningRate: 0.05, depth: 3 }) },
   ];
 
   // One evaluator for every model, so a candidate is never scored by a different ruler.
@@ -89,20 +98,20 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
   };
 
   console.log('CALIBRATION — body fat percentage (optimistic: this is the tuning partition)');
-  console.log('  ' + 'model'.padEnd(30) + 'n'.padStart(6) + 'bias'.padStart(9) + 'MAE'.padStart(8) + 'RMSE'.padStart(8) + 'slope'.padStart(8) + ' refused');
+  console.log('  ' + 'model'.padEnd(38) + 'n'.padStart(6) + 'bias'.padStart(9) + 'MAE'.padStart(8) + 'RMSE'.padStart(8) + 'slope'.padStart(8) + ' refused');
   const report = {};
   for (const entry of entries) {
     const s = score(entry);
     entry.score = s;
     report[entry.name] = { kind: entry.model.kind, features: entry.model.features, n: s.n, refused: s.refused, bias: s.bias, mae: s.mae, rmse: s.rmse, calibrationSlope: s.slope };
-    console.log('  ' + entry.name.padEnd(30) + String(s.n).padStart(6) + fixed(s.bias).padStart(9)
+    console.log('  ' + entry.name.padEnd(38) + String(s.n).padStart(6) + fixed(s.bias).padStart(9)
       + fixed(s.mae).padStart(8) + fixed(s.rmse).padStart(8) + fixed(s.slope).padStart(8) + String(s.refused).padStart(8));
   }
 
   // The question Sprint 3 exists to answer: does a stronger model fix the subgroup bias?
   console.log('\nSIGNED BIAS BY RACE/ETHNICITY AUDIT GROUP  (limit ±1.0, amendment 4)');
   const groups = [...new Set(calibration.map(p => p.raceEthnicity).filter(g => g != null))].sort();
-  console.log('  ' + 'model'.padEnd(30) + groups.map(g => ('RIDRETH1=' + g).padStart(12)).join('') + '   worst');
+  console.log('  ' + 'model'.padEnd(38) + groups.map(g => ('RIDRETH1=' + g).padStart(12)).join('') + '   worst');
   const biasReport = {};
   for (const entry of entries) {
     const byGroup = groups.map(group => {
@@ -114,12 +123,38 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
     biasReport[entry.name] = Object.fromEntries(groups.map((g, i) => ['RIDRETH1=' + g, byGroup[i]]));
     biasReport[entry.name].worstAbsolute = worst;
     biasReport[entry.name].passesAmendment4 = worst <= 1.0;
-    console.log('  ' + entry.name.padEnd(30) + byGroup.map(v => fixed(v, 3).padStart(12)).join('')
+    console.log('  ' + entry.name.padEnd(38) + byGroup.map(v => fixed(v, 3).padStart(12)).join('')
       + fixed(worst, 3).padStart(8) + (worst <= 1.0 ? '  passes' : '  FAILS'));
   }
 
+  // Amendment 5's freeze rule, applied rather than judged: of A++ and B++, the lower calibration MAE
+  // among those whose worst subgroup bias is within ±1.0. If neither qualifies, nothing is frozen and
+  // 2015-2016 stays unread. 0.32 is how far B+'s worst group moved from calibration to its holdout;
+  // the margin is reported against it, not gated on it.
+  const ATTEMPT_1_SHIFT = 0.32;
+  const selected = entries.filter(e => e.attempt === 2 && biasReport[e.name].passesAmendment4)
+    .sort((a, b) => a.score.mae - b.score.mae)[0] ?? null;
+  const selection = selected
+    ? { freeze: selected.name, calibrationMae: selected.score.mae,
+        worstSubgroupBias: biasReport[selected.name].worstAbsolute,
+        marginToLimit: 1.0 - biasReport[selected.name].worstAbsolute,
+        attempt1HoldoutShift: ATTEMPT_1_SHIFT,
+        marginWiderThanAttempt1Shift: 1.0 - biasReport[selected.name].worstAbsolute > ATTEMPT_1_SHIFT }
+    : { freeze: null,
+        reason: 'Neither A++ nor B++ keeps every subgroup bias within ±1.0 on calibration. Under amendment 5 nothing is frozen and 2015-2016 is not read.' };
+  console.log('\nAMENDMENT 5 FREEZE RULE');
+  if (selected) {
+    console.log('  qualifies: ' + selected.name + '  (calibration MAE ' + fixed(selection.calibrationMae)
+      + ', worst subgroup bias ' + fixed(selection.worstSubgroupBias) + ')');
+    console.log('  margin to the ±1.0 limit: ' + fixed(selection.marginToLimit) + (selection.marginWiderThanAttempt1Shift
+      ? ', wider than the ' + ATTEMPT_1_SHIFT + ' attempt 1 moved on its holdout'
+      : ', NARROWER than the ' + ATTEMPT_1_SHIFT + ' attempt 1 moved on its holdout: at real risk of failing'));
+  } else {
+    console.log('  nothing qualifies. ' + selection.reason);
+  }
+
   fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(path.join(OUT, 'candidates.json'), JSON.stringify({ accuracy: report, subgroupBias: biasReport }, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(path.join(OUT, 'candidates.json'), JSON.stringify({ accuracy: report, subgroupBias: biasReport, armMissing, attempt2Selection: selection }, null, 2) + '\n', 'utf8');
   console.log('\nWrote ' + path.join(OUT, 'candidates.json'));
   console.log('Calibration numbers are optimistic by construction. The holdout remains unread.');
 })();

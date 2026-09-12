@@ -39,10 +39,6 @@ if (args.includes('--help') || !args.includes('--data')) {
 const DATA = path.resolve(valueFor('--data'));
 const VERIFY = args.includes('--verify');
 
-const ROLES = {
-  '1999-2000': 'development', '2001-2002': 'development', '2003-2004': 'development',
-  '2011-2012': 'development', '2013-2014': 'development', '2017-2018': 'holdout',
-};
 // Exactly the hyperparameters candidate B+ was reported with. Changing any of them makes a
 // different model and must produce a different version.
 const HYPERPARAMETERS = Object.freeze({
@@ -54,11 +50,12 @@ const HYPERPARAMETERS = Object.freeze({
   const { readXport } = await import('../../tools/nhanes/xport.mjs');
   const { buildCohort, modelReadyExport } = await import('../../tools/nhanes/cohort.mjs');
   const M = await import('../../tools/nhanes/models.mjs');
+  const { cohortRoleFor } = await import('../../tools/nhanes/roles.mjs');
 
   const lock = JSON.parse(fs.readFileSync(LOCKFILE, 'utf8'));
   const cycles = new Map();
   for (const entry of lock.files) {
-    if (ROLES[entry.cycle] !== 'development') continue;       // the holdout is not read
+    if (cohortRoleFor(entry.role, entry.cycle) !== 'development') continue;   // no holdout, spent or unread, is read
     const buffer = fs.readFileSync(path.join(DATA, entry.name + '.xpt'));
     if (crypto.createHash('sha256').update(buffer).digest('hex') !== entry.sha256) {
       console.error('  CHANGED  ' + entry.name + ' no longer matches sources.lock.json.'); process.exit(1);
@@ -74,7 +71,7 @@ const HYPERPARAMETERS = Object.freeze({
 
   // The hash of the sources, so the artifact names the exact bytes it learned from.
   const sourceDigest = crypto.createHash('sha256')
-    .update(lock.files.filter(f => ROLES[f.cycle] === 'development').map(f => f.name + ' ' + f.sha256).join('\n'))
+    .update(lock.files.filter(f => cohortRoleFor(f.role, f.cycle) === 'development').map(f => f.name + ' ' + f.sha256).join('\n'))
     .digest('hex');
 
   const artifact = {

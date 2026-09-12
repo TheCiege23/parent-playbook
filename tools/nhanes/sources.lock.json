@@ -1,7 +1,7 @@
 {
   "schema": "PP_NHANES_SOURCE_LOCK_V1",
   "note": "Sizes and SHA-256 of the files this study read. The files themselves are not committed; this is what lets a later run prove it read the same bytes.",
-  "recordedAt": "2026-09-12T18:06:01.573Z",
+  "recordedAt": "2026-09-12T20:59:47.924Z",
   "directory": "C:\\Users\\Guap_\\nhanes-data",
   "files": [
     {
@@ -140,8 +140,35 @@
       "sha256": "792ebf3791156367832a01be0c96286ef8da1f540a1d674077f5af12951e99e5"
     },
     {
-      "cycle": "2017-2018",
+      "cycle": "2015-2016",
       "role": "candidate-final-holdout",
+      "component": "demographics",
+      "name": "DEMO_I",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DEMO_I.xpt",
+      "bytes": 3756480,
+      "sha256": "c9297c6c37ae8f78f29be9568fa2a03cf3b112616a39afee04030fc775a66a0d"
+    },
+    {
+      "cycle": "2015-2016",
+      "role": "candidate-final-holdout",
+      "component": "body-measures",
+      "name": "BMX_I",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/BMX_I.xpt",
+      "bytes": 1989600,
+      "sha256": "d31da84e14212b4e58e8340598a5b8e2144fac83333563e966eb1b332e4141d6"
+    },
+    {
+      "cycle": "2015-2016",
+      "role": "candidate-final-holdout",
+      "component": "dxa-whole-body",
+      "name": "DXX_I",
+      "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DXX_I.xpt",
+      "bytes": 4314080,
+      "sha256": "56623a1b1c790e43d2c3d9792d30418de8553db53b55ef5e38ab2d00a8e983e8"
+    },
+    {
+      "cycle": "2017-2018",
+      "role": "spent-holdout",
       "component": "demographics",
       "name": "DEMO_J",
       "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DEMO_J.xpt",
@@ -150,7 +177,7 @@
     },
     {
       "cycle": "2017-2018",
-      "role": "candidate-final-holdout",
+      "role": "spent-holdout",
       "component": "body-measures",
       "name": "BMX_J",
       "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/BMX_J.xpt",
@@ -159,7 +186,7 @@
     },
     {
       "cycle": "2017-2018",
-      "role": "candidate-final-holdout",
+      "role": "spent-holdout",
       "component": "dxa-whole-body",
       "name": "DXX_J",
       "url": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/DXX_J.xpt",

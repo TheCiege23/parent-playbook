@@ -31,10 +31,7 @@ if (args.includes('--help') || !args.includes('--data')) {
 const DATA = path.resolve(valueFor('--data'));
 const OUT = path.resolve(valueFor('--out') || path.join(DATA, 'baselines'));
 
-const ROLES = {
-  '1999-2000': 'development', '2001-2002': 'development', '2003-2004': 'development',
-  '2011-2012': 'development', '2013-2014': 'development', '2017-2018': 'holdout',
-};
+// Roles come from sources.json through tools/nhanes/roles.mjs, like every other NHANES tool.
 
 const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFixed(places));
 
@@ -42,11 +39,12 @@ const fixed = (value, places = 3) => (value == null ? '—' : Number(value).toFi
   const { readXport } = await import('../../tools/nhanes/xport.mjs');
   const { buildCohort, modelReadyExport } = await import('../../tools/nhanes/cohort.mjs');
   const B = await import('../../tools/nhanes/baselines.mjs');
+  const { cohortRoleFor } = await import('../../tools/nhanes/roles.mjs');
 
   const lock = JSON.parse(fs.readFileSync(LOCKFILE, 'utf8'));
   const cycles = new Map();
   for (const entry of lock.files) {
-    if (ROLES[entry.cycle] !== 'development') continue;     // the holdout is not even read
+    if (cohortRoleFor(entry.role, entry.cycle) !== 'development') continue;     // the holdout is not even read
     const at = path.join(DATA, entry.name + '.xpt');
     const buffer = fs.readFileSync(at);
     if (crypto.createHash('sha256').update(buffer).digest('hex') !== entry.sha256) {

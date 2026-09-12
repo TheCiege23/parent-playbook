@@ -350,4 +350,84 @@ than to be released. That is a real outcome and this document already says it is
 
 ---
 
+### 5 — 2026-09-12 — a second attempt: arm circumference, with 2015-2016 as its holdout
+
+**What was known when this was made.** Everything in amendment 4, plus the first attempt's final
+holdout result (research/NHANES-HOLDOUT.md): `bodyfat-candidate-v0.1.0` passed five of six criteria
+on 2017-2018 and failed subgroup bias at 1.188 for RIDRETH1=4. That cycle is spent. No model in
+this study has used arm circumference, and no 2015-2016 demographics or DXA data has been read.
+
+One thing about 2015-2016 *was* looked at before this was written, and it is recorded so nobody has
+to take its absence on trust: the body-measures file `BMX_I` was downloaded to see which variables it
+carries. Its variable names and its row count (9,544, all ages) were seen. No value in it was
+summarized, and `DEMO_I` and `DXX_I` — the demographics and the DXA outcome — were not opened. Which
+variables exist is what NCHS publishes in the codebook, and the input could not be chosen without it.
+
+**Why not hip circumference.** research/NHANES-HOLDOUT.md named hip as the standard next input in
+this literature. That came from the literature and was never checked against the data. The data
+says no:
+
+| Variable | 99–00 | 01–02 | 03–04 | 11–12 | 13–14 | 15–16 | 17–18 |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Hip circumference `BMXHIP` | – | – | – | – | – | – | ✓ |
+| Arm circumference `BMXARMC` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Sagittal abdominal diameter `BMDAVSAD` | – | – | – | ✓ | ✓ | ✓ | – |
+| Thigh and calf circumference, triceps and subscapular skinfold | ✓ | ✓ | ✓ | – | – | – | – |
+| Waist circumference `BMXWAIST` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+NHANES measured hip in exactly one cycle, and it is the spent one. No hip model can be trained on
+the development cycles, and none could be validated on an unread cycle.
+
+**The added input: arm circumference** (`BMXARMC`, mid-upper arm, cm). Apart from waist, it is the
+only soft-tissue girth measured in every development cycle and in 2015-2016. Like waist, it is a
+tape measurement a person takes and enters. It is not derived from a photo, and nothing here changes
+what the photo scan may claim.
+
+**Not chosen: sagittal abdominal diameter.** It may well be the stronger abdominal measure, but it
+exists only from 2011. Using it would drop 1999-2004 — most of the development data — and change two
+things at once. Recorded so the choice is visible rather than unexamined.
+
+**Splits for attempt 2.**
+
+- **Final holdout:** 2015-2016, read once. §5 says the holdout is "the most recent usable cycle"; the
+  most recent is spent, and this is the most recent that has not been read.
+- **Development:** unchanged. The same five cycles and the same participant hash, so the training and
+  calibration partitions are identical to attempt 1's.
+- **2017-2018:** spent, and in neither. Training on it would be legitimate — it is no longer anyone's
+  test set — but it would change the training data at the same moment as the inputs, and an
+  improvement could then not be attributed to either. Holding development fixed also means attempt
+  1's calibration numbers must reproduce exactly, which checks that nothing else moved.
+
+**Candidates, declared before either is fitted.** Exactly two. Hyperparameters are not retuned.
+
+- **A++** — spline ridge: age, height, weight, waist and arm circumference as continuous inputs, sex
+  as binary, λ = 1. Candidate A+ plus arm.
+- **B++** — boosted trees: age, sex, height, weight, waist and arm circumference; 300 trees, learning
+  rate 0.05, depth 3, minimum leaf 20. Candidate B+ plus arm.
+
+A+ and B+ are refitted beside them on the same calibration partition as the reference.
+
+**What gets frozen, decided now.** Of A++ and B++, the one with the lower calibration MAE among those
+whose worst race/ethnicity subgroup bias on calibration is within ±1.0. If neither qualifies, nothing
+is frozen and 2015-2016 is not read. An unread holdout is worth more than a read already expected to
+fail.
+
+What attempt 1 taught about that rule is recorded here rather than turned into a threshold: B+ passed
+calibration with 0.135 to spare and moved 0.32 on the holdout. A candidate that passes calibration by
+less than that is at real risk, and the report will say so. Setting a margin is a threshold decision,
+and §8 gives those to the qualified reviewer.
+
+**Release criteria: unchanged.** Every row of §8, including amendment 4. A second attempt is exactly
+when loosening is most tempting, so nothing loosens.
+
+**Product cost, stated before anyone knows whether it buys anything.** If an attempt-2 model is
+released, arm circumference becomes required alongside waist: a second tape measurement for every
+estimate, and more refusals. Both will be reported.
+
+**Multiplicity.** This is the second model this study has taken toward a holdout. Two tests of
+related models are weaker evidence than one, and the second result will not be presented as if it
+were the first.
+
+---
+
 Any further amendment records its date, its reason, and what was already known when it was made.

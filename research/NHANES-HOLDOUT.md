@@ -110,6 +110,11 @@ planning. It is nonetheless untouched, and it is the obvious holdout for a secon
    this literature. This must not become "add race as a feature": §3 forbids it, and it would
    encode a population difference as a property of a person.
 
+   **Correction, 2026-09-12 (amendment 5).** Hip circumference was named here from the literature
+   without checking the data. NHANES measured it in one cycle only — 2017-2018, the one this read
+   spent — so no hip model can be trained or validated on NHANES. Attempt 2 used arm circumference
+   instead; see research/NHANES-ATTEMPT-2.md.
+
 **A statistician.** §8 requires a qualified reviewer to approve thresholds and sample adequacy
 before any release. That was outstanding before this read and remains outstanding; no tool here
 can satisfy it, and nothing should be released on the strength of an automated pass.

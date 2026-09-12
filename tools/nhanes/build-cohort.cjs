@@ -41,11 +41,8 @@ const DATA = path.resolve(valueFor('--data'));
 const OUT = path.resolve(valueFor('--out') || path.join(DATA, 'cohort'));
 const INCLUDE_HOLDOUT = flag('--include-holdout');
 
-// Which cycle plays which part. The holdout is the most recent, per the preregistration.
-const ROLES = {
-  '1999-2000': 'development', '2001-2002': 'development', '2003-2004': 'development',
-  '2011-2012': 'development', '2013-2014': 'development', '2017-2018': 'holdout',
-};
+// Which cycle plays which part comes from sources.json through tools/nhanes/roles.mjs. The first
+// attempt kept a copy of that map in four tools.
 // Only the early cycles impute; the policy is inert elsewhere but is stated for every cycle so the
 // report says what was applied rather than leaving it to be inferred.
 const REPLICATE_POLICY = 'measured_only';
@@ -53,6 +50,7 @@ const REPLICATE_POLICY = 'measured_only';
 (async () => {
   const { readXport } = await import('../../tools/nhanes/xport.mjs');
   const { buildCohort, modelReadyExport, evaluationExport, formatCohortFlow } = await import('../../tools/nhanes/cohort.mjs');
+  const { cohortRoleFor } = await import('../../tools/nhanes/roles.mjs');
 
   if (!fs.existsSync(LOCKFILE)) { console.error('No sources.lock.json. Run acquire.cjs --download first.'); process.exit(2); }
   const lock = JSON.parse(fs.readFileSync(LOCKFILE, 'utf8'));
@@ -72,20 +70,24 @@ const REPLICATE_POLICY = 'measured_only';
   if (bad) { console.error('\n' + bad + ' file(s) missing or changed. Re-download, or record why this study now reads different bytes.'); process.exit(1); }
   console.log('All ' + lock.files.length + ' source files match sources.lock.json.\n');
 
+  // The role is decided before a file is parsed, so a cycle that is skipped is never read at all.
   const byCycle = new Map();
+  const skipped = new Map();
   for (const [, { entry, buffer }] of files) {
-    if (!byCycle.has(entry.cycle)) byCycle.set(entry.cycle, {});
+    const role = cohortRoleFor(entry.role, entry.cycle);
+    if (role === null || (role === 'holdout' && !INCLUDE_HOLDOUT)) { skipped.set(entry.cycle, entry.role); continue; }
+    if (!byCycle.has(entry.cycle)) byCycle.set(entry.cycle, { role });
     byCycle.get(entry.cycle)[entry.component] = readXport(buffer);
+  }
+  for (const [cycle, manifestRole] of [...skipped].sort()) {
+    console.log(manifestRole === 'spent-holdout'
+      ? 'Skipping ' + cycle + ' (spent holdout). It has been read once and takes no further part.'
+      : 'Skipping ' + cycle + ' (final holdout). Pass --include-holdout only at the release decision.');
   }
 
   const cycles = [];
   for (const [cycle, components] of byCycle) {
-    const role = ROLES[cycle];
-    if (!role) { console.error('Cycle ' + cycle + ' has no declared role; add it to ROLES deliberately.'); process.exit(2); }
-    if (role === 'holdout' && !INCLUDE_HOLDOUT) {
-      console.log('Skipping ' + cycle + ' (final holdout). Pass --include-holdout only at the release decision.');
-      continue;
-    }
+    const { role } = components;
     cycles.push({
       cycle, role,
       demo: components['demographics'].rows,

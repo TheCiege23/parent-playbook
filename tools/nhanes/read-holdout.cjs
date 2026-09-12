@@ -49,6 +49,7 @@ const meanOf = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
   const { buildCohort, modelReadyExport } = await import('../../tools/nhanes/cohort.mjs');
   const { estimateBodyComposition } = await import('../../tools/nhanes/frozen-predict.mjs');
   const B = await import('../../tools/nhanes/baselines.mjs');
+  const { cohortRoleFor } = await import('../../tools/nhanes/roles.mjs');
 
   // --- the artifact, unchanged and unread ------------------------------------------------
   const raw = fs.readFileSync(ARTIFACT, 'utf8');
@@ -81,7 +82,9 @@ const meanOf = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
     }
     const slot = { 'demographics': 'demo', 'body-measures': 'bmx', 'dxa-whole-body': 'dxa' }[entry.component];
     if (entry.cycle === HOLDOUT_CYCLE) holdout[slot] = readXport(buffer).rows;
-    else {
+    // Development only. This was a bare else, which would have put 2015-2016 — the next unread
+    // holdout — into the baseline fit below. See tools/nhanes/roles.mjs.
+    else if (cohortRoleFor(entry.role, entry.cycle) === 'development') {
       if (!development.has(entry.cycle)) development.set(entry.cycle, { cycle: entry.cycle, role: 'development', replicatePolicy: 'measured_only' });
       development.get(entry.cycle)[slot] = readXport(buffer).rows;
     }
