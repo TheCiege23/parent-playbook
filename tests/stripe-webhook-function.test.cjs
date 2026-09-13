@@ -87,31 +87,52 @@ test('any other database failure answers 500, so Stripe delivers the event again
     assert.equal(res.status, 500, failure + ' must not be acknowledged');
     assert.ok(!(await res.text()).includes('connection failure'), 'the database message is not echoed to the caller');
   }
-  const subscriptions = fakeSupabase({ subscriptions: [{ guardian_id: 'g1', status: 'inactive' }] }, { errors: { 'update:subscriptions': { code: '08006', message: 'x' } } });
-  const sub = { type: 'customer.subscription.updated', data: { object: { id: 'sub_1', status: 'active', metadata: { guardian_id: 'g1' } } } };
+  const subscriptions = fakeSupabase({ subscriptions: [{ guardian_id: 'g1', status: 'inactive' }] }, { errors: { 'rpc:apply_stripe_subscription_event': { code: '08006', message: 'x' } } });
+  const sub = { type: 'customer.subscription.updated', created: 1790000000, data: { object: { id: 'sub_1', status: 'active', metadata: { guardian_id: 'g1' } } } };
   assert.equal((await createStripeWebhookHandler({ db: subscriptions, verifyEvent: trusting })(delivery(sub))).status, 500);
 });
 
-test('subscription events set the guardian\'s status and period end, in the order they arrive', async () => {
+// A stand-in for public.apply_stripe_subscription_event. tests/db/security-tests.cjs (S03 to S10) checks the real
+// function against a database; here it only has to answer the way the function does.
+const applyEvent = (args, tables) => {
+  const row = (tables.subscriptions || []).find(r => r.guardian_id === args.p_guardian_id);
+  if (!row) return 'no_subscription';
+  if (row.stripe_event_at && row.stripe_event_at > args.p_event_at) return 'stale';
+  Object.assign(row, { stripe_subscription_id: args.p_subscription_id, status: args.p_status, current_period_end: args.p_current_period_end, stripe_event_at: args.p_event_at });
+  return 'applied';
+};
+const RPCS = { apply_stripe_subscription_event: applyEvent };
+
+test('subscription events carry Stripe\'s event time, so a late event cannot undo a newer one', async () => {
   const { createStripeWebhookHandler, subscriptionStatus } = await load();
   assert.deepEqual(['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'paused'].map(subscriptionStatus),
     ['active', 'active', 'past_due', 'canceled', 'canceled', 'canceled', 'canceled', 'canceled']);
 
-  const db = fakeSupabase({ subscriptions: [{ guardian_id: 'g1', status: 'inactive' }] });
+  const db = fakeSupabase({ subscriptions: [{ guardian_id: 'g1', status: 'inactive' }] }, { rpcs: RPCS });
   const handle = createStripeWebhookHandler({ db, verifyEvent: trusting, now: () => NOW });
-  const event = (type, status) => ({ type, data: { object: { id: 'sub_1', status, current_period_end: 1790000000, metadata: { guardian_id: 'g1' } } } });
+  const event = (type, status, created) => ({ type, created, data: { object: { id: 'sub_1', status, current_period_end: 1790000000, metadata: { guardian_id: 'g1' } } } });
 
-  await handle(delivery(event('customer.subscription.created', 'active')));
-  assert.deepEqual(db.tables.subscriptions[0], {
-    guardian_id: 'g1', status: 'active', stripe_subscription_id: 'sub_1',
-    current_period_end: new Date(1790000000 * 1000).toISOString(), updated_at: NOW.toISOString(),
-  });
+  assert.equal((await handle(delivery(event('customer.subscription.created', 'active', 1789000000)))).status, 200);
+  assert.deepEqual(db.log[0], ['rpc', 'apply_stripe_subscription_event', {
+    p_guardian_id: 'g1', p_subscription_id: 'sub_1', p_status: 'active',
+    p_current_period_end: new Date(1790000000 * 1000).toISOString(), p_event_at: new Date(1789000000 * 1000).toISOString(),
+  }]);
 
-  // Pinned, not endorsed: a late "updated" after a "deleted" wins, because arrival order is applied as-is.
-  // Fixing it needs the event time stored beside the subscription, which is a schema change.
-  await handle(delivery(event('customer.subscription.deleted', 'canceled')));
-  await handle(delivery(event('customer.subscription.updated', 'active')));
-  assert.equal(db.tables.subscriptions[0].status, 'active');
+  // The cancellation was created last, but arrives before a retried update from earlier.
+  await handle(delivery(event('customer.subscription.deleted', 'canceled', 1789000200)));
+  await handle(delivery(event('customer.subscription.updated', 'active', 1789000100)));
+  assert.equal(db.tables.subscriptions[0].status, 'canceled', 'the older update arrived late and is ignored');
+});
+
+test('a subscription event without a usable creation time is refused, not applied or retried forever', async () => {
+  const { createStripeWebhookHandler } = await load();
+  const db = fakeSupabase({ subscriptions: [{ guardian_id: 'g1', status: 'inactive' }] }, { rpcs: RPCS });
+  const handle = createStripeWebhookHandler({ db, verifyEvent: trusting, now: () => NOW });
+  for (const created of [undefined, 0, -5, 'yesterday', 1.5]) {
+    const res = await handle(delivery({ type: 'customer.subscription.updated', created, data: { object: { id: 'sub_1', status: 'active', metadata: { guardian_id: 'g1' } } } }));
+    assert.equal(res.status, 400, String(created));
+  }
+  assert.deepEqual(db.log, []);
 });
 
 test('events with nothing to record are acknowledged without a write', async () => {
