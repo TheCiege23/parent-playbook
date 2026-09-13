@@ -105,6 +105,30 @@ host.
 
 `node tools/sdk-verify.cjs` checks the package against its checksum manifest.
 
+**5. Results API (optional).** `supabase/functions/company-results-api/` gives a server of yours read
+and delete access to an organization's stored results using an organization API key instead of a
+person's session. Every access rule is in the migration `20260913120000_company_results_api.sql`; the
+function maps HTTP onto it and decides nothing itself.
+
+- A team administrator creates a key:
+  `select public.create_company_api_key(team_id, 'label', array['results:read'], now() + interval '90 days');`
+  The secret is returned once. Only its SHA-256 hash is stored, and administrators can list their keys
+  but not read hashes. Revoke with `select public.revoke_company_api_key(key_id);`.
+- A key carries scopes (`results:read`, `results:delete`), an expiry of at most a year, and a per-minute
+  rate limit.
+- Endpoints: `GET /v1/body-assessments` and `GET /v1/reference-assessments`, paged with `limit` (1 to
+  100) and `cursor`; `GET /v1/{kind}/{id}`; `DELETE /v1/{kind}/{id}`. Send
+  `Authorization: Bearer ppk_...`.
+- Child body assessments are served only while the athlete is on the key's roster and their biometric
+  release is live. Another organization's id is answered exactly like a missing one. Every result served
+  and every deletion is written to `access_log` with the key that did it.
+- Deploy with `supabase functions deploy company-results-api --no-verify-jwt`. The function receives API
+  keys, not Supabase JWTs. It sends no CORS headers: an organization key belongs on a server.
+
+The access rules are tested against a disposable database (the `results-api` group in `tests/db/security-tests.cjs`)
+and the HTTP mapping under Node (`tests/company-results-api.test.cjs`). The API has not been deployed to
+any project, and no key has been issued against a live database.
+
 ## Dependency and license inventory
 
 There are **zero npm dependencies**. Nothing is installed to run this. Everything below is fetched

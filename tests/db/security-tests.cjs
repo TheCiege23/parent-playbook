@@ -1075,6 +1075,145 @@ add('R64', 'external-integrity', 'the report bucket is private',
   { sql: "select public::text from storage.buckets where id='composition-reports';",
     expect: 'ok', expectOut: 'false' });
 
+// =========================================================== O. organization results API
+// supabase/migrations/20260913120000_company_results_api.sql. A key is created by a signed-in
+// administrator and then used as service_role, the only role the edge function holds. Each case is one
+// rolled-back transaction, so the secret travels between role switches in a transaction-local setting.
+const asUser = (who) => `select set_config('request.jwt.claims','{"sub":"${who}","role":"authenticated"}',true); set local role authenticated;`;
+const asOwner = `reset role; select set_config('request.jwt.claims','',true);`;
+const asService = `reset role; select set_config('request.jwt.claims','',true); set local role service_role;`;
+const makeKey = (name, { team = ORG_A, who = ADMIN_A, scopes = "array['results:read']", days = 30, limit = 120 } = {}) =>
+  asUser(who)
+  + `select set_config('pp.${name}', public.create_company_api_key('${team}','synthetic key ${name}',${scopes},now() + interval '${days} days',${limit})::text, true);`
+  + asOwner;
+const secret = (name) => `(current_setting('pp.${name}')::jsonb->>'secret')`;
+const keyId = (name) => `(current_setting('pp.${name}')::jsonb->>'id')`;
+const listCall = (name, kind, cursor = 'null', limit = 50) => `public.company_results_api_list(${secret(name)},'${kind}',${cursor},${limit})`;
+const idsOf = (jsonExpr) => `(select coalesce(string_agg(e.value->>'id', ',' order by e.ord), '') from jsonb_array_elements((${jsonExpr})->'items') with ordinality e(value, ord))`;
+
+const R1 = 'd0000000-0000-4000-8000-0000000000a1';
+const R2 = 'd0000000-0000-4000-8000-0000000000a2';
+const R3 = 'd0000000-0000-4000-8000-0000000000a3';
+const RB = 'd0000000-0000-4000-8000-0000000000b1';
+const B_LIVE = 'd0000000-0000-4000-8000-0000000000c1';
+const B_REVOKED = 'd0000000-0000-4000-8000-0000000000c2';
+const B_EXPIRED = 'd0000000-0000-4000-8000-0000000000c3';
+const B_OFF = 'd0000000-0000-4000-8000-0000000000c4';
+
+const refRow = (id, assessment, { team = ORG_A, actor = ADMIN_A, saved = '2026-09-10T04:05:00Z' } = {}) =>
+  `insert into public.company_reference_assessments(id,assessment_id,team_id,subject_reference,consent_reference,adult_attested_at,created_by,captured_at,saved_at,retention_until,record)
+   values ('${id}','${assessment}','${team}','synthetic-adult-001','synthetic-permission-001','2026-09-10T03:00:00Z','${actor}','2026-09-10T04:00:00Z','${saved}','2099-01-01T00:00:00Z',
+   public.test_company_assessment_payload('${assessment}','synthetic-adult-001','${team}','${actor}','synthetic-permission-001','2026-09-10T04:00:00Z','${saved}','2099-01-01T00:00:00Z'));`;
+const bodyRow = (id, assessment, consent, athlete = ATH_A) =>
+  `insert into public.company_body_assessments(id,assessment_id,team_id,athlete_id,consent_id,created_by,captured_at,saved_at,retention_until,record)
+   values ('${id}','${assessment}','${ORG_A}','${athlete}','${consent}','${ADMIN_A}','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z','2099-01-01T00:00:00Z',
+   public.test_company_assessment_payload('${assessment}','${athlete}','${ORG_A}','${ADMIN_A}','${consent}'));`;
+const INVALID_KEY = /invalid API key/;
+
+add('O01', 'results-api', 'a signed-in member who does not administer the organization cannot create its API key',
+  { sql: asUser(MEMBER_C) + `select public.create_company_api_key('${ORG_A}','synthetic',array['results:read'],now() + interval '30 days');`,
+    expect: 'error', expectError: /only an administrator of this organization/ });
+add('O02', 'results-api', 'the secret is returned once and only its SHA-256 hash is stored',
+  { sql: makeKey('k') + `select (k.key_hash = encode(sha256(convert_to(${secret('k')},'UTF8')),'hex')
+      and position(${secret('k')} in row_to_json(k)::text) = 0
+      and ${secret('k')} ~ '^ppk_[0-9a-f]{8}_[0-9a-f]{56}$')::text
+      from public.company_api_keys k where k.id = ${keyId('k')}::uuid;`,
+    expect: 'ok', expectOut: 'true' });
+add('O03', 'results-api', 'an administrator cannot read a key hash, even for their own organization',
+  { sql: makeKey('k') + asUser(ADMIN_A) + 'select key_hash from public.company_api_keys;',
+    expect: 'error', expectError: /permission denied/ });
+add('O04', 'results-api', "an administrator sees their own organization's keys and not another's",
+  { sql: makeKey('a') + makeKey('b', { team: ORG_B, who: ADMIN_B }) + asUser(ADMIN_A) + 'select count(*)::text from public.company_api_keys;',
+    expect: 'ok', expectOut: '1' });
+add('O05', 'results-api', 'a signed-in role cannot call the results API functions directly',
+  { sql: makeKey('k') + `set local role authenticated; select ${listCall('k', 'reference_assessments')};`,
+    expect: 'error', expectError: /permission denied for function/ });
+add('O06', 'results-api', 'the anonymous role cannot call the results API functions directly',
+  { sql: makeKey('k') + `set local role anon; select ${listCall('k', 'reference_assessments')};`,
+    expect: 'error', expectError: /permission denied for function/ });
+add('O07', 'results-api', "a read key lists its own organization's results and none of another's",
+  { setup: refRow(R1, 'synthetic-a1') + refRow(RB, 'synthetic-b1', { team: ORG_B, actor: ADMIN_B }),
+    sql: makeKey('k') + asService + `select ${idsOf(listCall('k', 'reference_assessments'))};`,
+    expect: 'ok', expectOut: R1 });
+add('O08', 'results-api', "another organization's result id is answered exactly like a missing one",
+  { setup: refRow(RB, 'synthetic-b1', { team: ORG_B, actor: ADMIN_B }),
+    sql: makeKey('k') + asService + `select (public.company_results_api_get(${secret('k')},'reference_assessments','${RB}') is null)::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('O09', 'results-api', 'a revoked key is refused',
+  { sql: makeKey('k') + asUser(ADMIN_A) + `select public.revoke_company_api_key(${keyId('k')}::uuid);` + asService + `select ${listCall('k', 'reference_assessments')};`,
+    expect: 'error', expectError: INVALID_KEY });
+add('O10', 'results-api', 'an expired key is refused',
+  { sql: makeKey('k') + `update public.company_api_keys set created_at = now() - interval '40 days', expires_at = now() - interval '1 day' where id = ${keyId('k')}::uuid;`
+      + asService + `select ${listCall('k', 'reference_assessments')};`,
+    expect: 'error', expectError: INVALID_KEY });
+add('O11', 'results-api', 'a well-formed key that was never issued is refused',
+  { sql: asService + `select public.company_results_api_list('ppk_00000000_${'0'.repeat(56)}','reference_assessments',null,50);`,
+    expect: 'error', expectError: INVALID_KEY });
+add('O12', 'results-api', 'an administrator of another organization cannot revoke this one\'s key',
+  { sql: makeKey('k') + asUser(ADMIN_B) + `select public.revoke_company_api_key(${keyId('k')}::uuid);`,
+    expect: 'error', expectError: /API key not found/ });
+add('O13', 'results-api', 'a read-only key cannot delete',
+  { setup: refRow(R1, 'synthetic-a1'),
+    sql: makeKey('k') + asService + `select public.company_results_api_delete(${secret('k')},'reference_assessments','${R1}');`,
+    expect: 'error', expectError: /does not carry the results:delete scope/ });
+add('O14', 'results-api', 'a delete key deletes once, reports a repeat as nothing deleted, and the audit names the key',
+  { setup: refRow(R1, 'synthetic-a1'),
+    sql: makeKey('k', { scopes: "array['results:read','results:delete']" }) + asService
+      + `select public.company_results_api_delete(${secret('k')},'reference_assessments','${R1}');`
+      + `select set_config('pp.second', public.company_results_api_delete(${secret('k')},'reference_assessments','${R1}')::text, true);`
+      + asOwner
+      + `select ((select count(*) from public.company_reference_assessments where id = '${R1}') = 0
+          and current_setting('pp.second')::jsonb->>'deleted' = 'false'
+          and (select count(*) from public.access_log where action = 'company_results_api_delete'
+                 and detail->>'key_id' = ${keyId('k')} and detail->>'result_id' = '${R1}') = 1)::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('O15', 'results-api', "the rate limit refuses the request after a key's per-minute allowance",
+  { sql: makeKey('k', { limit: 2 }) + asService
+      + `select ${listCall('k', 'reference_assessments')}; select ${listCall('k', 'reference_assessments')}; select ${listCall('k', 'reference_assessments')};`,
+    expect: 'error', expectError: /rate limit of 2 requests per minute exceeded/ });
+add('O16', 'results-api', 'pages follow newest first, never overlap, and the last page has no cursor',
+  { setup: refRow(R1, 'synthetic-1', { saved: '2026-09-10T04:05:00Z' }) + refRow(R2, 'synthetic-2', { saved: '2026-09-10T04:06:00Z' })
+      + refRow(R3, 'synthetic-3', { saved: '2026-09-10T04:07:00Z' }),
+    sql: makeKey('k') + asService
+      + `select set_config('pp.p1', ${listCall('k', 'reference_assessments', 'null', 2)}::text, true);`
+      + `select set_config('pp.p2', ${listCall('k', 'reference_assessments', "current_setting('pp.p1')::jsonb->>'nextCursor'", 2)}::text, true);`
+      + `select concat_ws('|', ${idsOf("current_setting('pp.p1')::jsonb")}, ${idsOf("current_setting('pp.p2')::jsonb")}, coalesce(current_setting('pp.p2')::jsonb->>'nextCursor', 'none'));`,
+    expect: 'ok', expectOut: `${R3},${R2}|${R1}|none` });
+add('O17', 'results-api', 'a malformed cursor is refused',
+  { sql: makeKey('k') + asService + `select ${listCall('k', 'reference_assessments', "'zz'")};`,
+    expect: 'error', expectError: /invalid cursor/ });
+add('O18', 'results-api', 'a page size outside 1 to 100 is refused',
+  { sql: makeKey('k') + asService + `select ${listCall('k', 'reference_assessments', 'null', 101)};`,
+    expect: 'error', expectError: /limit must be between 1 and 100/ });
+add('O19', 'results-api', 'an unknown result kind is refused',
+  { sql: makeKey('k') + asService + `select ${listCall('k', 'composition_results')};`,
+    expect: 'error', expectError: /unknown result kind/ });
+add('O20', 'results-api', 'child results are served only while the athlete is rostered and the release is live',
+  { setup: bodyRow(B_LIVE, 'synthetic-live', C_LIVE) + bodyRow(B_REVOKED, 'synthetic-revoked', C_REVOKED)
+      + bodyRow(B_EXPIRED, 'synthetic-expired', C_EXPIRED) + bodyRow(B_OFF, 'synthetic-off-roster', C_OFF, ATH_OFF),
+    sql: makeKey('k') + asService + `select ${idsOf(listCall('k', 'body_assessments'))};`,
+    expect: 'ok', expectOut: B_LIVE });
+add('O21', 'results-api', 'every child result served is written to the access log against the athlete and the key',
+  { setup: bodyRow(B_LIVE, 'synthetic-live', C_LIVE),
+    sql: makeKey('k') + asService + `select ${listCall('k', 'body_assessments')};` + asOwner
+      + `select count(*)::text from public.access_log where action = 'company_results_api_read' and athlete_id = '${ATH_A}'
+           and detail->>'result_id' = '${B_LIVE}' and detail->>'key_id' = ${keyId('k')};`,
+    expect: 'ok', expectOut: '1' });
+add('O22', 'results-api', 'key creation is audited, and the audit entry does not contain the secret',
+  { sql: makeKey('k') + `select (count(*) = 1 and bool_and(position(${secret('k')} in detail::text) = 0))::text
+      from public.access_log where action = 'company_api_key_created' and detail->>'key_id' = ${keyId('k')};`,
+    expect: 'ok', expectOut: 'true' });
+add('O23', 'results-api', 'tenant roles cannot write keys, read hashes or reach the rate-limit table, and the key table has RLS',
+  { sql: `select (not has_table_privilege('authenticated','public.company_api_keys','INSERT')
+      and not has_table_privilege('authenticated','public.company_api_keys','UPDATE')
+      and not has_table_privilege('authenticated','public.company_api_keys','DELETE')
+      and not has_table_privilege('authenticated','public.company_api_keys','TRUNCATE')
+      and not has_column_privilege('authenticated','public.company_api_keys','key_hash','SELECT')
+      and not has_table_privilege('anon','public.company_api_keys','SELECT')
+      and not has_table_privilege('authenticated','private.company_api_key_windows','SELECT')
+      and (select relrowsecurity from pg_class where oid = 'public.company_api_keys'::regclass))::text;`,
+    expect: 'ok', expectOut: 'true' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
