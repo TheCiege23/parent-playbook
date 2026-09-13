@@ -15,7 +15,7 @@ async function screenWeek(){
   // Calendar weeks back, not epoch milliseconds: see mondayWeeksBack(). Fetching from the
   // wrong Monday would drop the oldest week's sessions and cut the streak short.
   const histFrom=isoDay(mondayWeeksBack(26));
-  const [{data:sports},{data:goals},{data:histRows},{data:cancelRows},{data:heightRows},{data:changeRows}] = await Promise.all([
+  const [{data:sports},{data:goals},{data:histRows},{data:cancelRows},{data:heightRows},{data:changeRows,error:changeError}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     // order explicitly: goals[0] drives the big "This week's focus" headline, and
     // unordered Postgres rows made it change between page loads
@@ -44,6 +44,9 @@ async function screenWeek(){
   const changesByWeek={};
   (changeRows||[]).forEach(r=>{ changesByWeek[r.week_start]=r; });
   const weekChange=changesByWeek[weekStart]||null;
+  // Until the week_exceptions migration reaches a database, the table does not exist and this read fails.
+  // A change that cannot be saved is worse than no offer at all, so the button waits for the table.
+  const weekChangesAvailable=!changeError;
   const cancelledIdx=[0,1,2,3,4,5,6].filter(i=>cancelledDates.has(dateForDayIndex(i)));
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
   state.activeSportKey = primary?.sport_key||'general'; setAppBg();
@@ -365,7 +368,7 @@ async function screenWeek(){
              // A parent's change: offered on a future, unfinished home session when the week has none yet,
              // and undoable from either day it touched. See applyWeekChange().
              weekStart, dayIdx:i,
-             changeOptions:(state.canEdit!==false && !weekChange)?changeOptionsFor(i):null,
+             changeOptions:(weekChangesAvailable && state.canEdit!==false && !weekChange)?changeOptionsFor(i):null,
              changedHere:!!(weekChange&&(weekChange.from_day===i||weekChange.to_day===i)) }; };
 
   { const tctx=ctxFor(todayIdx);
