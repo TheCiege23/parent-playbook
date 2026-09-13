@@ -12,8 +12,9 @@ is free:
 
 - **ANSUR II (2012)** — US Army Anthropometric Survey, 6,068 subjects, 93 measurements, released by
   the US Army Natick Soldier Research Center. A US Government work, so public domain.
-- **CDC / NHANES** — stature, weight, BMI and a handful of circumferences, already used for stature
-  in `js/cdc-stature.js`.
+- **CDC / NHANES** — body measures including stature, weight, BMI, upper arm length, upper leg length
+  and several circumferences. CDC's growth charts, built from it, are already used for stature in
+  `js/cdc-stature.js`. What it can and cannot benchmark is checked below.
 
 Neither can be wired to our 25 outputs today, and adding them anyway would make the product worse,
 not better.
@@ -40,6 +41,40 @@ Two further mismatches, either of which is disqualifying on its own:
 - **Scaling.** Our outputs are already normalised by supplied height. Comparing a height-scaled
   estimate against an absolute-measurement distribution compares two different things.
 
+## What NHANES offers, checked against our outputs (2026-09-13)
+
+The NHANES body-measures files already pinned for the composition study (`tools/nhanes/sources.lock.json`;
+the files themselves are kept outside the repository) carry four length variables. Checked against the
+25 outputs:
+
+| NHANES variable | NHANES definition | Closest scan output | Equivalent? |
+|---|---|---|---|
+| `BMXHT` standing height | Stadiometer, standing | None. Height is supplied to the scan, not measured by it | Only for the supplied height itself, which `js/cdc-stature.js` already references for ages 2–20 |
+| `BMXARML` upper arm length | Acromion process to the tip of the olecranon process, right arm, elbow flexed to 90° | `left/right_upper_arm_length`: shoulder joint centre to elbow joint centre | No. Palpated bony surface landmarks against predicted joint centres |
+| `BMXLEG` upper leg length | Midpoint of the inguinal crease to the proximal edge of the patella, seated, knee at 90° | `left/right_thigh_length`: hip joint centre to knee joint centre | No, and a weaker match: different landmarks at both ends and a different posture |
+| `BMXRECUM` recumbent length | Lying length, infants and toddlers | None | No |
+
+No pinned cycle has a sitting height, so NHANES cannot benchmark the manual sitting height the maturity
+offset uses either. The definitions above summarise the NHANES Anthropometry Procedures Manuals; confirm
+them against the edition for each cycle before building anything from them.
+
+So no NHANES length cohort is loaded, not even marked `not_established`. It would change nothing a parent
+sees, and a cohort whose only metrics are unusable invites someone to flip the flag. The route to one is
+an agreement study. `research/MEASUREMENT-STUDY-PROTOCOL.md` §2 now proposes recording the two NHANES
+landmark definitions beside its ISAK ones, which is what would let a result establish equivalence with
+an NHANES reference. Anyone who then builds a cohort from these files must also:
+
+- **Use only the development cycles.** 2015–2016 is the composition study's unread final holdout, and
+  2017–2018 is spent (`research/NHANES-PREREGISTRATION.md`).
+- **Apply the survey weights.** They cannot be pooled across cycles by concatenation
+  (`research/NHANES-DATA-STRUCTURE.md`), and nothing in the repository computes a weighted NHANES
+  statistic yet.
+- **Split by sex and age:** an LMS table for children, age bands for adults.
+- **Convert centimetres to inches.** The outputs are in inches, and `referencePercentile()` refuses a
+  unit mismatch.
+- **Never use race or ethnicity as an input.** It may be used only to check whether the reference serves
+  every group.
+
 ## What the code does about it
 
 `referencePercentile()` refuses any metric whose cohort has not declared an **established**
@@ -51,8 +86,9 @@ A cohort can be loaded, inspected and audited while being unusable. `usableMetri
 only the metrics that cleared the gate — for every cohort we currently know of, that is an empty
 list.
 
-It also refuses to extrapolate outside the cohort's age range, to answer for a sex the cohort does
-not cover, or to accept a mismatched unit. Every percentile it does return carries the cohort's
+It requires the subject's age for every cohort and refuses an age outside the cohort's range. Until
+2026-09-13 a mean/SD cohort skipped that check, so an adult reference would have answered for a child.
+It also refuses to answer for a sex the cohort does not cover, or to accept a mismatched unit. Every percentile it does return carries the cohort's
 source, citation, version, population, sample size and measurement method, so a reader six months
 later can judge it instead of trusting it.
 

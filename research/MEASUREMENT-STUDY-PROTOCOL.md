@@ -74,6 +74,21 @@ that distinction is enforced in code, and this study does not relax it.
 | Ankle to heel, L/R | No standard counterpart | No: descriptive only |
 | Foot landmark length, L/R | Foot length, heel to longest toe | Yes, with the definitional caveat |
 
+**Proposed addition for population benchmarking (FM14) [decide with the measurement lead].** NHANES
+measures upper arm and upper leg length to its own landmarks, not ISAK's. As written, this study
+therefore cannot establish equivalence with an NHANES reference (`REFERENCE-COHORTS.md`). Two further
+hand measurements would let it:
+
+- **NHANES upper arm length:** acromion process to the tip of the olecranon process, right arm, elbow
+  flexed to 90°
+- **NHANES upper leg length:** midpoint of the inguinal crease to the proximal edge of the patella,
+  seated, knee at 90°
+
+Each would be compared with the right-side scan output (upper arm, thigh) the same way as the rows above,
+and reported apart from the accuracy criteria. The cost is two more measurements, and one seated position,
+at every visit. Confirm the definitions against the NHANES Anthropometry Procedures Manual.
+`tools/study/reference.mjs` does not record either measurement until this is adopted.
+
 **Height.** Every output is scaled by the height the scan is given, so a wrong height makes every
 number wrong. The study measures stadiometer height twice (three times if the first two differ by
 more than [tolerance, e.g. 0.5 cm]) and gives the scan the mean.
@@ -325,3 +340,4 @@ saved, what is measured, the retention date shown before agreeing, and immediate
 10. Pass/fail criteria, with the statistician (§9)
 11. Whether employees may take part (§3)
 12. IRB, recruitment channels and states of recruitment (§3, §10)
+13. Whether to add the two NHANES landmark measurements for population benchmarking, with the measurement lead (§2)

@@ -581,4 +581,29 @@ the not-released result stands.
 
 ---
 
+### 8 — 2026-09-13 — a disclosure: per-variable counts were read from the 2015-2016 body-measures file
+
+**What was known when this was made.** Everything in amendment 7. 2015-2016 is still the final holdout
+for attempts 2 to 4, and none of them has been run against it. Amendment 5 recorded that `BMX_I`'s
+variable names and row count had been seen, and that no value in it had been summarized.
+
+**What happened.** On 2026-09-13, research for a different question read the local body-measures files,
+`BMX_I` among them. The question was whether NHANES length measurements could serve as a population
+reference for the photo scan's outputs (`REFERENCE-COHORTS.md`). For four length variables, it counted
+how many rows carry a value. For `BMX_I` it saw 9,544 rows (already recorded in amendment 5), standing
+height `BMXHT` in 8,769, upper leg length `BMXLEG` in 7,110, upper arm length `BMXARML` in 8,976 and
+recumbent length `BMXRECUM` in 1,073. A count of missing values is a summary of the file, so it is
+recorded here rather than left to be discovered. No mean, distribution, percentile or other value of any
+variable was computed, and `DEMO_I` and `DXX_I` were not opened.
+
+**What it touches.** Of the four, only height is a model input (§3). A count of non-missing heights says
+how many 2015-2016 participants could be scored, not how any of them scores. The outcome, DXA body fat in
+`DXX_I`, remains unread. Nothing in §8, the splits or any candidate changes, and this is not a reason to
+change the holdout.
+
+**What it adds.** Work on any other question reads the holdout cycle's files only after checking this
+document, and anything it summarizes from them, however small, is recorded here the same way.
+
+---
+
 Any further amendment records its date, its reason, and what was already known when it was made.
