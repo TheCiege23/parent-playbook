@@ -208,6 +208,7 @@ async function screenWeek(){
     ${topBar(sub, streak>0?H`<span class="streak" title="${streak} full ${streak===1?'week':'weeks'} in a row"><b>${streak}</b><span>${streak===1?'Week':'Weeks'}</span></span>`:'')}
     <div class="app-pad two-col" style="padding-top:6px">
       <div class="col-main">
+      ${playbookPath('week')}
       <div class="card app-pad" style="position:relative;overflow:hidden;background:${weekGrad};color:#fff;border:none">
         <div class="sportwm" style="background-image:${sportPattern(weekEmoji)}"></div>
         <div style="position:relative">
@@ -323,13 +324,10 @@ async function screenWeek(){
     fillWeekRail(a, goals, days, todayIdx).catch(e => console.error('rail', e));
   }
   bindTop();
+  bindPlaybookPath();
   { const gb=$("#goalBanner"); clickableCard(gb,()=>openAddGoal(goals||[])); }
-  { const sc=$("#schedBanner"); if(sc&&primary) clickableCard(sc,()=>openPracticeSchedule(primary.sport_key,
-      { practiceDays:primary.practice_days||[], gameDay:primary.game_day,
-        seasonStart:primary.season_start, seasonEnd:primary.season_end })); }
-  { const sc=$("#editWeekSchedule"); if(sc&&primary) sc.onclick=()=>openPracticeSchedule(primary.sport_key,
-      { practiceDays:primary.practice_days||[], gameDay:primary.game_day,
-        seasonStart:primary.season_start, seasonEnd:primary.season_end }, ()=>renderApp('week')); }
+  { const sc=$("#schedBanner"); if(sc&&primary) clickableCard(sc,()=>openWeekScheduleEditor(sports||[],primary)); }
+  { const sc=$("#editWeekSchedule"); if(sc&&primary) sc.onclick=()=>openWeekScheduleEditor(sports||[],primary); }
 
   // context for a day row — shared by the row, the tick, and today's card so the tally
   // can never disagree with whichever one the parent tapped
@@ -387,6 +385,30 @@ async function screenWeek(){
     if(t&&l){ t.onclick=flip; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } }; } }
 
   $("#screen").querySelectorAll('[data-act]').forEach(el=>{ const k=el.getAttribute('data-act'); if(k&&cards[k]) el.onclick=()=>openActivity(cards[k]); });
+}
+
+// A merged multi-sport week must expose every schedule that shaped it. Previously the
+// Week button silently opened only the primary sport even when another sport supplied
+// the practice or game shown in the plan.
+function openWeekScheduleEditor(sports,primary){
+  const rows=(sports||[]).filter(Boolean);
+  const openRow=row=>openPracticeSchedule(row.sport_key,
+    { practiceDays:row.practice_days||[], gameDay:row.game_day,
+      seasonStart:row.season_start, seasonEnd:row.season_end },()=>renderApp('week'));
+  if(rows.length<=1){ if(primary) openRow(primary); return; }
+  const nameOf=k=>state.ref?.sports.find(s=>s.key===k)?.name||k;
+  const bg=sheet(H`<h3>Edit weekly schedules</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Every sport shares one training load. Choose the schedule you need to change.</p>
+    <div class="card app-pad">
+      ${rows.map(row=>H`<button class="schedule-choice" data-week-sport="${esc(row.id)}">
+        <span><b>${esc(nameOf(row.sport_key))}${row.is_primary?' · primary':''}</b>
+          <small>${(row.practice_days||[]).length?esc(row.practice_days.map(i=>DAY_LABELS[i]).join(', ')):'No practice days set'}${row.game_day!=null?' · game '+esc(DAY_LABELS[row.game_day]):''}</small></span><i>›</i>
+      </button>`).join('')}
+    </div>`);
+  bg.querySelectorAll('[data-week-sport]').forEach(b=>b.onclick=()=>{
+    const row=rows.find(s=>String(s.id)===b.dataset.weekSport); if(!row) return;
+    bg.remove(); openRow(row);
+  });
 }
 
 // ---- GROWTH ----

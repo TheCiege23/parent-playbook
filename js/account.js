@@ -30,6 +30,8 @@ async function screenAccount(){
     </div>
     <div class="app-pad" style="padding-top:6px">
 
+      ${playbookPath('account')}
+
       <div class="sec-title">Your household</div>
       <div class="card app-pad">
         <div class="mrow"><span>Household</span>
@@ -56,7 +58,7 @@ async function screenAccount(){
         <div id="pushState"></div>
       </div>
 
-      <!-- Not a launcher — the scan itself starts from an athlete's Growth screen, because
+      ${state.canEdit?H`<!-- Not a launcher — the scan itself starts from an athlete's Growth screen, because
            the subject is always an athlete. This is where a release given there is reviewed
            and withdrawn, which is the half of a biometric permission that usually has no
            home in the interface at all. Filled asynchronously; it must never delay Account. -->
@@ -66,6 +68,7 @@ async function screenAccount(){
       </div>
       <p class="muted-note">Withdrawing stops any future scan immediately. It does not delete measurements
         already saved — those are removed from Growth, alongside every other measurement.</p>
+      `:''}
 
       <div class="sec-title">Your data</div>
       <div class="card app-pad">
@@ -113,10 +116,11 @@ async function screenAccount(){
 
       <div class="sec-title">Danger zone</div>
       <div class="card app-pad">
-        <div class="navrow danger" id="delAthlete" role="button" tabindex="0"><div class="gi">🗑️</div>
+        ${state.canEdit?H`<div class="navrow danger" id="delAthlete" role="button" tabindex="0"><div class="gi">🗑️</div>
           <div class="gt"><b>Delete ${esc(a.first_name)}'s profile</b><span>Removes them and everything in their journey, for everyone</span></div><i>›</i></div>
+        `:''}
         <div class="navrow danger" id="delAccount" role="button" tabindex="0"><div class="gi">⚠️</div>
-          <div class="gt"><b>Delete my account</b><span>Your account, every child's profile, and every photo</span></div><i>›</i></div>
+          <div class="gt"><b>Delete my account</b><span>${state.canEdit?'Your account and the family data you own':'Removes your sign-in and access to this family'}</span></div><i>›</i></div>
       </div>
       <p class="muted-note">Deleting can't be undone. Export first if you want a copy.</p>
 
@@ -126,13 +130,14 @@ async function screenAccount(){
   const go=(id,fn)=>{ const el=$('#'+id); if(!el) return;
     el.onclick=fn; el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fn(); } }; };
   $("#acctBack").onclick=()=>renderApp('profile');
+  bindPlaybookPath();
   // Deliberately plain text, not a button: on a shared family phone nobody should hit
   // log out by accident reaching for something else.
   $("#acctLogout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   { const r=$("#renameFam"); if(r&&household) r.onclick=()=>openRenameHousehold(household); }
   { const c=$("#changePw"); if(c) c.onclick=openChangePassword; }
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
-  fillScanConsents();
+  if(state.canEdit) fillScanConsents();
   go('exportAll', openExportEverything);
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@playbookbp.com'; });

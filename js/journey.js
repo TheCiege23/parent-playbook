@@ -78,16 +78,21 @@ function jrnTimeline(games, miles){
 async function screenJourney(){
   logUsageEvent('view_journey');
   const a=state.active;
-  const [{data:sports},{data:games},{data:miles},{data:media},{data:access}] = await Promise.all([
+  const weekStart=isoDay(mondayOfThisWeek()), weekEnd=dateForDayIndex(6);
+  const [{data:sports},{data:games},{data:miles},{data:media},{data:sessions},{data:measures},{data:goals}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('games').select('*').eq('athlete_id',a.id).order('game_date',{ascending:false}),
     sb.from('milestones').select('*').eq('athlete_id',a.id).order('milestone_date',{ascending:false}),
     sb.from('media').select('*').eq('athlete_id',a.id).order('created_at',{ascending:false}),
-    sb.from('athlete_access').select('guardian_id,role').eq('athlete_id',a.id).is('revoked_at',null),
+    sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).gte('done_on',weekStart).lte('done_on',weekEnd),
+    state.canEdit===false ? Promise.resolve({data:[]}) : sb.from('measurements').select('metric_key,value,unit,measured_on').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(1),
+    state.canEdit===false ? Promise.resolve({data:[]}) : sb.from('goals').select('label').eq('athlete_id',a.id).eq('status','active').order('created_at').limit(1),
   ]);
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
-  const myRole=(access||[]).find(x=>x.guardian_id===state.user.id)?.role || 'owner';
-  const canEdit = myRole==='owner' || myRole==='editor';
+  // loadRole() already resolves both direct athlete access and household membership.
+  // Re-reading only athlete_access here used the retired `editor` role name and could
+  // hide Journey controls from a valid co-parent.
+  const canEdit = state.canEdit!==false;
 
   // Sport tabs. A game logged before games.sport_key existed has null — it belongs to
   // the primary sport, which is what the backfill assumed and what the UI must match.
@@ -133,6 +138,7 @@ async function screenJourney(){
     $("#screen").innerHTML = H`
       ${topBar('Journey')}
       <div class="app-pad" style="padding-top:6px">
+        ${playbookPath('journey')}
         <div class="jrn-empty">
           <div class="k">${esc(a.first_name)}'s journey</div>
           <h2>Nothing here yet — and that's the point.</h2>
@@ -147,6 +153,7 @@ async function screenJourney(){
         </div>
       </div>`;
     bindTop();
+    bindPlaybookPath();
     { const b=$("#logGame"); if(b) b.onclick=()=>openLogGame(); }
     return;
   }
@@ -182,6 +189,14 @@ async function screenJourney(){
   $("#screen").innerHTML = H`
     ${topBar(`${total} game${total===1?'':'s'}${since?` · since ${since}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
+
+      ${playbookPath('journey')}
+
+      <div class="journey-bridge">
+        <div><span>Week</span><b>${(sessions||[]).length}</b><small>sessions done</small></div>
+        ${canEdit?`<div><span>Growth</span><b>${(measures||[])[0]?esc(fmtMeasure((measures||[])[0].metric_key,(measures||[])[0].value,(measures||[])[0].unit)):'—'}</b><small>${(measures||[])[0]?esc(metricName((measures||[])[0].metric_key)):'no measurement yet'}</small></div>`:''}
+        ${canEdit?`<div><span>Goal</span><b class="text-value">${(goals||[])[0]?esc((goals||[])[0].label):'Choose one'}</b><small>shapes the plan</small></div>`:''}
+      </div>
 
       ${tabs.length>1?H`<div class="jrn-tabs" role="tablist">
         ${tabs.map(k=>H`<button role="tab" aria-selected="${k===activeSport?'true':'false'}"
@@ -241,6 +256,7 @@ async function screenJourney(){
       <p class="muted-note" style="margin-top:18px">Photos and videos stay private to your household and the people you invite. Nothing here is ever posted anywhere or given a public link.</p>
     </div>`;
   bindTop();
+  bindPlaybookPath();
   { const b=$("#logGame");  if(b) b.onclick=()=>openLogGame(); }
   { const b=$("#addMile");  if(b) b.onclick=()=>openAddMilestone(); }
   { const b=$("#addMedia"); if(b) b.onclick=()=>openAddMedia(games||[]); }

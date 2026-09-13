@@ -9,23 +9,50 @@
 // scanning is important enough to deserve its own tab, but it was never its own feature
 // — it's how some of Growth's numbers get filled in, and this screen says so rather than
 // pretending otherwise.
+function scanHistorySessions(rows){
+  const seen=new Map();
+  (rows||[]).forEach(r=>{
+    const record=typeof readScanRecord==='function'?readScanRecord(r):null;
+    const key=record?.id||r.id;
+    if(!seen.has(key)) seen.set(key,{ key, on:r.measured_on, source:r.source, record, rows:[] });
+    seen.get(key).rows.push(r);
+  });
+  return [...seen.values()].sort((a,b)=>String(b.record?.captured_at||b.on||'').localeCompare(String(a.record?.captured_at||a.on||'')));
+}
+
 async function screenScan(){
   logUsageEvent('view_scan_hub');
   const a = state.active;
+  const age=ageFrom(a.birthdate), minor=age!=null&&age<18, ageKnown=age!=null;
 
-  const { data: recent } = await sb.from('measurements')
-    .select('id,metric_key,value,unit,measured_on,source,created_at')
+  const [{ data: recent },{ data: heightRows }] = await Promise.all([sb.from('measurements')
+    .select('id,athlete_id,metric_key,value,unit,measured_on,source,created_at,note')
     .eq('athlete_id', a.id).in('source', ['photo','video','guided'])
     // Order fully before taking six. measured_on is a DATE and one body scan writes
     // twenty-five rows sharing it, so ordering by date alone left the database to choose
     // which six appeared and the list changed between visits with no new data. created_at
     // breaks the tie by what was recorded last; id makes the order total.
     .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).order('id', { ascending:false })
-    .limit(6);
+    .limit(80),
+    sb.from('measurements').select('value,unit,measured_on').eq('athlete_id',a.id).eq('metric_key','height').eq('unit','in').order('measured_on',{ascending:false}).limit(1),
+  ]);
+  const recentSessions=scanHistorySessions(recent).slice(0,6);
+  const hasHeight=!!(heightRows&&heightRows.length);
 
   $("#screen").innerHTML = H`
     ${topBar('Body & movement assessments')}
     <div class="app-pad" style="padding-top:6px">
+
+      ${playbookPath('scan')}
+
+      <div class="scan-readiness ${minor?'youth':''}">
+        <div class="scan-ready-icon">${minor?'🛡️':ageKnown?'✓':'!'}</div>
+        <div><b>${minor?`Youth scan · age ${esc(String(age))}`:ageKnown?'Ready for an adult scan':'Birth date needed before scanning'}</b>
+          <span>${minor?`A parent or legal guardian must give permission, ${esc(a.first_name)} must agree to the photos, and either person can stop at any point.`:ageKnown?'Permission is confirmed before the camera opens.':'Age decides which consent flow is required, so the camera stays closed until it is known.'}</span>
+          <small class="${ageKnown&&hasHeight?'ok':'needs'}">${!ageKnown?'Add a birth date in Profile':hasHeight?'Height on file · scan can be scaled':'Add a measured height in Growth before scanning'}</small>
+        </div>
+      </div>
+      ${minor?`<p class="muted-note scan-limit">The workflow accepts athletes under 18. Its outputs are estimates from clothed photos and have not been independently validated as pediatric body-composition or medical measurements.</p>`:''}
 
       <div class="card app-pad" style="margin-bottom:14px;background:#0b2429;color:#f5faf8">
         <h2 style="font-size:24px;margin:0 0 8px">Your body insights</h2>
@@ -78,11 +105,12 @@ async function screenScan(){
         timer doesn't use the camera to measure, so it doesn't ask.</p>
 
       <div class="sec-title" style="margin-top:22px">Recent scans</div>
-      ${recent && recent.length ? H`
+      ${recentSessions.length ? H`
       <div class="card app-pad">
-        ${recent.map(r=>H`<div class="mrow">
-          <span>${esc(metricName(r.metric_key))} · ${esc(fmtDate(r.measured_on))}</span>
-          <b>${esc(fmtMeasure(r.metric_key, r.value, r.unit))}</b></div>`).join('')}
+        ${recentSessions.map(s=>{const first=s.rows[0], body=!!s.record;
+          return H`<div class="mrow scan-history-row">
+            <span><b>${body?'Body scan':esc(metricName(first.metric_key))}</b><small>${esc(fmtDate(s.on))}${body?' · '+s.rows.length+' outputs':''}</small></span>
+            <b>${body?s.rows.length+' saved':esc(fmtMeasure(first.metric_key,first.value,first.unit))}</b></div>`;}).join('')}
       </div>`
       : H`<p class="empty">Nothing yet — run either above and it shows here, and on Growth with everything
           else.</p>`}
@@ -93,6 +121,7 @@ async function screenScan(){
           <span>Percentile, growth spurt, predicted height and every measurement together.</span></div><i>›</i></div>
     </div>`;
   bindTop();
+  bindPlaybookPath();
   $("#scanInsights").onclick=()=>renderApp('insights');
   { const b=$("#scanBody");
     if(b){ const open=()=>openBodyScan(a);

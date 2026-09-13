@@ -28,7 +28,7 @@ async function renderCoachView(){
     <nav class="nav" id="nav">
       <div class="sb-brand" aria-hidden="true"><span class="mk">P</span><b>Parent Playbook</b></div>
       <div class="sb-foot" aria-hidden="true">
-        <img src="/assets/brownpig-logo-ondark.png" alt="" width="112" height="112"/>
+        <img src="/img/brownpig-logo-ondark.png" alt="" width="112" height="112"/>
         <span>A Brown Pig company</span>
       </div>
     </nav>`;

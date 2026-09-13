@@ -1,4 +1,6 @@
 # Parent Playbook — end-to-end audit
+
+> **Current review:** See [AUDIT-2026-09-13.md](AUDIT-2026-09-13.md) for the current FITMATCH parity, youth-scan and connected parent-product audit. The material below is the original 2026-08-11 audit and its historical fix log.
 **Scope:** sign-in → account creation → admin panel → child intake → training regimen
 **Date:** 2026-08-11 · **Reviewed:** all 19 modules, `index.html`, `sw.js`, `vercel.json`
 

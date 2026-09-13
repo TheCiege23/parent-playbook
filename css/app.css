@@ -186,6 +186,50 @@
 
   /* Mono eyebrow labels — the cheapest change that makes the app read as designed. */
   .sec-title{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:22px 2px 10px}
+  .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+
+  /* The four parent jobs stay visible across the product. This is a context map rather
+     than another tab bar: each label explains how work in one screen feeds the next. */
+  .playbook-path{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:6px;margin:0 0 14px}
+  .playbook-path button{min-width:0;display:flex;align-items:center;gap:7px;text-align:left;padding:9px 8px;
+    border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.72);color:var(--muted)}
+  .playbook-path button i{width:22px;height:22px;flex:0 0 22px;border-radius:50%;display:grid;place-items:center;
+    background:var(--soft);font-style:normal;font-size:10px;font-weight:800}
+  .playbook-path button span{min-width:0;font-family:'Archivo';font-size:11.5px;font-weight:750;line-height:1.1}
+  .playbook-path button small{display:block;font-family:'Public Sans';font-size:9.5px;font-weight:500;margin-top:3px;color:var(--muted)}
+  .playbook-path button.on{background:var(--green-d);border-color:var(--green-d);color:#fff;box-shadow:var(--shadow)}
+  .playbook-path button.on i{background:var(--amber);color:var(--ink-deep)}
+  .playbook-path button.on small{color:rgba(255,255,255,.7)}
+  .playbook-path button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+  .connection-card{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px;
+    padding:15px 16px;border-radius:15px;background:linear-gradient(135deg,#EAF3F0,#fff);border:1px solid #CFE3DC;cursor:pointer}
+  .connection-card>div{min-width:0}.connection-card .connection-k{display:block;font-family:'JetBrains Mono';font-size:10px;
+    text-transform:uppercase;letter-spacing:.1em;color:var(--green-d);margin-bottom:4px}
+  .connection-card b{display:block;font-family:'Archivo';font-size:15px}.connection-card small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+  .connection-card>i{font-style:normal;font-size:22px;color:var(--green-d)}
+  .connection-card:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+  .journey-bridge{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:14px}
+  .journey-bridge>div{min-width:0;background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 10px}
+  .journey-bridge span,.journey-bridge small{display:block;color:var(--muted);font-size:10.5px}
+  .journey-bridge b{display:block;font-family:'Archivo';font-size:20px;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .journey-bridge b.text-value{font-size:13px;line-height:1.25;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+  .scan-readiness{display:flex;gap:12px;align-items:flex-start;background:#EAF3F0;border:1px solid #CFE3DC;border-radius:15px;padding:14px 15px;margin-bottom:8px}
+  .scan-readiness.youth{background:var(--amber-s);border-color:#EEDCBC}
+  .scan-ready-icon{width:34px;height:34px;flex:0 0 34px;border-radius:11px;background:var(--green-d);color:#fff;display:grid;place-items:center;font-weight:800}
+  .scan-readiness.youth .scan-ready-icon{background:var(--amber);color:var(--ink-deep)}
+  .scan-readiness b,.scan-readiness span,.scan-readiness small{display:block}.scan-readiness b{font-family:'Archivo';font-size:14.5px}
+  .scan-readiness span{font-size:12px;color:var(--muted);line-height:1.45;margin-top:3px}.scan-readiness small{font-size:11px;font-weight:700;margin-top:7px}
+  .scan-readiness small.ok{color:var(--good)}.scan-readiness small.needs{color:var(--danger)}
+  .scan-limit{margin:7px 2px 14px}.scan-history-row>span{min-width:0}.scan-history-row>span b,.scan-history-row>span small{display:block}
+  .scan-history-row>span small{color:var(--muted);font-size:11px;margin-top:2px}.scan-history-row>b{font-size:12px;color:var(--green-d);text-align:right}
+
+  .schedule-choice{display:flex;width:100%;align-items:center;text-align:left;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+  .schedule-choice:first-child{padding-top:2px}.schedule-choice:last-child{border-bottom:0;padding-bottom:2px}.schedule-choice span{flex:1;min-width:0}
+  .schedule-choice b,.schedule-choice small{display:block}.schedule-choice b{font-family:'Archivo';font-size:14px}.schedule-choice small{font-size:12px;color:var(--muted);margin-top:3px}
+  .schedule-choice i{font-style:normal;font-size:19px;color:var(--muted)}.schedule-choice:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:8px}
 
   /* week list */
   .day{display:flex;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--line);background:#fff;margin-bottom:10px;align-items:center}

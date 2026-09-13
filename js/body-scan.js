@@ -34,7 +34,7 @@
 // The wording a parent agreed to, versioned. Change the release text and this MUST
 // change with it: an old consent then stops matching, and the parent is asked again.
 // Silently reusing a release for terms it never covered is the failure this prevents.
-const SCAN_POLICY_VERSION = '2026-09-09.ondevice.v4';
+const SCAN_POLICY_VERSION = '2026-09-13.ondevice.v5';
 
 // BIPA wants a retention schedule that is published and honoured, with destruction no
 // later than the purpose being satisfied. A season is the purpose, so a year is the
@@ -416,10 +416,8 @@ function bsRetentionDate(){
 // specific affirmative act — not a pre-ticked box, not a continue button that implies
 // agreement.
 //
-// For a minor there are TWO ticks, because two separate things are being attested and
-// bundling them into one is how a release gets argued away later: that the signer is
-// the child's legally authorised representative, and that they understand what is
-// being collected.
+// For a minor there are THREE ticks: the adult's authority, the child's agreement to
+// being photographed, and the adult's understanding of collection and retention.
 function bsConsent(age, p, height){
   const minor = age < ADULT_AGE;
   const nm = esc(BS.subject.first_name || 'this athlete');
@@ -472,6 +470,9 @@ function bsConsent(age, p, height){
               <span>I am ${nm}'s parent or legal guardian, and I authorise this app to measure their body from
                 photographs I take.</span></label>
             <label><input type="checkbox" id="bsOk2"/>
+              <span>I have explained the scan to ${nm} in words they understand, and they agree to have these
+                four photographs taken. If they change their mind, I will stop.</span></label>
+            <label><input type="checkbox" id="bsOk3"/>
               <span>I understand what is measured, that the photographs are not uploaded or kept, and that the
                 measurements are deleted on the date above.</span></label>`
         : H`<label><input type="checkbox" id="bsOk1"/>
@@ -508,6 +509,7 @@ function bsConsent(age, p, height){
       retention_until: until,
       method: 'in_app_written_release',
       detail: { produces: p.produces || [], engine_label: p.label || p.id,
+                minor_assent_attested: minor ? true : null,
                 optional_surface: p.id==='ondevice-pose'?'reviewed-silhouette-preview-v1/session-only':null,
                 height_in: height.value, height_on: height.on },
     }).select('id').maybeSingle();
