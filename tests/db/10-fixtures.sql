@@ -221,3 +221,35 @@ begin
   returning id into new_id;
   return new_id;
 end $$;
+
+-- ---- helper that builds a structurally valid SYNTHETIC company assessment payload, accepted by both
+-- the child body-assessment table and the adult reference table. The measurement list is empty on
+-- purpose: the results API cases need rows that exist, not numbers that mean anything.
+create or replace function public.test_company_assessment_payload(
+  p_assessment text,
+  p_subject text,
+  p_team uuid,
+  p_actor uuid,
+  p_consent text,
+  p_captured timestamptz default '2026-09-10T04:00:00Z',
+  p_saved timestamptz default '2026-09-10T04:05:00Z',
+  p_retention timestamptz default '2099-01-01T00:00:00Z')
+returns jsonb language sql immutable as $$
+  select jsonb_build_object(
+    'schema', 'PP_COMPANY_BODY_ASSESSMENT_V1',
+    'assessmentId', p_assessment,
+    'subjectId', p_subject,
+    'organizationId', p_team::text,
+    'createdBy', p_actor::text,
+    'consentReference', p_consent,
+    'capturedAt', p_captured,
+    'savedAt', p_saved,
+    'retentionUntil', p_retention,
+    'assessment', jsonb_build_object(
+      'schema', 'PP_BODY_SDK_SUMMARY_V1', 'sdkVersion', '0.0.0-synthetic', 'status', 'provisional', 'unit', 'in',
+      'surfaceStatus', 'not_requested', 'outputCount', 0,
+      'measurements', '[]'::jsonb, 'missingOutputs', '[]'::jsonb, 'pairs', '[]'::jsonb,
+      'engine', jsonb_build_object('id', 'synthetic-engine', 'version', '0.0.0', 'model', 'synthetic')),
+    'dataScope', 'Synthetic fixture. No measurement of any person.',
+    'limitations', 'Synthetic fixture.')
+$$;

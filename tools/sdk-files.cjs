@@ -56,6 +56,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260912100000_external_body_composition_records.sql',
   'supabase/migrations/20260912110000_external_composition_covering_indexes.sql',
   'supabase/migrations/20260912123000_family_wide_parent_invites.sql',
+  'supabase/migrations/20260913120000_company_results_api.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.
@@ -65,6 +66,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
 // missing test file is silently reported as success by `node --test`.
 const BUNDLE_CONTRACT_TESTS = Object.freeze([
   'tests/body-composition-contract.test.cjs',
+  'tests/company-results-api.test.cjs',
   'tests/body-composition-reference.test.cjs',
   'tests/composition-import.test.cjs',
   'tests/composition-import-store.test.cjs',
@@ -146,6 +148,8 @@ const BUNDLE_FILES = Object.freeze([
   ...BUNDLE_VERIFICATION,
   ...BUNDLE_CONTRACT_TESTS,
   ...BUNDLE_MIGRATIONS,
+  // The organization results API: the edge function a buyer deploys beside the migrations above.
+  'supabase/functions/company-results-api/handler.mjs','supabase/functions/company-results-api/index.ts',
   ...BUNDLE_RESEARCH,
   'HANDOVER.md','REFERENCE-COHORTS.md','BODY-SDK.md','HEIC-IMPORT.md','README.md',
 ]);
