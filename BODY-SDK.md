@@ -84,8 +84,9 @@ Copy these files together into a versioned directory on the application's **same
 - `js/heic-decode.js`
 - `js/photo-import.mjs` (preview/capture UI helper)
 - `js/photo-import-worker.js` (preview/capture UI worker)
+- `js/body-sdk-embed.mjs` (message bridge, needed only inside a native app's WebView)
 
-Serve over HTTPS (localhost is suitable for development), with JavaScript MIME types. Do not import this version from a separate CDN origin: its relative dedicated worker must be hosted on the page's origin. Publish all 26 SDK source files as a matched version. The repository Dockerfile includes `js/` and publishes the company demo at `/company-sdk-demo`. ParentPlaybook's organization integration and the standalone demonstration are deployed on `playbookbp.com`; the portable handoff remains separately runnable on loopback.
+Serve over HTTPS (localhost is suitable for development), with JavaScript MIME types. Do not import this version from a separate CDN origin: its relative dedicated worker must be hosted on the page's origin. Publish all 34 SDK source files as a matched version. The repository Dockerfile includes `js/` and publishes the company demo at `/company-sdk-demo`. ParentPlaybook's organization integration and the standalone demonstration are deployed on `playbookbp.com`; the portable handoff remains separately runnable on loopback.
 
 ```js
 import {createBodyScanner} from '/vendor/parent-playbook/0.13.0/body-sdk.mjs';
@@ -453,6 +454,106 @@ Adult-reference and child-athlete scopes stay distinct end to end. An `adult_ref
 Step 4 of `/company-composition-demo` lists this history for a signed-in organization administrator. With no licensed model connected, no composition result can exist, and the room says **No stored composition results.** Nothing is seeded to populate that screen.
 
 The deployed `/company-composition-demo` route provides the three-step manifest, estimate and validation-data workflow. Files remain in the browser tab. Its downloadable starter templates are deliberately incomplete and cannot validate as provider evidence. A buyer must still supply and independently review the model, rights, datasets, study design, subgroup performance and release thresholds before any body-composition claim is enabled.
+
+## Embedding in a mobile WebView
+
+The SDK can run inside a native iOS or Android app's WebView, and that is how Flutter and similar wrappers
+embed it too. **What has been tested is the page side only.** `js/body-sdk-embed.mjs` is covered by
+`tests/sdk-embed-bridge.test.cjs` with stand-in native handlers. No WebView has loaded the SDK, the Swift and
+Kotlin below have never been compiled, and no intended phone has run a scan. There is no native iOS SDK.
+
+**Serve it; don't bundle it into the app.** Load the SDK page from your HTTPS origin, never from `file://`.
+The module worker has to be same-origin with the page, and the pose model downloads from
+`https://cdn.jsdelivr.net` and `https://storage.googleapis.com` (see below), so the WebView needs network
+access and a policy that allows those hosts. Length inference needs WebAssembly and a GPU delegate; a WebView
+that lacks them fails rather than returning measurements.
+
+**Photos come from `<input type="file">`.** The SDK takes files, not a live camera stream.
+
+- iOS: WKWebView shows the system picker itself. If that picker can offer the camera, the app needs
+  `NSCameraUsageDescription` in its Info.plist. HEIC originals from the camera are accepted.
+- Android: a file input does nothing until the app implements `WebChromeClient.onShowFileChooser` and returns
+  the chosen `Uri` values through its callback. Always answer the callback, with `null` on cancel, or the
+  input stops responding. Offering the camera there also needs the `CAMERA` permission and a content URI for
+  the captured photo.
+
+**Results reach the app through the bridge, not a download.** A download link goes nowhere in a WebView. On
+the page:
+
+```js
+import {createBodyScanner} from '/vendor/parent-playbook/0.13.0/body-sdk.mjs';
+import {createEmbedBridge} from '/vendor/parent-playbook/0.13.0/body-sdk-embed.mjs';
+
+const bridge = createEmbedBridge();          // throws EMBED_NO_NATIVE_BRIDGE outside the app
+const scanner = createBodyScanner();
+try {
+  const result = await scanner.scan({frames, heightIn, permissionAcknowledged, onProgress: text => bridge.sendStatus(text)});
+  bridge.sendResult(result);                 // the allowlisted summary only
+} catch (error) {
+  bridge.sendError(error);
+} finally {
+  scanner.dispose();
+}
+```
+
+The bridge sends only four message types, as JSON text with schema `PP_BODY_SDK_EMBED_MESSAGE_V1`:
+
+- `result`: the `PP_BODY_SDK_SUMMARY_V1` summary a company record stores, rebuilt from the result
+- `review`: a photo review's codes
+- `error`: an error's name, code and message
+- `status`: a progress line
+
+It refuses a result that carries 3D surface geometry. It checks every message again for photo, landmark,
+mask, contour, mesh, geometry, vertex, face, digest, fingerprint, frame and blob keys, and caps its size (64 KB
+by default). The native side still owns permission, authentication, storage, retention and deletion for
+anything it keeps.
+
+iOS (untested reference code):
+
+```swift
+import WebKit
+
+final class ScanMessages: NSObject, WKScriptMessageHandler {
+  func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+    // Accept messages only from the origin that serves the SDK page.
+    guard message.frameInfo.securityOrigin.host == "sdk.example.com",
+          let text = message.body as? String else { return }
+    // Decode PP_BODY_SDK_EMBED_MESSAGE_V1 from text and pass it to your own authorized backend.
+  }
+}
+
+let configuration = WKWebViewConfiguration()
+configuration.userContentController.add(ScanMessages(), name: "parentPlaybookSdk")
+let webView = WKWebView(frame: .zero, configuration: configuration)
+webView.load(URLRequest(url: URL(string: "https://sdk.example.com/scan")!))
+```
+
+Android (untested reference code), using androidx.webkit so that only the SDK's origin can post:
+
+```kotlin
+val origin = "https://sdk.example.com"
+webView.settings.javaScriptEnabled = true
+if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+  WebViewCompat.addWebMessageListener(webView, "parentPlaybookSdk", setOf(origin)) { _, message, _, _, _ ->
+    // Decode PP_BODY_SDK_EMBED_MESSAGE_V1 from message.data and pass it to your own authorized backend.
+  }
+}
+webView.webChromeClient = object : WebChromeClient() {
+  override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+    pendingFileCallback = callback            // answer it from your picker's result, with null on cancel
+    photoPicker.launch(params.createIntent())
+    return true
+  }
+}
+webView.loadUrl("$origin/scan")
+```
+
+Prefer the web message listener over `addJavascriptInterface`, which exposes the object to every page and
+frame the WebView loads.
+
+**Memory.** On-device inference is memory-hungry, and a WebView can lose its content process under pressure.
+Handle `webViewWebContentProcessDidTerminate` on iOS and `onRenderProcessGone` on Android by reloading the page
+and starting the scan again. Never resume a half-finished one. Dispose the scanner when the screen closes.
 
 ## Browser and network requirements
 

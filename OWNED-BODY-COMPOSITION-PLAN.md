@@ -365,6 +365,6 @@ The inexpensive owned path is complete when:
 
 ## Score treatment
 
-Do not change the current 40 parity points (rubric version 2) for planning work, imports or an unqualified model.
+Do not change the current 40.75 parity points (rubric version 2) for planning work, imports or an unqualified model.
 FM05 can advance only when the fixed rubric supports it: a real output exists, the model has lawful
 deployment rights, its provenance is truthful, and the required test/evidence stage has been met.
