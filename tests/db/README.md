@@ -50,12 +50,12 @@ named in any file that ships in the buyer package.
 | `run.cjs` | Creates the cluster, orchestrates, disposes |
 | `00-preamble.sql` | Supabase-compatible emulation: `anon` / `authenticated` / `service_role` roles, `auth.users`, `auth.uid()`, storage and vault stubs, and **stubs for pg_cron and pg_net** |
 | `05-post-identity-seed.sql` | Synthetic guardian row so the marketplace migration's hard-coded `app_admins` seed can replay |
-| `replay.cjs` | Applies all 81 real migrations in order, each in its own transaction, recording failures rather than stopping |
+| `replay.cjs` | Applies all 85 real migrations in order, each in its own transaction, recording failures rather than stopping |
 | `10-fixtures.sql` | Two synthetic organizations, three synthetic accounts, three synthetic athletes, six synthetic provider registrations (active, revoked, expired, narrow, other-study), and payload builders |
-| `security-tests.cjs` | 281 cases, each in its own transaction, rolled back |
+| `security-tests.cjs` | 304 cases, each in its own transaction, rolled back |
 | `restore-deletion.cjs` | 17 cases that must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact |
 
-Expected result: **82 of 83 migrations applied**, **281/281 security cases** and **17/17 rehearsal
+Expected result: **84 of 85 migrations applied**, **304/304 security cases** and **17/17 rehearsal
 cases** pass. The single migration failure is `20260812174514_enable_cron_and_net.sql`, which needs
 the pg_cron and pg_net binaries that only exist inside Supabase.
 
