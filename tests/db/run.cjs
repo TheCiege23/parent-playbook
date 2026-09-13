@@ -182,8 +182,11 @@ async function main() {
   // situation the 0xC000013A cascade came from in the first place.
   const interactive = Boolean(process.stdout.isTTY || process.stdin.isTTY);
   const logFd = fs.openSync(logFile, 'a');
+  // No Unix socket. Every connection this harness makes is TCP to 127.0.0.1, and distro Linux builds put the
+  // socket lock in /var/run/postgresql, which an ordinary user cannot write: there the cluster failed to start
+  // with 'could not create lock file ... Permission denied'. Found by CI's first run on Ubuntu.
   const launcher = spawn(bin('postgres'), ['-D', dataDir, '-p', String(port),
-    '-c', 'listen_addresses=127.0.0.1', '-c', 'fsync=off', '-c', 'full_page_writes=off'],
+    '-c', 'listen_addresses=127.0.0.1', '-c', 'unix_socket_directories=', '-c', 'fsync=off', '-c', 'full_page_writes=off'],
     { detached: interactive, stdio: ['ignore', logFd, logFd], windowsHide: true });
   launcher.unref();
   fs.closeSync(logFd);
