@@ -58,6 +58,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260912123000_family_wide_parent_invites.sql',
   'supabase/migrations/20260913120000_company_results_api.sql',
   'supabase/migrations/20260913140000_stripe_webhook_ordering.sql',
+  'supabase/migrations/20260913140500_notification_schedules.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.

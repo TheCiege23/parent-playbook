@@ -15,7 +15,7 @@ schedule stated here stops matching the workflow.
 | Continuous integration | `.github/workflows/ci.yml` runs the JavaScript suite and `tests/db/run.cjs` on GitHub's Ubuntu runners | Every pull request and every push to `main` | Added 2026-09-13; its first run was on its own pull request |
 | Production smoke check | `.github/workflows/production-monitor.yml` runs `tools/deployment-smoke.cjs` against playbookbp.com | `17 */6 * * *` (every six hours, at 17 minutes past) and on demand | Merged 2026-09-13; not yet observed running on GitHub |
 | Retention sweeps | `cron.job` in the live project | `biometric-retention` 03:20 UTC, `company-body-assessment-retention` 03:35, `company-reference-assessment-retention` 03:40, `company-composition-result-retention` 03:50, `external-composition-retention` 03:55 | The first four were observed succeeding on 2026-09-11. `external-composition-retention` has not been observed |
-| Notification pushes | `cron.job` in the live project | `weekly-plan-push` and `gameday-push`, which call edge functions through `net.http_post` | Running in production; they message real families |
+| Notification pushes | `cron.job` in the live project | `weekly-plan-push` (Sundays 22:00 UTC), `gameday-push` (nightly 23:00), `daily-nudge` (daily 20:12) and `measure-nudge` (Sundays 14:14; `notify-measure` sends only in the first week of the month), which call edge functions through `net.http_post` | Running in production; they message real families. `daily-nudge` and `measure-nudge` existed only in the live project until migration `20260913140500` |
 
 Nothing else is scheduled. The database posture check, restore drills and key rotation are manual.
 
@@ -101,7 +101,7 @@ The purpose is to prove that a backup made by the hosting provider comes back as
 
 1. Restore the backup, or a point-in-time recovery, into a **new** project or database. Never restore over
    production. Check which restore options the Supabase plan provides.
-2. **Before the restored copy runs anything, disable its notification jobs** (`weekly-plan-push`, `gameday-push`).
+2. **Before the restored copy runs anything, disable its notification jobs** (`weekly-plan-push`, `gameday-push`, `daily-nudge`, `measure-nudge`).
    A restored copy keeps the schedules, and they would message real families.
 3. Run the comparison, with owner-role connection strings in the environment:
 

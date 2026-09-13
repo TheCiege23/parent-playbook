@@ -1263,6 +1263,15 @@ add('S10', 'stripe-webhook', 'a signed-in guardian calling it directly to mark t
   { setup: subRow, role: 'authenticated', claims: SUB_GUARDIAN, sql: applySub('active', '2026-09-13T10:00:00Z'),
     expect: 'error', expectError: /permission denied for function apply_stripe_subscription_event/ });
 
+// =========================================================== T. notification schedules
+//
+// The replayed migrations alone must schedule every push job production runs. The harness's cron stub records a job
+// without ever firing it, which is all this needs.
+add('T01', 'notification-schedules', 'the migrations schedule all four push jobs, each once, reading the key from Vault',
+  { sql: `select string_agg(jobname || '=' || schedule, ',' order by jobname) from cron.job
+      where command like '%/functions/v1/notify-%' and command like '%vault.decrypted_secrets%';`,
+    expect: 'ok', expectOut: 'daily-nudge=12 20 * * *,gameday-push=0 23 * * *,measure-nudge=14 14 * * 0,weekly-plan-push=0 22 * * 0' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
