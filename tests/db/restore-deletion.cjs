@@ -294,6 +294,41 @@ check('R07', 'restore', 'the restored copy still refuses a payload the original 
   eq(restored, 'f', 'the restored copy rejects it too');
 });
 
+// tools/restore-drill.cjs is written for a restore made by the hosting provider, which none of these cases
+// can produce. Its comparisons are only worth running there if they pass on a faithful copy and fail on a
+// damaged one, so both are proven here, on the dump and restore this file has just made.
+const DRILL = path.join(__dirname, '..', '..', 'tools', 'restore-drill.cjs');
+function runDrill() {
+  const url = database => 'postgresql://' + encodeURIComponent(USER) + '@127.0.0.1:' + PORT + '/' + database;
+  const env = { ...process.env, PP_RESTORE_SOURCE: url(DB), PP_RESTORE_TARGET: url(RESTORED) };
+  try {
+    return JSON.parse(execFileSync(process.execPath, [DRILL, '--json', '--psql', bin('psql')],
+      { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, maxBuffer: 64 * 1024 * 1024 }));
+  } catch (error) {
+    if (error.stdout) return JSON.parse(error.stdout);
+    throw error;
+  }
+}
+
+check('R12', 'restore', 'the restore drill passes on the faithful restored copy', () => {
+  const result = runDrill();
+  if (!result.ok) throw new Error('failing drill checks: ' + result.checks.filter(c => !c.ok).map(c => c.id + ' ' + JSON.stringify(c.detail, null, 1)).join('; '));
+});
+
+check('R13', 'restore', 'the restore drill fails when the restored copy lost row-level security on a table', () => {
+  const victim = sql(`select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relrowsecurity order by c.relname limit 1;`, { database: RESTORED });
+  if (!victim) throw new Error('no RLS-enabled table to probe with');
+  sql(`alter table public.${victim} disable row level security;`, { database: RESTORED });
+  try {
+    const result = runDrill();
+    const failed = result.checks.filter(c => !c.ok).map(c => c.id);
+    if (result.ok || !failed.includes('rls') || !failed.includes('schema')) throw new Error('the drill did not fail both rls and schema: ' + JSON.stringify(failed));
+  } finally {
+    sql(`alter table public.${victim} enable row level security;`, { database: RESTORED });
+  }
+});
+
 // R04 and R05 are the two checks the buyer claim rests on, and both are of the shape
 // that passes whether or not it is looking at anything. These damage the restored copy
 // on purpose and require the comparison to notice, then undo the damage. Without them,

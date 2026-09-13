@@ -297,9 +297,9 @@ test('the recorded archive still describes the payload that would be built today
 // This cannot verify the total is right; only running tests/db/run.cjs does that. It can
 // verify that one number was updated everywhere, which is the failure that actually
 // happened.
-const DB_TOTAL = 323;
+const DB_TOTAL = 325;
 const DB_SECURITY = 304;
-const DB_RESTORE = 19;
+const DB_RESTORE = 21;
 
 test('every document quotes the same database total', () => {
   const sites = [
