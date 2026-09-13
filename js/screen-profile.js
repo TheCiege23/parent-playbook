@@ -19,8 +19,9 @@ async function screenProfile(){
   const _primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=_primary?.sport_key||state.activeSportKey||'general'; setAppBg();
   const myAccess=(access||[]).find(x=>x.guardian_id===state.user.id);
-  const myRole=myAccess?myAccess.role:'owner';
+  const myRole=state.role||(myAccess?myAccess.role:'owner');
   const isOwner=(myRole==='owner');
+  const canEdit=state.canEdit!==false;
   const sportName=state.ref?.sports.find(x=>x.key===_primary?.sport_key)?.name||'';
   const seasonLabel=(typeof seasonMeta==='function'&&_primary?.season_state)
     ? (seasonMeta(_primary.season_state)||{}).label : null;
@@ -30,6 +31,7 @@ async function screenProfile(){
   $("#screen").innerHTML = H`
     ${topBar(sub||'Athlete')}
     <div class="app-pad" style="padding-top:6px">
+      ${playbookPath('profile')}
 
       <div class="card app-pad">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -37,12 +39,12 @@ async function screenProfile(){
             <h3 style="font-size:19px">${esc(a.first_name)}${age!=null?', '+age:''}</h3>
             <p style="font-size:13px;color:var(--muted);margin:3px 0 0">${esc(sub||'No sport set')}</p>
           </div>
-          ${isOwner?'<button class="btn sm ghost" id="editAthlete">Edit</button>':''}
+          ${canEdit?'<button class="btn sm ghost" id="editAthlete">Edit</button>':''}
         </div>
-        ${seasonLabel||isOwner?H`<div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+        ${seasonLabel||canEdit?H`<div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
           ${seasonLabel?`<span class="pill good">${esc(seasonLabel)}</span>`:''}
-          ${isOwner?'<button class="btn sm ghost" id="editSeason">'+(seasonLabel?'Change season':'Set the season')+'</button>':''}
-          ${isOwner?'<button class="btn sm ghost" id="addSport">＋ Add a sport</button>':''}
+          ${canEdit?'<button class="btn sm ghost" id="editSeason">'+(seasonLabel?'Change season':'Set the season')+'</button>':''}
+          ${canEdit?'<button class="btn sm ghost" id="addSport">＋ Add a sport</button>':''}
         </div>`:''}
       </div>
 
@@ -54,17 +56,17 @@ async function screenProfile(){
             <div class="gt"><b>${esc(nm)}${s.is_primary?' · primary':''}</b>
               <span>${esc((s.positions||[]).join('/')||'no position')} · ${esc(s.level||'no level')}</span></div>
             <div style="display:flex;gap:5px">
-              ${isOwner?`<button class="btn sm ghost" data-editsport="${esc(s.id)}" title="Positions & level">✎</button>`:''}
-              ${isOwner?`<button class="btn sm ghost" data-schedsport="${esc(s.id)}" title="Practice schedule">📅</button>`:''}
-              ${isOwner&&!s.is_primary?`<button class="btn sm ghost" data-primary="${esc(s.id)}" title="Make primary">⭐</button>`:''}
-              ${isOwner&&(sports||[]).length>1?`<button class="btn sm ghost" data-rmsport="${esc(s.id)}" title="Remove">✕</button>`:''}
+              ${canEdit?`<button class="btn sm ghost" data-editsport="${esc(s.id)}" title="Positions & level">✎</button>`:''}
+              ${canEdit?`<button class="btn sm ghost" data-schedsport="${esc(s.id)}" title="Practice schedule">📅</button>`:''}
+              ${canEdit&&!s.is_primary?`<button class="btn sm ghost" data-primary="${esc(s.id)}" title="Make primary">⭐</button>`:''}
+              ${canEdit&&(sports||[]).length>1?`<button class="btn sm ghost" data-rmsport="${esc(s.id)}" title="Remove">✕</button>`:''}
             </div></div>`;}).join('')}
         <p style="font-size:11.5px;color:var(--muted);margin:10px 2px 0">Practices and games from every sport share one weekly load budget — adding a sport never doubles the training.</p>
       </div>`:''}
 
       ${_primary?H`<div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">${esc(sportName||'Primary')} schedule</div>
-        <button class="btn sm ghost" id="editSched">Edit</button>
+        ${canEdit?'<button class="btn sm ghost" id="editSched">Edit</button>':''}
       </div>
       <div class="card app-pad">
         <div class="mrow"><span>Practice days</span><b>${(_primary.practice_days||[]).length?esc(_primary.practice_days.map(i=>DAY_LABELS[i]).join(', ')):'Not set'}</b></div>
@@ -79,10 +81,10 @@ async function screenProfile(){
       <div class="card app-pad">
         <div class="grow" style="border:none;padding:0"><div class="gi">✦</div>
           <div class="gt"><b>Did you play ${esc(sportName||'this sport')}?</b><span>We'll add notes written for someone who already knows the drill.</span></div></div>
-        <div class="chipgrid" id="pexpEdit" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
-          ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" role="button" tabindex="0" data-e="${v}">${esc(l)}</div>`).join('')}
+        <div class="chipgrid" id="pexpEdit" style="grid-template-columns:repeat(3,1fr);margin-top:12px" ${canEdit?'':'aria-disabled="true"'}>
+          ${PARENT_EXP.map(([v,l])=>`<div class="chip ${(_primary.parent_experience||'')===v?'on':''}" ${canEdit?'role="button" tabindex="0"':''} data-e="${v}">${esc(l)}</div>`).join('')}
         </div>
-        ${_primary.sport_key==='football'?H`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+        ${_primary.sport_key==='football'&&canEdit?H`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
           <div class="gt" style="margin-bottom:8px"><b>Your league's ball-carrier weight limit</b>
             <span>Pop Warner's "X-Man" rule is real but set locally — enter your league's number and it shows up on Growth. Leave it blank and Growth just explains the rule instead.</span></div>
           <div style="display:flex;gap:8px;align-items:center">
@@ -97,19 +99,19 @@ async function screenProfile(){
 
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">Who can see ${esc(a.first_name)}</div>
-        ${isOwner?'<button class="btn sm ghost" id="invite">＋ Invite</button>':''}
+        ${canEdit?'<button class="btn sm ghost" id="invite">＋ Invite</button>':''}
       </div>
       <div class="card app-pad">
         <div class="grow"><div class="gi">👤</div><div class="gt"><b>You</b><span>${isOwner?'Owner · full control':esc(myRole)+' access'}</span></div></div>
         ${(access||[]).filter(x=>x.guardian_id!==state.user.id).map(x=>H`
-          <div class="grow"><div class="gi">🤝</div><div class="gt"><b>Shared guardian</b><span>${esc(x.role)} · can ${x.role==='editor'?'edit':'view'}</span></div></div>`).join('')}
+          <div class="grow"><div class="gi">🤝</div><div class="gt"><b>Shared guardian</b><span>${esc(x.role)} · can ${x.role==='co_parent'||x.role==='owner'?'edit':'view'}</span></div></div>`).join('')}
         ${visibleInvites.map(i=>H`
           <div class="grow"><div class="gi">✉️</div><div class="gt"><b>${i.scope==='family'?'Family invite pending':'Invite pending'}</b><span>${esc(i.role)} · expires ${new Date(i.expires_at).toLocaleDateString()}</span></div>
             <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button></div>`).join('')}
       </div>
 
       <div class="card app-pad" style="margin-top:14px">
-        ${isOwner?H`<div class="navrow" id="addChild"><div class="gi">👧</div>
+        ${canEdit?H`<div class="navrow" id="addChild"><div class="gi">👧</div>
           <div class="gt"><b>Add another athlete</b><span>Different sport, different age, separate plan</span></div><i>›</i></div>`:''}
         <div class="navrow" id="toAccount"><div class="gi">⚙️</div>
           <div class="gt"><b>Account &amp; settings</b><span>Household, notifications, your data</span></div><i>›</i></div>
@@ -122,6 +124,7 @@ async function screenProfile(){
       </div>`:''}
     </div>`;
   bindTop();
+  bindPlaybookPath();
   state.athleteSports = sports||[];   // openSportEditor needs to know what's already added
   { const ea=$("#editAthlete"); if(ea) ea.onclick=openEditAthlete; }
   { const as=$("#addSport"); if(as) as.onclick=()=>openSportEditor(null,()=>renderApp('profile')); }
@@ -148,7 +151,7 @@ async function screenProfile(){
   { const iv=$("#invite"); if(iv) iv.onclick=openInvite; }
   { const ac=$("#addChild"); if(ac) ac.onclick=startAddChild; }
   { const ta=$("#toAccount"); if(ta) ta.onclick=()=>renderApp('account'); }
-  { const pe=$("#pexpEdit"); if(pe&&_primary) pe.querySelectorAll('.chip').forEach(c=>c.onclick=async()=>{
+  { const pe=$("#pexpEdit"); if(pe&&_primary&&canEdit) pe.querySelectorAll('.chip').forEach(c=>c.onclick=async()=>{
       const v=c.dataset.e; pe.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
       const { error }=await sb.from('athlete_sports').update({ parent_experience:v||null }).eq('athlete_id',a.id).eq('sport_key',_primary.sport_key);
       if(error){ console.error(error); reportError(error,'profile:parentExp'); toast('Could not save'); return; }

@@ -76,7 +76,7 @@ async function renderApp(tab, fromPop){
       ${navBtn('journey','Journey','M12 6.5C10 5 7 5 4 6v12c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V6c-3-1-6-1-8 .5z M12 6.5V19')}
       ${navBtn('profile','Profile','M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0')}
       <div class="sb-foot" aria-hidden="true">
-        <img src="/assets/brownpig-logo-ondark.png" alt="" width="112" height="112"/>
+        <img src="/img/brownpig-logo-ondark.png" alt="" width="112" height="112"/>
         <span>A Brown Pig company</span>
       </div>
     </nav>`;
@@ -135,6 +135,28 @@ function topBar(sub, extra){
 function bindTop(){
   $("#logout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   const sw=$("#switch"); if(sw) sw.onclick=openSwitch;
+}
+
+// A small, consistent map of how the parent-facing product fits together. The bottom
+// navigation names destinations; this names the job each destination does and includes
+// Settings, which otherwise sits one level below Profile and was easy to miss.
+function playbookPath(active){
+  const steps=[
+    { route:'week', label:'Plan', detail:'This week' },
+    ...(state.canEdit===false ? [] : [{ route:'growth', label:'Growth', detail:'Measure' }]),
+    { route:'journey', label:'Journey', detail:'Remember' },
+    { route:'account', label:'Settings', detail:'Adjust' },
+  ];
+  const selected=(active==='scan'||active==='insights')?'growth':(active==='profile'?'account':active);
+  return H`<nav class="playbook-path" aria-label="${esc(state.active?.first_name||'Athlete')}'s playbook">
+    ${steps.map((s,i)=>H`<button type="button" data-flow="${s.route}" class="${s.route===selected?'on':''}"
+      ${s.route===selected?'aria-current="page"':''}>
+      <i>${i+1}</i><span>${s.label}<small>${s.detail}</small></span>
+    </button>`).join('')}
+  </nav>`;
+}
+function bindPlaybookPath(){
+  document.querySelectorAll('[data-flow]').forEach(b=>{ b.onclick=()=>renderApp(b.dataset.flow); });
 }
 
 // ---- WEEK ----

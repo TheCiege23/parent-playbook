@@ -90,7 +90,7 @@ function trendBars(list, lowerIsBetter){
 async function screenGrowth(){
   logUsageEvent('view_growth');
   const a=state.active; const age=ageFrom(a.birthdate); const band=ageBand(age);
-  const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow},{data:coachUp}] = await Promise.all([
+  const [{data:goals},{data:meas},{data:sess},{data:sports},{data:grow},{data:coachUp},{data:games},{data:miles}] = await Promise.all([
     sb.from('goals').select('*').eq('athlete_id',a.id).order('created_at'),
     sb.from('measurements').select('*').eq('athlete_id',a.id).order('measured_on',{ascending:false}).limit(60),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id).order('done_on',{ascending:false}).limit(60),
@@ -101,8 +101,14 @@ async function screenGrowth(){
       .eq('id',a.id).maybeSingle(),
     sb.from('coach_updates').select('kind,body,created_at').eq('athlete_id',a.id)
       .order('created_at',{ascending:false}).limit(1),
+    sb.from('games').select('game_date,opponent').eq('athlete_id',a.id).order('game_date',{ascending:false}).limit(1),
+    sb.from('milestones').select('milestone_date,title').eq('athlete_id',a.id).order('milestone_date',{ascending:false}).limit(1),
   ]);
   const latestCoachUp = (coachUp||[])[0] || null;
+  const latestGame=(games||[])[0]||null, latestMile=(miles||[])[0]||null;
+  const journeyLatest=latestMile&&(!latestGame||latestMile.milestone_date>=latestGame.game_date)
+    ? {kind:'milestone',date:latestMile.milestone_date,title:latestMile.title}
+    : latestGame ? {kind:'game',date:latestGame.game_date,title:'Game'+(latestGame.opponent?' vs '+latestGame.opponent:'')} : null;
   const primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=primary?.sport_key||state.activeSportKey||'general'; setAppBg();
 
@@ -167,6 +173,7 @@ async function screenGrowth(){
   $("#screen").innerHTML = H`
     ${topBar(`Progress${sinceLabel?` · since ${sinceLabel}`:''}`)}
     <div class="app-pad" style="padding-top:6px">
+      ${playbookPath('growth')}
       <button class="btn ghost" id="growthInsights" style="margin-bottom:14px;width:100%">Body Insights · compare measurements & export →</button>
 
       <div class="ghero">
@@ -223,11 +230,11 @@ async function screenGrowth(){
       </div>
       ${age!=null&&age<13?`<p class="muted-note" style="margin-top:10px">No weigh-ins suggested for under-13s. Ask your pediatrician before tracking weight.</p>`:''}`}
 
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        ${maturityOffsetPrompt(mat,a)}
-        ${growthPrompt(mat)}
+      ${maturityOffsetPrompt(mat,a)}
+      ${growthPrompt(mat)}
 
-      <div class="sec-title">Goals</div>
+      <div class="section-head">
+        <div class="sec-title">Goals</div>
         <button class="btn sm ghost" id="addGoal">＋ Goal</button>
       </div>
       <div class="card app-pad">
@@ -264,6 +271,13 @@ async function screenGrowth(){
             </div><i>›</i></div>
       </div>`:''}
 
+      <div class="connection-card" id="growthToJourney" role="button" tabindex="0">
+        <div><span class="connection-k">Journey</span>
+          <b>${journeyLatest?esc(journeyLatest.title):`Start ${esc(a.first_name)}'s sports story`}</b>
+          <small>${journeyLatest?esc(fmtDate(journeyLatest.date)):'Games, milestones, photos and videos live together.'}</small>
+        </div><i>›</i>
+      </div>
+
       ${primary?.sport_key==='football'?H`<div class="sec-title" style="margin-top:18px">Pop Warner divisions</div>
       <div class="card app-pad">
         ${pwWeight==null
@@ -285,6 +299,7 @@ async function screenGrowth(){
       ${(sess||[]).length?`<p class="muted-note" style="margin-top:16px">${sess.length} session${sess.length===1?'':'s'} logged, most recently ${esc(fmtDate(sess[0].done_on))}.</p>`:''}
     </div>`;
   bindTop();
+  bindPlaybookPath();
   $("#growthInsights").onclick=()=>renderApp('insights');
   { const b=$("#addGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
   { const b=$("#heroGoal"); if(b) b.onclick=()=>openAddGoal(goals||[]); }
@@ -306,6 +321,7 @@ async function screenGrowth(){
   { const b=$("#addMeas"); if(b) b.onclick=()=>openAddMeasure(); }
   { const b=$("#heroRecord"); if(b&&leadKey) b.onclick=()=>openAddMeasure(leadKey); }
   { const b=$("#mpBanner"); clickableCard(b,openMarketplace); }
+  { const j=$("#growthToJourney"); clickableCard(j,()=>renderApp('journey')); }
   $("#screen").querySelectorAll('[data-rec]').forEach(b=>b.onclick=()=>openAddMeasure(b.dataset.rec));
   // Achieving keeps the goal in the record; removing takes it out of the plan entirely.
   $("#screen").querySelectorAll('[data-achieve]').forEach(b=>b.onclick=async()=>{
