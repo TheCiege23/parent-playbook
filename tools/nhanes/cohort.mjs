@@ -59,14 +59,21 @@ export const EXCLUSIONS = Object.freeze([
   { id: 'pregnant_or_undetermined', label: 'Pregnant, or pregnancy undetermined',
     // Amendment 3: an exclusion, never a requirement. Asked only of women 20-44.
     test: p => p.demo.RIDEXPRG === 1 || p.demo.RIDEXPRG === 3 },
+  // The three DXA steps also see participants the replicate collapse already removed. Under the
+  // measured_only policy the collapse drops imputed participants before any exclusion runs, so they
+  // arrive here with no DXA row. Counting them as "No DXA record" was wrong in a way that hid the
+  // study's largest deliberate exclusion: 1,700 early-cycle adults were filed as never scanned.
+  // p.dxaDropped says the collapse removed them and whether any replicate carried a value, so each
+  // lands in the step that describes why — the same step they would reach under single_imputation.
   { id: 'no_dxa_record', label: 'No DXA record',
-    test: p => p.dxa == null },
+    test: p => p.dxa == null && p.dxaDropped == null },
   { id: 'dxa_not_usable', label: 'DXA present but no whole-body result',
     // Amendment 3: the value's presence, NOT the exam status flag.
-    test: p => p.dxa.DXDTOPF == null || p.dxa.DXDTOFAT == null || p.dxa.DXDTOLI == null || p.dxa.DXDTOTOT == null },
+    test: p => (p.dxaDropped ? !p.dxaDropped.hasValue
+      : p.dxa.DXDTOPF == null || p.dxa.DXDTOFAT == null || p.dxa.DXDTOLI == null || p.dxa.DXDTOTOT == null) },
   { id: 'dxa_imputed', label: 'DXA value imputed rather than measured',
     // Amendment 1. Only the early cycles impute; elsewhere DXITOT is absent and this never fires.
-    test: p => p.dxa.DXITOT != null && p.dxa.DXITOT !== 0 },
+    test: p => (p.dxaDropped ? true : p.dxa.DXITOT != null && p.dxa.DXITOT !== 0) },
   { id: 'no_body_measures', label: 'No body-measures record',
     test: p => p.bmx == null },
   { id: 'missing_inputs', label: 'Missing height, weight or sex',
@@ -149,11 +156,13 @@ export function buildCohort(cycles, { trainPercent = 80 } = {}) {
     const demoById = new Map(demo.map(row => [row.SEQN, row]));
     const bmxById = new Map(bmx.map(row => [row.SEQN, row]));
     const dxaById = new Map(collapsed.rows.map(row => [row.SEQN, row]));
+    const droppedDxaById = new Map(collapsed.droppedParticipants.map(entry => [entry.id, entry]));
 
     // Everyone with a demographics record is a candidate; the DXA and body-measures records are
     // looked up and their absence is an exclusion with its own line rather than a silent drop.
     let candidates = [...demoById.keys()].map(seqn => ({
       seqn, demo: demoById.get(seqn), bmx: bmxById.get(seqn) ?? null, dxa: dxaById.get(seqn) ?? null,
+      dxaDropped: droppedDxaById.get(seqn) ?? null,
     }));
 
     const steps = [{ step: 'start', label: 'Participants with a demographics record', remaining: candidates.length }];

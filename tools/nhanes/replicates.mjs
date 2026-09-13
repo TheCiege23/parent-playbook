@@ -92,13 +92,13 @@ export function detectReplicates(rows, { idKey = 'SEQN', versionKey = '_MULT_' }
  * choosing between.
  */
 export function collapseReplicates(rows, {
-  policy = null, idKey = 'SEQN', versionKey = '_MULT_', imputationFlagKey = 'DXITOT',
+  policy = null, idKey = 'SEQN', versionKey = '_MULT_', imputationFlagKey = 'DXITOT', valueKey = 'DXDTOPF',
 } = {}) {
   const shape = detectReplicates(rows, { idKey, versionKey });
 
   if (!shape.replicated) {
     return Object.freeze({
-      rows, policy: 'not_replicated',
+      rows, policy: 'not_replicated', droppedParticipants: Object.freeze([]),
       report: Object.freeze({ ...shape, kept: rows.length, dropped: 0,
         note: 'One row per participant; no replicate handling was needed or applied.' }),
     });
@@ -133,13 +133,21 @@ export function collapseReplicates(rows, {
   }
 
   const kept = [];
+  // Who measured_only removed, and whether any replicate carried a value. Returned rather than only
+  // counted: these participants leave the file here, before any exclusion runs, and a cohort flow
+  // that cannot see them counts them as having no DXA record at all.
+  const dropped = [];
   let droppedImputed = 0, keptImputed = 0, keptMeasured = 0;
 
   for (const [, group] of byParticipant) {
     // The flag is on every replicate of a participant; the first is representative.
     const imputed = group[0]?.[imputationFlagKey] !== 0;
     if (policy === 'measured_only') {
-      if (imputed) { droppedImputed++; continue; }
+      if (imputed) {
+        droppedImputed++;
+        dropped.push(Object.freeze({ id: group[0][idKey], hasValue: group.some(row => row[valueKey] != null) }));
+        continue;
+      }
       kept.push(pickVersion(group, versionKey, 1));
       keptMeasured++;
     } else if (policy === 'single_imputation') {
@@ -154,6 +162,7 @@ export function collapseReplicates(rows, {
   return Object.freeze({
     rows: kept,
     policy,
+    droppedParticipants: Object.freeze(dropped),
     report: Object.freeze({
       ...shape,
       policy,
@@ -163,6 +172,8 @@ export function collapseReplicates(rows, {
       dropped: rows.length - kept.length,
       participantsKept: policy === 'measured_only' ? keptMeasured : byParticipant.size,
       participantsDropped: policy === 'measured_only' ? droppedImputed : 0,
+      droppedWithImputedValue: dropped.filter(d => d.hasValue).length,
+      droppedWithoutValue: dropped.filter(d => !d.hasValue).length,
       measuredParticipants: keptMeasured,
       imputedParticipants: policy === 'measured_only' ? 0 : keptImputed,
       // Said out loud in the report rather than left to the reader to remember.

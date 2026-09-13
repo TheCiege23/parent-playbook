@@ -227,11 +227,19 @@ files against `sources.lock.json`. The final holdout is **not** built by default
 preregistration says it is read once, at the release decision, and a command that produces it on
 every iteration is how "read once" quietly becomes "read forty times".
 
+> **Recomputed 2026-09-13.** The first version of this table did not match the code. The replicate
+> collapse removes imputed participants before any exclusion runs, so the flow filed the 1,700
+> early-cycle adults removed by the measured-only rule under "No DXA", as if they had never been
+> scanned. Its 1999–2000 row also gave intermediate counts the code does not produce. The flow now
+> counts each participant in the step that says why they were excluded, and the table below is its
+> output. The included counts, the partition and every model result are unchanged: the cohort was
+> fingerprinted before and after the change and is identical.
+
 | Cycle | Start | Under 18 | Over 59 | Pregnant | No DXA | DXA unusable | Imputed | Missing inputs | **Included** |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1999–2000 | 9,965 | 4,409 | 1,668 | 480 | 601 | 0 | 350 | 7 | **2,450** |
-| 2001–2002 | 11,039 | 5,046 | 1,872 | 535 | 665 | 0 | 0 | 11 | **2,910** |
-| 2003–2004 | 10,122 | 4,502 | 1,901 | 445 | 666 | 0 | 0 | 15 | **2,593** |
+| 1999–2000 | 9,965 | 4,517 | 1,834 | 519 | 118 | 14 | 506 | 7 | **2,450** |
+| 2001–2002 | 11,039 | 5,046 | 1,872 | 535 | 71 | 74 | 520 | 11 | **2,910** |
+| 2003–2004 | 10,122 | 4,502 | 1,901 | 445 | 80 | 22 | 564 | 15 | **2,593** |
 | 2011–2012 | 9,756 | 3,892 | 1,791 | 142 | 104 | 862 | 0 | 9 | **2,956** |
 | 2013–2014 | 10,175 | 4,062 | 1,841 | 159 | 86 | 630 | 0 | 11 | **3,386** |
 | **Development total** | | | | | | | | | **14,295** |
@@ -240,10 +248,11 @@ Split by a stable hash of the participant identifier: **11,417 train, 2,878 cali
 
 Two things the flow shows that a single total would not:
 
-**The imputed and the unusable trade places between eras.** In 1999–2000 the "DXA unusable"
-column is zero and 350 are excluded as imputed; from 2011 the imputation column is zero and 862
-then 630 are excluded as unusable. Same participants in substance — a scan that could not be
-used — reached by opposite mechanisms. A pipeline with one filter would have kept one group or the
+**The imputed and the unusable trade places between eras.** In 1999–2004, 1,590 adults are
+excluded as imputed and only 110 as unusable, because a scan that could not be used was imputed.
+From 2011 the imputation column is zero and 862 then 630 are excluded as unusable, because the same
+kind of scan is left blank. Same participants in substance — a scan that could not be used —
+reached by opposite mechanisms. A pipeline with one filter would have kept one group or the
 other, and the cohort would have looked fine either way.
 
 **The pregnancy exclusion costs nothing, and is still right to have.** Checked directly: of the
