@@ -115,16 +115,16 @@
     <tr><td class="ok">0.75</td><td>Deployed and demonstrated</td>
       <td>Body-insights portal, integration and portable results, data protection and operation</td></tr>
     <tr><td>0.5</td><td>Core workflow with automated checks</td>
-      <td>Guided capture, 25+ anthropometrics, PHV and maturity offset, predicted adult height,
-        static asymmetry, history and reference comparisons, presentation</td></tr>
-    <tr><td>0.25</td><td>Partial</td><td>Personalized 3D body, circumferences</td></tr>
+      <td>Guided capture, personalized 3D body, 25+ anthropometrics, PHV and maturity offset,
+        predicted adult height, static asymmetry, history and reference comparisons, presentation</td></tr>
+    <tr><td>0.25</td><td>Partial</td><td>Circumferences</td></tr>
     <tr><td>0</td><td>Nothing shipped</td><td><strong>Body composition</strong></td></tr>
   </table>
   <p class="sub">Fixed rubric, recorded in <code>tools/parity-progress.json</code>. Stages are
     engineering judgments, not measured accuracy.</p>
-  <div class="notes"><b>Notes.</b> The weights matter more than the total: body composition (15) and
-    personalized 3D body (20) carry 35 of 100 points and are the two weakest. Say it before they
-    find it. The score did not move during this build cycle and was not meant to — the recent work
+  <div class="notes"><b>Notes.</b> The weights matter more than the total. Body composition (15) and
+    circumferences (10) are the two weakest: 25 of 100 points, with 2.5 earned. Personalized 3D body
+    is the heaviest category (20) and is only halfway. Say it before they find it. The score did not move during this build cycle and was not meant to — the recent work
     was operational evidence, not new measurement capability. What moves it is licensed technology
     and validation studies, not more code.</div>
 </section>
@@ -240,7 +240,7 @@
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
     <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v113</code>, 28/28</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>728/728</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>729/729</td></tr>
     <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>298/298</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>7/7 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>

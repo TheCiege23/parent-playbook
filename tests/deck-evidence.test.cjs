@@ -50,6 +50,33 @@ test('the deck cites the weighted parity score the rubric produces', () => {
     'the deck must keep saying no category is fully accepted while that is true');
 });
 
+test('the deck puts every category in the stage the rubric gives it', () => {
+  // The total alone let this go stale. The slide listed FM02 as partial (0.25) while the rubric
+  // scored it 0.5, and 42.75% still matched because nothing added the table up. So each row's
+  // stage is read from the table, and every category id is checked against the rubric.
+  const text = source.replace(/\r\n/g, '\n');
+  const start = text.indexOf('Capability against FIT:MATCH');
+  assert.ok(start !== -1, 'FRIDAY-DECK.md lost the capability slide');
+  const slide = text.slice(start, text.indexOf('\n---', start));
+  const rows = [...slide.matchAll(/^\| (0\.75|0\.5|0\.25|0|1)\b[^|]*\|[^|]*\| ([^|]+) \|$/gm)];
+  assert.ok(rows.length >= 4, 'the stage table should have a row for each stage in use');
+
+  const placed = new Map();
+  for (const [, stage, ids] of rows) {
+    for (const id of ids.match(/FM\d{2}/g) || []) {
+      assert.ok(!placed.has(id), id + ' appears in more than one stage row');
+      placed.set(id, Number(stage));
+    }
+  }
+  for (const category of parity.categories) {
+    assert.ok(placed.has(category.id), 'the stage table omits ' + category.id);
+    assert.strictEqual(placed.get(category.id), category.stage,
+      category.id + ' (' + category.name + ') is listed at stage ' + placed.get(category.id)
+      + ' but the rubric scores it ' + category.stage);
+  }
+  assert.strictEqual(placed.size, parity.categories.length, 'the stage table lists a category the rubric does not have');
+});
+
 test('the deck cites the archive size the bundler actually produces', () => {
   const payload = BUNDLE_FILES.length;
   assert.ok(deck.includes(`${payload} files`) || deck.includes(`${payload}/${payload}`),
