@@ -53,9 +53,9 @@ named in any file that ships in the buyer package.
 | `replay.cjs` | Applies all 85 real migrations in order, each in its own transaction, recording failures rather than stopping |
 | `10-fixtures.sql` | Two synthetic organizations, three synthetic accounts, three synthetic athletes, six synthetic provider registrations (active, revoked, expired, narrow, other-study), and payload builders |
 | `security-tests.cjs` | 304 cases, each in its own transaction, rolled back |
-| `restore-deletion.cjs` | 17 cases that must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact |
+| `restore-deletion.cjs` | 19 cases. Seventeen must COMMIT: does a deleted record actually go, and does this schema survive a dump and restore with row-level security and privileges intact. Two run `tests/company-deletion-live-rls.sql`, the rollback-only rehearsal written for production, once as written and once with its refusal deliberately broken |
 
-Expected result: **84 of 85 migrations applied**, **304/304 security cases** and **17/17 rehearsal
+Expected result: **84 of 85 migrations applied**, **304/304 security cases** and **19/19 rehearsal
 cases** pass. The single migration failure is `20260812174514_enable_cron_and_net.sql`, which needs
 the pg_cron and pg_net binaries that only exist inside Supabase.
 

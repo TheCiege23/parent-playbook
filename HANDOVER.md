@@ -178,7 +178,7 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
 | `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
-| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 321 cases pass as restricted roles: 304 security cases plus a 17-case restore and deletion rehearsal |
+| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 323 cases pass as restricted roles: 304 security cases plus a 19-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
 | `node tools/sdk-host-smoke.cjs <url>` | A deployed host serves exactly the manifest's modules, over HTTPS, and nothing else from the package |
