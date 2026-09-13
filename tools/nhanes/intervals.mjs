@@ -9,11 +9,13 @@
  *
  * WHAT A HALF-WIDTH MAY DEPEND ON
  *
- * Nothing about the person. intervalFor takes an estimate and a half-width and nothing else, so no
- * input — and in particular no race or ethnicity — can widen or narrow one person's interval
- * relative to another's. The group-covering rule looks at subgroups to choose that single number,
- * and amendment 6 records that as a use of the audit variable the preregistration did not
- * contemplate. It is still one number.
+ * Under amendment 6, nothing about the person. Under amendment 7, sex and nothing else: sex is
+ * already a model input, and PERMITTED_STRATA is a closed list, so no other key becomes a stratum
+ * because a caller passed one. intervalFor itself still takes an estimate and a half-width and
+ * nothing else. Race and ethnicity can therefore never make one person's interval wider or narrower
+ * than another's. The group-covering rules do look at subgroups, audit groups included, to choose a
+ * number, and amendments 6 and 7 record that as a use of the audit variable the preregistration did
+ * not contemplate. Within a stratum it is still one number.
  */
 
 const fail = (code, message) => { throw Object.assign(new Error(message), { name: 'NhanesIntervalError', code }); };
@@ -120,4 +122,51 @@ export function summarizeCoverage(records, { nominal = NOMINAL_COVERAGE, z = 2 }
   const coverage = covered / n;
   const floor = coverageFloor(n, { nominal, z });
   return Object.freeze({ n, covered, coverage, estimateTooHigh, estimateTooLow, floor, z, pass: coverage >= floor });
+}
+
+/* Inputs a half-width may be chosen by. Amendment 7 allows sex, which the model already uses. The
+ * list is closed on purpose: a stratum is a way of giving some people a different interval from
+ * others, and the audit variable must never become one because a caller passed its name.
+ */
+export const PERMITTED_STRATA = Object.freeze(['sexMale']);
+
+/* One half-width per value of a permitted stratum, under the pooled or group-covering rule.
+ *
+ * records: [{ absoluteResidual, person }]. Under 'group-covering', breakdowns are applied within
+ * each stratum, so a subgroup has to reach the minimum inside that stratum to set its width.
+ */
+export function stratifiedHalfWidths(records, stratum, { rule = 'pooled', breakdowns = {}, coverage, minimum } = {}) {
+  if (!PERMITTED_STRATA.includes(stratum)) {
+    fail('FORBIDDEN_STRATUM', stratum + ' may not choose a half-width. Permitted: ' + PERMITTED_STRATA.join(', ') + '.');
+  }
+  if (rule !== 'pooled' && rule !== 'group-covering') fail('UNKNOWN_RULE', 'Rule must be pooled or group-covering; got ' + rule + '.');
+  const byValue = new Map();
+  for (const record of records) {
+    const value = record.person?.[stratum];
+    // Refused rather than skipped, for the same reason as a missing residual: dropping it shrinks n.
+    if (value == null) fail('MISSING_STRATUM', 'A residual with no ' + stratum + ' cannot be given a width.');
+    if (!byValue.has(value)) byValue.set(value, []);
+    byValue.get(value).push(record);
+  }
+  const widths = {};
+  for (const [value, rows] of [...byValue].sort((a, b) => String(a[0]).localeCompare(String(b[0])))) {
+    if (rule === 'pooled') {
+      widths[value] = Object.freeze({ n: rows.length, halfWidth: conformalHalfWidth(rows.map(r => r.absoluteResidual), coverage), binding: null });
+    } else {
+      const covering = groupCoveringHalfWidth(rows, breakdowns, { coverage, minimum });
+      widths[value] = Object.freeze({ n: rows.length, halfWidth: covering.halfWidth, pooled: covering.pooled, binding: covering.binding });
+    }
+  }
+  return Object.freeze({ stratum, rule, widths: Object.freeze(widths) });
+}
+
+/* The half-width for one person, or null when their stratum has none.
+ *
+ * No fallback to another stratum's width or to a pooled one. A person whose stratum was never
+ * calibrated has no stated coverage, and borrowing a width would state one anyway.
+ */
+export function halfWidthFor(stratified, person) {
+  const value = person?.[stratified.stratum];
+  if (value == null || !Object.hasOwn(stratified.widths, value)) return null;
+  return stratified.widths[value].halfWidth;
 }

@@ -127,6 +127,7 @@ const BUNDLE_RESEARCH = Object.freeze([
   'research/NHANES-HOLDOUT.md',
   'research/NHANES-ATTEMPT-2.md',
   'research/NHANES-INTERVALS.md',
+  'research/NHANES-INTERVALS-BY-SEX.md',
   'research/model/MODEL-CARD.md',
   'research/model/bodyfat-candidate-v0.1.0.json',
   'research/model/bodyfat-candidate-v0.1.0.sha256',

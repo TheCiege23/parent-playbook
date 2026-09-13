@@ -142,3 +142,68 @@ test('run-intervals never loads the unread holdout', () => {
   assert.match(source, /cohortRoleFor\(entry\.role, entry\.cycle\) !== 'development'\) continue;/);
   assert.ok(!/include-holdout|2015-2016'\s*:/.test(source));
 });
+
+// ----------------------------------------------------------------- amendment 7: a half-width per sex
+
+const sexed = (sexMale, residuals, extra = {}) => residuals.map(absoluteResidual => ({ absoluteResidual, person: { sexMale, ...extra } }));
+
+test('each sex gets the conformal half-width of its own residuals', () => {
+  const records = [...sexed(0, range(1, 19).map(i => i / 2)), ...sexed(1, range(1, 19).map(i => i / 4))];
+  const result = I.stratifiedHalfWidths(records, 'sexMale');
+  assert.equal(result.widths[0].halfWidth, I.conformalHalfWidth(range(1, 19).map(i => i / 2)));
+  assert.equal(result.widths[1].halfWidth, I.conformalHalfWidth(range(1, 19).map(i => i / 4)));
+  assert.equal(I.halfWidthFor(result, { sexMale: 0 }), 9);
+  assert.equal(I.halfWidthFor(result, { sexMale: 1 }), 4.5);
+});
+
+test('only sex may choose a half-width, and above all not the audit variable', () => {
+  const records = sexed(0, range(1, 19));
+  for (const stratum of ['raceEthnicity', 'RIDRETH1', 'ageYears', 'waistCm', 'cycle']) {
+    rejects(() => I.stratifiedHalfWidths(records, stratum), 'FORBIDDEN_STRATUM');
+  }
+  assert.deepEqual([...I.PERMITTED_STRATA], ['sexMale']);
+  assert.ok(Object.isFrozen(I.PERMITTED_STRATA), 'the list cannot be extended at runtime');
+});
+
+test('a residual with no sex is refused, and an unknown rule is refused', () => {
+  rejects(() => I.stratifiedHalfWidths([...sexed(0, range(1, 19)), { absoluteResidual: 3, person: {} }], 'sexMale'), 'MISSING_STRATUM');
+  rejects(() => I.stratifiedHalfWidths(sexed(0, range(1, 19)), 'sexMale', { rule: 'widest' }), 'UNKNOWN_RULE');
+});
+
+test('a stratum with no calibrated width gets no width, not a borrowed one', () => {
+  const result = I.stratifiedHalfWidths(sexed(1, range(1, 19)), 'sexMale');
+  assert.equal(I.halfWidthFor(result, { sexMale: 1 }), 18);
+  assert.equal(I.halfWidthFor(result, { sexMale: 0 }), null, 'women were never calibrated here; no width');
+  assert.equal(I.halfWidthFor(result, {}), null);
+  assert.equal(I.halfWidthFor(result, { sexMale: 'toString' }), null, 'inherited names are not strata');
+});
+
+test('group-covering within a sex is set by a subgroup that is large enough inside that sex', () => {
+  const records = [
+    // Women: band b's residuals run wider than the pooled set's, so b sets their width.
+    ...sexed(0, range(1, 200).map(i => i / 40), { band: 'a' }),
+    ...sexed(0, range(1, 150).map(i => i / 20), { band: 'b' }),
+    ...sexed(0, range(1, 20).map(() => 0.5), { band: 'c' }),
+    // Men: band c's residuals are huge, but only 20 men are in it — under the minimum, and few
+    // enough not to move the pooled quantile — so c must not set their width.
+    ...sexed(1, range(1, 300).map(i => i / 60), { band: 'a' }),
+    ...sexed(1, range(1, 20).map(() => 40), { band: 'c' }),
+  ];
+  const result = I.stratifiedHalfWidths(records, 'sexMale', { rule: 'group-covering', breakdowns: { band: p => p.band } });
+  assert.equal(result.widths[0].binding.key, 'b');
+  assert.equal(result.widths[0].halfWidth, I.conformalHalfWidth(range(1, 150).map(i => i / 20)));
+  assert.ok(result.widths[0].halfWidth > result.widths[0].pooled);
+  assert.equal(result.widths[1].binding, null, 'band c has 20 men, under the minimum, so it cannot set their width');
+  assert.ok(result.widths[1].halfWidth < 40);
+  assert.equal(result.widths[1].groups, undefined, 'the per-sex entry reports its width, not a second copy of every group');
+});
+
+test('run-intervals requires an attempt and has no default', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'tools', 'nhanes', 'run-intervals.cjs'), 'utf8');
+  assert.match(source, /!\['3', '4'\]\.includes\(ATTEMPT\)/);
+  assert.ok(!/valueFor\('--attempt'\)\s*(\|\||\?\?)/.test(source), 'an attempt must not fall back to a default');
+  // Attempt 4 stratifies by sex through the closed list and nothing else.
+  const strata = source.match(/stratifiedHalfWidths\([^,]+,\s*'([^']+)'/g) || [];
+  assert.ok(strata.length >= 2);
+  assert.ok(strata.every(call => call.endsWith("'sexMale'")));
+});

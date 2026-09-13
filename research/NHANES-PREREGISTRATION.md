@@ -524,4 +524,61 @@ finding is that one interval cannot state this model's uncertainty honestly for 
 
 ---
 
+### 7 — 2026-09-12 — attempt 4: a half-width per sex, with 2015-2016 still unread
+
+**What was known when this was made.** Everything attempt 3 produced (research/NHANES-INTERVALS.md).
+One half-width for everyone under-covered women in every left-out cycle: 86.0% pooled, against 92.1%
+for men. The group-covering width passed everything except one cell — women in 1999-2000, 87.3%
+against a floor of 87.4%, with 120 misses too low against 30 too high. No per-sex half-width has been
+computed. 2015-2016 remains unread, and this attempt does not read it.
+
+**This attempt was suggested by the last result, and that is its central weakness.** Amendments 1–6
+were each written before the results they judge. This one was written after seeing exactly the
+failure it is designed to fix, on the same five development cycles it will be evaluated on. A pass
+here is therefore weaker evidence than a pass under amendment 6 would have been. It would justify
+going to the reviewer and then reading 2015-2016. It would not, by itself, justify anything else.
+
+Something is also foreseeable, and it is recorded for the same reason as before. A separate
+half-width fixes a difference in **spread** between women and men; it does not fix a **shift**.
+Attempt 3's misses for women ran four to one in one direction in 1999-2000, and two to one or more
+the other way in 2011-2014. If that shift is large, a half-width per sex will still under-cover women
+in some cycle, and the per-cycle criterion is where that would show.
+
+**What changes: one half-width per sex.** Sex is already a model input (§3), so letting it choose the
+half-width uses no information the model does not already have. Every other rule of the amendment 6
+interval stands: B+ as frozen, split-conformal, symmetric, nominal 90%, truncated to 1–75%. Within a
+sex, every person gets the same half-width. Race never chooses a half-width, and no input other than
+sex does.
+
+**Two width rules, in order.**
+
+- **S1, per sex, race-blind:** each sex's half-width is the conformal half-width of that sex's
+  residuals.
+- **S2, per sex, group-covering:** within each sex, the largest of that sex's pooled half-width and
+  the half-width of each subgroup within that sex — age band, BMI band and race/ethnicity audit group
+  — that has at least 100 conformal participants. It carries the same flag as W2: the audit variable
+  helps set a number, and that goes to the reviewer.
+
+S1 is preferred. S2 is considered only if S1 fails. If both fail, attempt 4 fails.
+
+**Evaluation and criteria: exactly amendment 6's.** Leave one development cycle out, with the same
+coverage floors — overall, per pooled subgroup, and per subgroup within each left-out cycle — and the
+same minimum of 100. Usefulness is judged per sex: in every fold, for each sex, B+'s half-width must be
+narrower than baseline 1's under the same rule. Nothing loosens, including the per-cycle floor that
+attempt 3's closest result missed by 0.1.
+
+**A regression check comes first.** The runner is extended rather than replaced. Before any per-sex
+half-width is computed, it must reproduce attempt 3 exactly: W1 at 89.2% overall with 8 of 73
+per-cycle cells failing, and W2 at 92.5% overall with 1 of 73 failing. If it does not, nothing it
+reports for attempt 4 can be trusted.
+
+**If attempt 4 meets the criteria**, the next decisions come in order. First, the reviewer decides
+whether an interval product may be released when its centre fails amendment 4, as amendment 6
+already referred. Then comes freezing it. Last is reading 2015-2016 against these criteria — the only
+test of this attempt whose result was not already seen. **If it fails**, the finding is that neither
+one half-width nor one per sex can state this model's uncertainty honestly across survey eras, and
+the not-released result stands.
+
+---
+
 Any further amendment records its date, its reason, and what was already known when it was made.
