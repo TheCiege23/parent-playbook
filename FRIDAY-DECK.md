@@ -13,7 +13,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 28/28 checks, `ok: true` |
+| Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 29/29 checks, `ok: true` |
 | JavaScript suite | `node --test "tests/*.test.cjs"` | 729/729 |
 | Database suite | `node tests/db/run.cjs` | 298/298 on a disposable cluster built from the real migrations: 281 security cases plus a 17-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 202/202, exclusions clean, contracts 316/316, database 298/298, signature verified, host serving |
