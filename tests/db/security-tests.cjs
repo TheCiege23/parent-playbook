@@ -1272,6 +1272,130 @@ add('T01', 'notification-schedules', 'the migrations schedule all four push jobs
       where command like '%/functions/v1/notify-%' and command like '%vault.decrypted_secrets%';`,
     expect: 'ok', expectOut: 'daily-nudge=12 20 * * *,gameday-push=0 23 * * *,measure-nudge=14 14 * * 0,weekly-plan-push=0 22 * * 0' });
 
+// =========================================================== U. parent body scan records
+//
+// A parent's body scan is one row in public.body_scan_assessments, and its outputs are the measurements that
+// reference it. These cases pin the save (one call, idempotent, as the signed-in guardian), the consent gate that
+// applies even to the service role, the provenance allowlist, deletion, retention, the audit and the backfill.
+const SCAN_ID = 'd5000000-0000-4000-8000-000000000001';
+const SCAN_OLD = 'd5000000-0000-4000-8000-000000000002';
+const SCAN_CONSENT = 'd6000000-0000-4000-8000-000000000001';
+const SCAN_FAMILY = 'ffffffff-0000-4000-8000-00000000000f';
+const SCAN_OTHER_ATHLETE = 'b1111111-1111-4111-8111-11111111111b';
+const SCAN_REVOKED_AT = '2026-08-01T00:00:00Z';
+
+const scanConsent = ({ athlete = ATH_A, engine = 'ondevice-pose', until = 'current_date + 365', revoked = null } = {}) =>
+  `insert into public.biometric_consents(id, athlete_id, guardian_id, subject_is_minor, policy_version, scan_engine, retention_until, revoked_at)
+   values ('${SCAN_CONSENT}', '${athlete}', '${MEMBER_C}', true, 'synthetic-scan-policy', '${engine}', ${until}, ${revoked ? `'${revoked}'` : 'null'});`;
+// A view-only grandparent: family view is granted per athlete through athlete_access.
+const scanFamilyViewer = `insert into public.athlete_access(athlete_id, guardian_id, role) values ('${ATH_A}', '${ADMIN_B}', 'family_view');`;
+const scanRowId = i => 'd7000000-0000-4000-8000-' + String(i).padStart(12, '0');
+const saveScan = ({ athlete = ATH_A, rowAthlete = athlete, actor = MEMBER_C, engine = 'ondevice-pose', record = "'{}'::jsonb", rows = 2 } = {}) => {
+  const items = Array.from({ length: rows }, (_, i) =>
+    `jsonb_build_object('id','${scanRowId(i + 1)}','athlete_id','${rowAthlete}','metric_key','${i % 2 ? 'leg_length' : 'wingspan'}',`
+    + `'value',${60 + i},'unit','in','source','photo','measured_on',current_date,'created_by','${actor}',`
+    + `'scan_assessment_id','${SCAN_ID}','note','synthetic scan row')`);
+  return `select public.save_body_scan_assessment(
+    jsonb_build_object('id','${SCAN_ID}','athlete_id','${athlete}','consent_id','${SCAN_CONSENT}','captured_at',now() - interval '1 hour',
+      'engine',jsonb_build_object('id','${engine}','version','0.0.0-synthetic','model','synthetic'),'record',${record}),
+    jsonb_build_array(${items.join(',')}))::text;`;
+};
+// Planted as the table owner, standing in for a scan saved earlier.
+const seedScan = ({ id = SCAN_ID, rowId = scanRowId(1), captured = "now() - interval '1 hour'", retention = "now() + interval '11 months'" } = {}) =>
+  `insert into public.body_scan_assessments(id, athlete_id, consent_id, created_by, engine_id, engine_version, engine_model,
+     captured_at, measured_on, retention_until, output_count, record)
+   values ('${id}', '${ATH_A}', '${SCAN_CONSENT}', '${MEMBER_C}', 'ondevice-pose', '0.0.0-synthetic', 'synthetic',
+     ${captured}, (${captured})::date, ${retention}, 1, '{}'::jsonb);
+   insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by, note, scan_assessment_id)
+   values ('${rowId}', '${ATH_A}', 'wingspan', 60, 'in', 'photo', (${captured})::date, '${MEMBER_C}', 'synthetic scan row', '${id}');`;
+// Two rows saved before scan records existed, carrying the old note, plus one whose note does not parse.
+const legacyScanRows = [1, 2].map(i =>
+  `insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by, note)
+   values ('${scanRowId(i)}', '${ATH_A}', '${i === 1 ? 'wingspan' : 'leg_length'}', ${59 + i}, 'in', 'photo', current_date - 1, '${MEMBER_C}',
+     'PP_SCAN_V1:' || jsonb_build_object('schema', 1, 'id', '${SCAN_ID}', 'athlete_id', '${ATH_A}', 'captured_at', now() - interval '1 day',
+       'consent_id', '${SCAN_CONSENT}', 'engine', jsonb_build_object('id', 'ondevice-pose', 'version', '0.0.0-synthetic', 'model', 'synthetic'),
+       'photo_reuse_check', jsonb_build_object('protocol', 'exact-photo-bytes-v1', 'checked_views', 4, 'distinct_files', true),
+       'quality', jsonb_build_object('kind', 'heuristic'))::text);`).join('\n')
+  + `\ninsert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by, note)
+   values ('${scanRowId(9)}', '${ATH_A}', 'wingspan', 61, 'in', 'photo', current_date - 1, '${MEMBER_C}', 'PP_SCAN_V1:{broken');`;
+const asScanParent = { role: 'authenticated', claims: MEMBER_C };
+const scanRowCount = `select count(*)::text from public.measurements where scan_assessment_id = '${SCAN_ID}';`;
+const SCAN_NOT_LIVE = /scan permission is not live for this athlete and scan method/;
+
+add('U01', 'body-scan-records', 'a guardian saves a scan and its outputs in one call, linked to each other',
+  { setup: scanConsent(), ...asScanParent, sql: saveScan() + scanRowCount, expect: 'ok', expectOut: '2' });
+add('U02', 'body-scan-records', 'saving the same scan again is a no-op, not a duplicate',
+  { setup: scanConsent(), ...asScanParent,
+    sql: saveScan() + saveScan() + `select (select count(*) from public.body_scan_assessments where id = '${SCAN_ID}') || '|' || (select count(*) from public.measurements where scan_assessment_id = '${SCAN_ID}');`,
+    expect: 'ok', expectOut: '1|2' });
+add('U03', 'body-scan-records', 'the scan is destroyed no later than the end of the release it was taken under',
+  { setup: scanConsent({ until: 'current_date + 30' }), ...asScanParent,
+    sql: saveScan() + `select (retention_until > now() and retention_until <= now() + interval '32 days')::text from public.body_scan_assessments where id = '${SCAN_ID}';`,
+    expect: 'ok', expectOut: 'true' });
+add('U04', 'body-scan-records', 'a withdrawn release refuses the save',
+  { setup: scanConsent({ revoked: SCAN_REVOKED_AT }), ...asScanParent, sql: saveScan(), expect: 'error', expectError: SCAN_NOT_LIVE });
+add('U05', 'body-scan-records', 'a release for a different scan method refuses the save',
+  { setup: scanConsent({ engine: 'jump-video' }), ...asScanParent, sql: saveScan(), expect: 'error', expectError: SCAN_NOT_LIVE });
+add('U06', 'body-scan-records', "another athlete's release refuses the save",
+  { setup: scanConsent({ athlete: ATH_OFF }), ...asScanParent, sql: saveScan(), expect: 'error', expectError: SCAN_NOT_LIVE });
+add('U07', 'body-scan-records', 'a family viewer cannot save a scan',
+  { setup: scanConsent() + scanFamilyViewer, role: 'authenticated', claims: ADMIN_B, sql: saveScan({ actor: ADMIN_B }),
+    expect: 'error', expectError: /row-level security/ });
+add('U08', 'body-scan-records', "a scan cannot carry another athlete's measurement",
+  { setup: scanConsent(), ...asScanParent, sql: saveScan({ rowAthlete: SCAN_OTHER_ATHLETE }),
+    expect: 'error', expectError: /Every measurement must belong to this scan/ });
+add('U09', 'body-scan-records', 'provenance naming a landmark is refused, however deep',
+  { setup: scanConsent(), ...asScanParent,
+    sql: saveScan({ record: "jsonb_build_object('quality', jsonb_build_object('landmarks', jsonb_build_array(1, 2)))" }),
+    expect: 'error', expectError: /body_scan_assessments_record_check/ });
+add('U10', 'body-scan-records', 'provenance with a field outside the allowlist is refused',
+  { setup: scanConsent(), ...asScanParent, sql: saveScan({ record: "jsonb_build_object('frames', 'x')" }),
+    expect: 'error', expectError: /body_scan_assessments_record_check/ });
+add('U11', 'body-scan-records', 'more than 32 outputs is refused',
+  { setup: scanConsent(), ...asScanParent, sql: saveScan({ rows: 33 }), expect: 'error', expectError: /between 1 and 32 measurements/ });
+add('U12', 'body-scan-records', 'deleting a scan deletes its outputs',
+  { setup: scanConsent() + seedScan(), ...asScanParent,
+    sql: `delete from public.body_scan_assessments where id = '${SCAN_ID}';` + scanRowCount, expect: 'ok', expectOut: '0' });
+add('U13', 'body-scan-records', 'a family viewer cannot delete a scan',
+  { setup: scanConsent() + seedScan() + scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
+    sql: `delete from public.body_scan_assessments where id = '${SCAN_ID}';reset role;` + scanRowCount, expect: 'ok', expectOut: '1' });
+add('U14', 'body-scan-records', 'no one can edit a saved scan, anon cannot read one, and only a signed-in user can call the save',
+  { sql: `select (not has_table_privilege('authenticated', 'public.body_scan_assessments', 'UPDATE')
+      and not has_table_privilege('anon', 'public.body_scan_assessments', 'SELECT')
+      and has_table_privilege('authenticated', 'public.body_scan_assessments', 'DELETE')
+      and not has_function_privilege('anon', 'public.save_body_scan_assessment(jsonb,jsonb)', 'EXECUTE')
+      and has_function_privilege('authenticated', 'public.save_body_scan_assessment(jsonb,jsonb)', 'EXECUTE')
+      and (select relrowsecurity from pg_class where oid = 'public.body_scan_assessments'::regclass))::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('U15', 'body-scan-records', 'the service role, which bypasses row-level security, still needs a live release',
+  { setup: scanConsent({ revoked: SCAN_REVOKED_AT }), role: 'service_role', sql: seedScan(), expect: 'error', expectError: SCAN_NOT_LIVE });
+add('U16', 'body-scan-records', 'the nightly sweep deletes a scan past its retention date with its outputs, and keeps a current one',
+  { setup: scanConsent() + seedScan({ id: SCAN_OLD, rowId: scanRowId(2), captured: "now() - interval '13 months'", retention: "now() - interval '1 month'" }) + seedScan(),
+    sql: `select private.sweep_biometric_retention();
+      select (select count(*) from public.body_scan_assessments where id in ('${SCAN_ID}', '${SCAN_OLD}')) || '|'
+        || (select count(*) from public.measurements where scan_assessment_id in ('${SCAN_ID}', '${SCAN_OLD}'));`,
+    expect: 'ok', expectOut: '1|1' });
+add('U17', 'body-scan-records', 'saving a scan is audited with identifiers only, never a measurement',
+  { setup: scanConsent() + seedScan(),
+    sql: `select (count(*) = 1 and bool_and(detail->>'output_count' = '1') and bool_and(not (detail ? 'value')) and bool_and(not (detail ? 'metric_key')))::text
+      from public.access_log where action = 'body_scan_assessment_insert' and detail->>'assessment_id' = '${SCAN_ID}';`,
+    expect: 'ok', expectOut: 'true' });
+add('U18', 'body-scan-records', 'rows saved before scan records existed are linked into one scan when their release is live',
+  { setup: scanConsent() + legacyScanRows,
+    sql: `select private.link_legacy_body_scans();
+      select (select output_count from public.body_scan_assessments where id = '${SCAN_ID}') || '|'
+        || (select count(*) from public.measurements where scan_assessment_id = '${SCAN_ID}') || '|'
+        || (select (record ? 'reuse_check' and not (record ? 'photo_reuse_check'))::text from public.body_scan_assessments where id = '${SCAN_ID}');`,
+    expect: 'ok', expectOut: '2|2|true' });
+add('U19', 'body-scan-records', 'an old scan whose release was withdrawn is left exactly as it was',
+  { setup: scanConsent({ revoked: SCAN_REVOKED_AT }) + legacyScanRows,
+    sql: `select private.link_legacy_body_scans()::text;`, expect: 'ok', expectOut: '0' });
+add('U20', 'body-scan-records', 'only a photo measurement can belong to a scan',
+  { setup: scanConsent() + seedScan(),
+    sql: `insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by, scan_assessment_id)
+      values ('${scanRowId(5)}', '${ATH_A}', 'wingspan', 60, 'in', 'manual', current_date, '${MEMBER_C}', '${SCAN_ID}');`,
+    expect: 'error', expectError: /measurements_scan_assessment_photo_check/ });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

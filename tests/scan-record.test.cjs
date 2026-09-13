@@ -36,13 +36,34 @@ test('comparison excludes changed engine version, changed model and legacy/new m
   x.engine.version='1';x.engine.model='lite';assert.equal(c.scanCompatibility(a,c.buildScanRecord(input(),x).rows[0]),false);
   assert.equal(c.scanCompatibility(a,{...a,note:'legacy'}),false);
 });
-test('retries preserve row IDs and use conflict-ignore; another active athlete cannot redirect save',async()=>{
-  const sent=[];const c=setup({state:{user:{id:'parent-a'},active:{id:'athlete-b'}},loadScanConsent:async()=>({id:'consent-a'}),sb:{from:()=>({async upsert(rows,options){sent.push({rows,options});return {error:null}}})}});
+test('a save sends the scan and its outputs in one call, with stable ids that make a retry a no-op',async()=>{
+  const sent=[];const c=setup({state:{user:{id:'parent-a'},active:{id:'athlete-b'}},loadScanConsent:async()=>({id:'consent-a'}),sb:{rpc:async(name,args)=>{sent.push({name,args});return {error:null};}}});
   const record=c.buildScanRecord(input(),ctx());await c.saveScanRecord(record);await c.saveScanRecord(record);
-  assert.equal(sent[0].rows[0].id,sent[1].rows[0].id);assert.equal(sent[0].rows[0].athlete_id,'athlete-a');assert.equal(sent[0].options.ignoreDuplicates,true);
+  assert.equal(sent[0].name,'save_body_scan_assessment');
+  assert.equal(sent[0].args.p_rows[0].id,sent[1].args.p_rows[0].id);
+  assert.equal(sent[0].args.p_assessment.id,record.meta.id);
+  assert.equal(sent[0].args.p_assessment.athlete_id,'athlete-a','another active athlete cannot redirect the save');
+  assert.ok(sent[0].args.p_rows.every(r=>r.scan_assessment_id===record.meta.id&&r.athlete_id==='athlete-a'&&r.source==='photo'));
+});
+test('the scan record the database keeps has no photo-named field and no capture data',()=>{
+  const c=setup(),r=input(),context=ctx();r.detail.photoIdentity={protocol:'exact-photo-bytes-v1',checked_views:4,distinct_files:true,digests:['PRIVATE']};
+  const payload=c.scanAssessmentPayload(c.buildScanRecord(r,context));
+  assert.deepEqual(Object.keys(payload.record).sort(),['input_height','output_dictionary','processing','quality','reuse_check','side_method']);
+  assert.equal(payload.record.reuse_check.checked_views,4);
+  assert.deepEqual(Object.keys(payload).sort(),['athlete_id','captured_at','consent_id','engine','id','record']);
+  assert.ok(!JSON.stringify(payload).includes('PRIVATE'));
+});
+test('before the database has scan records, a save falls back to the measurement rows alone',async()=>{
+  const upserts=[];
+  const c=setup({state:{user:{id:'parent-a'}},loadScanConsent:async()=>({id:'consent-a'}),
+    sb:{rpc:async()=>({error:{code:'PGRST202',message:'Could not find the function'}}),from:()=>({async upsert(rows,options){upserts.push({rows,options});return {error:null};}})}});
+  const record=c.buildScanRecord(input(),ctx());await c.saveScanRecord(record);
+  assert.equal(upserts.length,1);
+  assert.ok(upserts[0].rows.every(row=>!('scan_assessment_id' in row)),'a column the database does not have yet is not sent');
+  assert.equal(upserts[0].options.ignoreDuplicates,true);
 });
 test('revoked/replaced consent and account changes refuse a save; database failures remain retryable',async()=>{
-  let writes=0;const c=setup({state:{user:{id:'parent-a'}},loadScanConsent:async()=>null,sb:{from:()=>({async upsert(){writes++;return {error:Error('offline')}}})}});
+  let writes=0;const c=setup({state:{user:{id:'parent-a'}},loadScanConsent:async()=>null,sb:{rpc:async()=>{writes++;return {error:Error('offline')}}}});
   const record=c.buildScanRecord(input(),ctx());await assert.rejects(c.saveScanRecord(record),/Permission changed/);assert.equal(writes,0);
   c.loadScanConsent=async()=>({id:'consent-a'});await assert.rejects(c.saveScanRecord(record),/offline/);assert.equal(writes,1);
   c.state.user={id:'other'};await assert.rejects(c.saveScanRecord(record),/Sign in/);assert.equal(writes,1);
