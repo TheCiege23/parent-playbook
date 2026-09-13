@@ -1316,6 +1316,63 @@ function rebalanceWeek(days, o){
   return out;
 }
 
+// ---- a parent's change to this week ----
+// One change a week, chosen by a parent: take a home session off, move it to a rest day, or swap it for
+// another card of the same kind. Rest-first is not up for negotiation, so a change can only keep or add
+// rest. Skipping turns work into rest; moving swaps a session with a rest day, so neither count changes;
+// swapping changes which card fills a day. Anything else is refused and the plan stands as generated.
+//
+// Applied to the generated plan before rebalancing, so a missed day still moves the way it always has,
+// and before the streak judges a week, so a session a parent took off is not counted as undone. Timing
+// (a future day, not yet ticked) is checked when the change is made, in weekChangeOptions(); applying it
+// checks only that the plan still has that session, so a skipped Tuesday stays skipped on Wednesday.
+const WEEK_CHANGE_OPS=['skip','move','swap'];
+function weekChangePool(prog, t){
+  const pool=t==='gym'?(prog.strength||[]):[...(prog.skills||[]),...(prog.speed||[])];
+  const seen=new Set();
+  return pool.filter(a=>a&&a.title&&!seen.has(a.title)&&seen.add(a.title));
+}
+function weekChangeOptions(days, prog, i, o){
+  const {todayIdx=0, isDone=()=>false}=o||{};
+  const d=days[i];
+  if(!d||(d.t!=='train'&&d.t!=='gym')||!d.act||i<todayIdx||isDone(i)) return null;
+  // Never the evening before a game (that day is deliberately light), and never a day the team cancelled
+  // and the plan kept as rest because the week was already full.
+  const gameEve=new Set((prog.gameDays||[]).map(g=>(g+6)%7));
+  const moveTo=days.map((x,j)=>({x,j}))
+    .filter(({x,j})=>j!==i&&j>=todayIdx&&x&&x.t==='rest'&&!gameEve.has(j)&&x.title!=='Team session off')
+    .map(({j})=>j);
+  const titles=new Set(days.map(x=>x&&x.title).filter(Boolean));
+  const swapFor=weekChangePool(prog,d.t).filter(a=>!titles.has(a.title)).map(a=>a.title);
+  return {day:i, title:d.act.title, moveTo, swapFor};
+}
+function applyWeekChange(days, prog, change){
+  if(!change) return {days, applied:false, reason:null};
+  const refuse=reason=>({days, applied:false, reason});
+  if(!WEEK_CHANGE_OPS.includes(change.op)) return refuse('unknown');
+  const i=Number(change.from_day);
+  if(!Number.isInteger(i)||i<0||i>6) return refuse('unknown');
+  const d=days[i];
+  // The plan the change was made against has changed since: a new schedule, a new goal, a new week's card.
+  if(!d||!d.act||d.act.title!==change.from_title) return refuse('changed');
+  const opts=weekChangeOptions(days, prog, i);
+  if(!opts) return refuse('not_changeable');
+  const out=days.map(x=>x?{...x}:x);
+  if(change.op==='skip'){
+    out[i]={d:d.d,t:'rest',type:'rest',title:'Rest instead',sub:'Your call this week',act:RECOVERY,changed:'skip'};
+  } else if(change.op==='move'){
+    const j=Number(change.to_day);
+    if(!opts.moveTo.includes(j)) return refuse('no_room');
+    out[j]={...d, d:days[j].d, sub:(d.act.dur?d.act.dur+' · ':'')+'Moved from '+DAY_LABELS[i], changed:'move', changedFrom:i};
+    out[i]={d:d.d,t:'rest',type:'rest',title:'Rest',sub:'Session moved to '+DAY_LABELS[j],act:RECOVERY,changed:'move',changedTo:j};
+  } else {
+    const card=weekChangePool(prog,d.t).find(a=>a.title===change.replacement_title);
+    if(!card||!opts.swapFor.includes(card.title)) return refuse('no_swap');
+    out[i]={...d, title:card.title, sub:(card.dur?card.dur+' · ':'')+'Swapped in', act:card, changed:'swap'};
+  }
+  return {days:out, applied:true, reason:null};
+}
+
 // ---- week-level streak ----
 // Counted in WEEKS, never days. A day-level streak turns a rest day into a loss, and
 // the entire argument of this product is that rest is training. Rest days count
@@ -1326,7 +1383,9 @@ function rebalanceWeek(days, o){
 // schedule and goals; if those changed mid-season an old week can be judged against
 // the wrong plan. That's an acceptable error for a streak counter and nowhere else.
 function weekStreak(sessionRows, o){
-  const {age, goals, sportKey, positions, weekIndex, schedule, maxLookback=26}=o;
+  // cancelledByWeek and changesByWeek are keyed by Monday. When given, each past week is rebuilt with its OWN
+  // cancellations and change; without them, every past week borrowed this week's cancellations.
+  const {age, goals, sportKey, positions, weekIndex, schedule, maxLookback=26, cancelledByWeek=null, changesByWeek=null}=o;
   const byWeek={};
   (sessionRows||[]).forEach(r=>{
     if(!r||!r.done_on) return;
@@ -1350,8 +1409,11 @@ function weekStreak(sessionRows, o){
     if(wi<0) break;
     const monday=mondayWeeksBack(back);
     const key=isoDay(monday);
-    const plan=buildProgram(age, goals, sportKey, positions, wi, schedule);
-    const need=plan.days.filter(d=>d && d.t!=='rest').length;
+    const weekSchedule=cancelledByWeek?{...(schedule||{}), cancelled:cancelledByWeek[key]||[]}:schedule;
+    const plan=buildProgram(age, goals, sportKey, positions, wi, weekSchedule);
+    const change=changesByWeek&&changesByWeek[key];
+    const weekDays=change?applyWeekChange(plan.days, plan, change).days:plan.days;
+    const need=weekDays.filter(d=>d && d.t!=='rest').length;
     if(need===0){ streak++; continue; }              // an all-rest week still counts
     const got=byWeek[key]?byWeek[key].size:0;
     if(got>=need) streak++; else break;

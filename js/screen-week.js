@@ -15,7 +15,7 @@ async function screenWeek(){
   // Calendar weeks back, not epoch milliseconds: see mondayWeeksBack(). Fetching from the
   // wrong Monday would drop the oldest week's sessions and cut the streak short.
   const histFrom=isoDay(mondayWeeksBack(26));
-  const [{data:sports},{data:goals},{data:histRows},{data:cancelRows},{data:heightRows}] = await Promise.all([
+  const [{data:sports},{data:goals},{data:histRows},{data:cancelRows},{data:heightRows},{data:changeRows}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     // order explicitly: goals[0] drives the big "This week's focus" headline, and
     // unordered Postgres rows made it change between page loads
@@ -23,15 +23,27 @@ async function screenWeek(){
     // one query covers both this week's ticks and the streak history
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id)
       .gte('done_on',histFrom).lte('done_on',weekEnd),
+    // Every week the streak looks back over, so each past week is rebuilt with its own cancellations.
     sb.from('schedule_exceptions').select('on_date,kind').eq('athlete_id',a.id)
-      .gte('on_date',weekStart).lte('on_date',weekEnd),
+      .gte('on_date',histFrom).lte('on_date',weekEnd),
     // Height history — the only measurement that changes the plan. See growthSignal().
     sb.from('measurements').select('metric_key,value,measured_on').eq('athlete_id',a.id)
       .eq('metric_key','height').order('measured_on',{ascending:false}).limit(12),
+    // A parent's one change per week, for this week's plan and for the streak. See applyWeekChange().
+    sb.from('week_exceptions').select('week_start,op,from_day,from_title,to_day,replacement_title').eq('athlete_id',a.id)
+      .gte('week_start',histFrom).lte('week_start',weekStart),
   ]);
   const thisWeekRows=(histRows||[]).filter(r=>r.done_on>=weekStart&&r.done_on<=weekEnd);
   const doneSet=new Set(thisWeekRows.map(r=>r.done_on+'|'+r.title));
-  const cancelledDates=new Set((cancelRows||[]).map(r=>r.on_date));
+  const cancelledDates=new Set((cancelRows||[]).filter(r=>r.on_date>=weekStart&&r.on_date<=weekEnd).map(r=>r.on_date));
+  // Past weeks' cancellations and changes, keyed by Monday. Rebuilding every past week with THIS week's
+  // cancellations let a practice called off today change whether last month's weeks counted.
+  const cancelledByWeek={};
+  (cancelRows||[]).forEach(r=>{ const day=new Date(r.on_date+'T00:00:00'), k=isoDay(mondayOf(day));
+    (cancelledByWeek[k]=cancelledByWeek[k]||[]).push((day.getDay()+6)%7); });
+  const changesByWeek={};
+  (changeRows||[]).forEach(r=>{ changesByWeek[r.week_start]=r; });
+  const weekChange=changesByWeek[weekStart]||null;
   const cancelledIdx=[0,1,2,3,4,5,6].filter(i=>cancelledDates.has(dateForDayIndex(i)));
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
   state.activeSportKey = primary?.sport_key||'general'; setAppBg();
@@ -72,6 +84,9 @@ async function screenWeek(){
       inSeason, seasonStart, seasonEnd, seasonState: primary?.season_state||null,
       level: primary?.level||null, growth };
   const prog = buildProgram(age, goals||[], primary?.sport_key||'general', primary?.positions||[], weeksIn, sched);
+  // A parent's change to this week, applied to the generated plan before anything else reads it.
+  const changed=applyWeekChange(prog.days, prog, weekChange);
+  const planned=changed.days;
   // The athlete row now carries the season, because it is the single thing that most
   // changes what a week should look like.
   const sub = (multiSport
@@ -86,8 +101,8 @@ async function screenWeek(){
   const bandAges = {littles:'ages 3–6',youth:'ages 7–9',preteen:'ages 10–12',teen:'ages 13–15',older:'ages 16–19'}[prog.band];
 
   // ---- rebalance, then read the week ----
-  const isDoneAt=i=>{ const d=prog.days[i]; return !!(d&&d.act&&doneSet.has(dateForDayIndex(i)+'|'+d.act.title)); };
-  const days = rebalanceWeek(prog.days, { todayIdx, isDone:isDoneAt, gameDays:prog.gameDays||[] });
+  const isDoneAt=i=>{ const d=planned[i]; return !!(d&&d.act&&doneSet.has(dateForDayIndex(i)+'|'+d.act.title)); };
+  const days = rebalanceWeek(planned, { todayIdx, isDone:isDoneAt, gameDays:prog.gameDays||[] });
   // Rest and moved days are never "done" — there is nothing to complete. Without this
   // guard a rest day whose RECOVERY card shares a title with a logged session rendered
   // with a tick and a strikethrough, which is exactly the wrong message about rest.
@@ -102,7 +117,7 @@ async function screenWeek(){
 
   const streak = weekStreak(histRows||[], { age, goals:goals||[],
     sportKey:primary?.sport_key||'general', positions:primary?.positions||[],
-    weekIndex:weeksIn, schedule:sched });
+    weekIndex:weeksIn, schedule:sched, cancelledByWeek, changesByWeek });
 
   // ---- today ----
   const todayW = days[todayIdx];
@@ -119,6 +134,12 @@ async function screenWeek(){
         : `${DAY_LABELS[i]}'s ${days[i].title.toLowerCase()} didn't happen — it comes back next week`).join('. ')+'.'
     : '';
 
+  // Said once, in plain words, so the week reads as the family's plan and not as something gone wrong.
+  const changeNote = !weekChange ? ''
+    : !changed.applied ? "This week's change no longer fits the plan, so the week shows as planned. Undo it from the day you changed."
+    : weekChange.op==='skip' ? `${DAY_LABELS[weekChange.from_day]}'s session is off this week. Undo it from that day.`
+    : weekChange.op==='move' ? `${DAY_LABELS[weekChange.from_day]}'s session moved to ${DAY_LABELS[weekChange.to_day]}. Undo it from either day.`
+    : `${DAY_LABELS[weekChange.from_day]} has a swapped session. Undo it from that day.`;
   const tomorrowCard = !tomorrowW ? '' : H`
       <div class="card app-pad" id="tomorrowCard" style="cursor:pointer;margin-bottom:14px">
         <div class="sec-title" style="margin:0 0 8px">Tomorrow</div>
@@ -270,6 +291,7 @@ async function screenWeek(){
             : esc(w.title)}</h4><p>${esc(w.t==='rest'?(w.sub||'')+' — counts as done':(w.sub||''))}</p></div>
           <span class="tag t-${w.t}">${esc(w.type)}</span>
         </div>`;}).join('')}
+      ${changeNote?H`<p class="muted-note" style="margin-top:8px">${esc(changeNote)}</p>`:''}
 
       ${wkNotes.length?H`<div class="refbar" id="whyToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="whyList">
         <div class="gi">💡</div>
@@ -331,11 +353,20 @@ async function screenWeek(){
 
   // context for a day row — shared by the row, the tick, and today's card so the tally
   // can never disagree with whichever one the parent tapped
+  const changeOptionsFor=i=>{ const o=weekChangeOptions(planned, prog, i, { todayIdx, isDone:isDoneAt });
+    // A missed day the plan has already rebalanced into a rest day is not free any more.
+    if(o) o.moveTo=o.moveTo.filter(j=>days[j]&&days[j].t==='rest');
+    return o&&days[i]&&(days[i].t==='train'||days[i].t==='gym')?o:null; };
   const ctxFor=i=>{ const w=days[i]; if(!w||!w.act) return null;
     return { date:dateForDayIndex(i), kind:w.type, week:prog.week, title:w.act.title,
              loggable:w.t!=='rest'&&w.t!=='moved',
              teamSession:(w.t==='practice'||w.t==='game'),
-             cancelled:cancelledDates.has(dateForDayIndex(i)), done:done(i) }; };
+             cancelled:cancelledDates.has(dateForDayIndex(i)), done:done(i),
+             // A parent's change: offered on a future, unfinished home session when the week has none yet,
+             // and undoable from either day it touched. See applyWeekChange().
+             weekStart, dayIdx:i,
+             changeOptions:(state.canEdit!==false && !weekChange)?changeOptionsFor(i):null,
+             changedHere:!!(weekChange&&(weekChange.from_day===i||weekChange.to_day===i)) }; };
 
   { const tctx=ctxFor(todayIdx);
     const td=$("#todayDone"); if(td&&tctx) td.onclick=()=>markSessionDone(tctx,td);

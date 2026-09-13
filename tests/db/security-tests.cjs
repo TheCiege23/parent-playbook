@@ -1396,6 +1396,51 @@ add('U20', 'body-scan-records', 'only a photo measurement can belong to a scan',
       values ('${scanRowId(5)}', '${ATH_A}', 'wingspan', 60, 'in', 'manual', current_date, '${MEMBER_C}', '${SCAN_ID}');`,
     expect: 'error', expectError: /measurements_scan_assessment_photo_check/ });
 
+// =========================================================== V. a parent's change to a week
+//
+// public.week_exceptions holds at most one parent change per athlete per week. The browser decides what a
+// change may do to the plan (js/program.js applyWeekChange); the database holds the shape and who may write.
+const THIS_MONDAY = `(current_date - (extract(isodow from current_date)::int - 1))`;
+const weekChange = ({ actor = MEMBER_C, week = THIS_MONDAY, op = 'skip', to = 'null', rep = 'null' } = {}) =>
+  `insert into public.week_exceptions(athlete_id, week_start, op, from_day, from_title, to_day, replacement_title, created_by)
+   values ('${ATH_A}', ${week}, '${op}', 1, 'Synthetic session', ${to}, ${rep}, '${actor}');`;
+const weekChangeCount = `select count(*)::text from public.week_exceptions where athlete_id = '${ATH_A}';`;
+
+add('V01', 'week-changes', "a guardian who can edit records this week's change",
+  { ...asScanParent, sql: weekChange() + weekChangeCount, expect: 'ok', expectOut: '1' });
+add('V02', 'week-changes', 'a week holds one change, not two',
+  { ...asScanParent, sql: weekChange() + weekChange({ op: 'swap', rep: "'Another synthetic card'" }),
+    expect: 'error', expectError: /week_exceptions_athlete_id_week_start_key/ });
+add('V03', 'week-changes', 'a family viewer cannot change the plan',
+  { setup: scanFamilyViewer, role: 'authenticated', claims: ADMIN_B, sql: weekChange({ actor: ADMIN_B }),
+    expect: 'error', expectError: /row-level security/ });
+add('V04', 'week-changes', 'but a family viewer sees the change, so everyone reads the same week',
+  { setup: scanFamilyViewer + weekChange(), role: 'authenticated', claims: ADMIN_B, sql: weekChangeCount, expect: 'ok', expectOut: '1' });
+add('V05', 'week-changes', 'a change cannot be recorded in another guardian\'s name',
+  { ...asScanParent, sql: weekChange({ actor: ADMIN_A }), expect: 'error', expectError: /row-level security/ });
+add('V06', 'week-changes', 'a move has to say which day',
+  { ...asScanParent, sql: weekChange({ op: 'move' }), expect: 'error', expectError: /week_exceptions_move_check/ });
+add('V07', 'week-changes', 'a swap has to say which card',
+  { ...asScanParent, sql: weekChange({ op: 'swap' }), expect: 'error', expectError: /week_exceptions_swap_check/ });
+add('V08', 'week-changes', 'a move cannot land on the day it came from',
+  { ...asScanParent, sql: weekChange({ op: 'move', to: '1' }), expect: 'error', expectError: /week_exceptions_distinct_days_check/ });
+add('V09', 'week-changes', 'a week starts on a Monday',
+  { ...asScanParent, sql: weekChange({ week: `${THIS_MONDAY} + 1` }), expect: 'error', expectError: /week_exceptions_monday_check/ });
+add('V10', 'week-changes', 'a week that has already passed cannot be changed',
+  { ...asScanParent, sql: weekChange({ week: `${THIS_MONDAY} - 28` }), expect: 'error', expectError: /row-level security/ });
+add('V11', 'week-changes', 'a family viewer cannot undo a change',
+  { setup: scanFamilyViewer + weekChange(), role: 'authenticated', claims: ADMIN_B,
+    sql: `delete from public.week_exceptions where athlete_id = '${ATH_A}';reset role;` + weekChangeCount, expect: 'ok', expectOut: '1' });
+add('V12', 'week-changes', 'a guardian who can edit undoes this week\'s change',
+  { setup: weekChange(), ...asScanParent,
+    sql: `delete from public.week_exceptions where athlete_id = '${ATH_A}';reset role;` + weekChangeCount, expect: 'ok', expectOut: '0' });
+add('V13', 'week-changes', 'no one can edit a change in place, and anon cannot read one',
+  { sql: `select (not has_table_privilege('authenticated', 'public.week_exceptions', 'UPDATE')
+      and not has_table_privilege('anon', 'public.week_exceptions', 'SELECT')
+      and has_table_privilege('authenticated', 'public.week_exceptions', 'DELETE')
+      and (select relrowsecurity from pg_class where oid = 'public.week_exceptions'::regclass))::text;`,
+    expect: 'ok', expectOut: 'true' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

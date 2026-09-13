@@ -671,6 +671,49 @@ function schedChips(sel,id){
   return `<div class="chipgrid" id="${id}" style="grid-template-columns:repeat(4,1fr)">
     ${DAY_LABELS.map((d,i)=>`<div class="chip ${sel.includes(i)?'on':''}" role="button" tabindex="0" data-d="${i}">${d}</div>`).join('')}</div>`;
 }
+// A parent's one change to this week: take a home session off, move it to a rest day, or swap it for another
+// like it. applyWeekChange() in js/program.js decides what the plan does with it; this only offers what
+// weekChangeOptions() allowed and records the choice. Online only: a change that sat in a queue while the
+// week moved on could land against a day that has already passed.
+function openWeekChange(ctx){
+  const o=ctx&&ctx.changeOptions; if(!o||!ctx.weekStart) return;
+  const bg=sheet(H`<h3>Change ${esc(DAY_LABELS[o.day])}</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">One change a week, and rest days stay rest. Take this session off, move it to a rest day later this week, or swap it for another one like it.</p>
+    <div class="card app-pad">
+      <button class="schedule-choice" data-change-skip="1"><span><b>Take it off this week</b><small>${esc(o.title)} becomes a rest day</small></span><i>›</i></button>
+      ${o.moveTo.length?H`<div class="field" style="margin-top:12px"><label>Move it to</label>
+        <div class="chipgrid">${o.moveTo.map(j=>H`<button class="chip" data-change-move="${j}">${esc(DAY_LABELS[j])}</button>`).join('')}</div></div>`
+        :H`<p class="muted-note" style="margin-top:12px">No rest day later this week can take it without landing the evening before a game.</p>`}
+      ${o.swapFor.length?H`<div class="field" style="margin-top:12px"><label>Swap it for</label>
+        <div class="chipgrid">${o.swapFor.map(t=>H`<button class="chip" data-change-swap="${esc(t)}">${esc(t)}</button>`).join('')}</div></div>`:''}
+    </div>
+    <div class="err" id="weekChangeErr"></div>`);
+  const save=async(btn,change)=>{
+    const err=bg.querySelector('#weekChangeErr'); err.textContent='';
+    if(!navigator.onLine){ err.textContent='Connect to the internet to change this week.'; return; }
+    btn.disabled=true;
+    const { error }=await sb.from('week_exceptions').insert({ athlete_id:state.active.id, week_start:ctx.weekStart,
+      op:change.op, from_day:o.day, from_title:o.title, to_day:change.to_day==null?null:change.to_day,
+      replacement_title:change.replacement_title||null, created_by:state.user.id });
+    if(error){
+      console.error(error); btn.disabled=false;
+      err.textContent=error.code==='23505'?'This week already has a change. Undo that one first.':'Could not save the change.';
+      return;
+    }
+    bg.remove(); toast('This week is updated'); state.activity=null; renderApp('week');
+  };
+  bg.querySelector('[data-change-skip]').onclick=e=>save(e.currentTarget,{op:'skip'});
+  bg.querySelectorAll('[data-change-move]').forEach(b=>b.onclick=()=>save(b,{op:'move',to_day:+b.dataset.changeMove}));
+  bg.querySelectorAll('[data-change-swap]').forEach(b=>b.onclick=()=>save(b,{op:'swap',replacement_title:b.dataset.changeSwap}));
+}
+async function undoWeekChange(ctx, btn){
+  if(!ctx||!ctx.weekStart) return;
+  btn.disabled=true;
+  const { error }=await sb.from('week_exceptions').delete().eq('athlete_id',state.active.id).eq('week_start',ctx.weekStart);
+  if(error){ console.error(error); toast('Could not undo the change'); btn.disabled=false; return; }
+  toast('Back to the plan'); state.activity=null; renderApp('week');
+}
+
 function openPracticeSchedule(sportKey, current, onSaved){
   let picked=[...(current?.practiceDays||[])];
   const gameDay=current?.gameDay;

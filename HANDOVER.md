@@ -178,7 +178,7 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
 | `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
-| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 356 cases pass as restricted roles: 335 security cases plus a 21-case restore and deletion rehearsal |
+| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 369 cases pass as restricted roles: 348 security cases plus a 21-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
 | `node tools/restore-drill.cjs` | A restored database matches its source on schema, row-level security, tenant privileges, retention jobs and row counts (connection strings in `PP_RESTORE_SOURCE` and `PP_RESTORE_TARGET`) |
