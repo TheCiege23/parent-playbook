@@ -10,7 +10,10 @@
 --   * auto_rls_guardrail     — the event trigger that enables RLS on new tables existed in
 --                              production and in no migration, so a restore silently lost it
 --   * retention_overdue      — a retention sweep that runs and "succeeds" over zero eligible rows
---                              proves the job fires, not that it deletes; this checks the outcome
+--                              proves the job fires, not that it deletes; this checks the outcome.
+--                              tests/operations-check.test.cjs fails if a migration sweeps a table
+--                              this does not count. external_composition_records was left out when
+--                              its sweep was added on 2026-09-12.
 --   * composition_gate       — the gate must stay closed while no licensed model exists
 --
 -- Run it with tools/operations-check.cjs, which asserts the verdict and exits non-zero on failure.
@@ -83,7 +86,8 @@ retention_overdue as (
   select jsonb_build_object(
     'company_composition_results', (select count(*) from public.company_composition_results where retention_until <= now()),
     'company_body_assessments',    (select count(*) from public.company_body_assessments where retention_until <= now()),
-    'company_reference_assessments',(select count(*) from public.company_reference_assessments where retention_until <= now())
+    'company_reference_assessments',(select count(*) from public.company_reference_assessments where retention_until <= now()),
+    'external_composition_records', (select count(*) from public.external_composition_records where retention_until <= now())
   ) as detail
 ),
 
@@ -124,7 +128,8 @@ select jsonb_pretty(jsonb_build_object(
     'nothing_retained_past_its_retention_date', jsonb_build_object(
       'pass', (select (detail->>'company_composition_results')::integer = 0
                   and (detail->>'company_body_assessments')::integer = 0
-                  and (detail->>'company_reference_assessments')::integer = 0 from retention_overdue),
+                  and (detail->>'company_reference_assessments')::integer = 0
+                  and (detail->>'external_composition_records')::integer = 0 from retention_overdue),
       'detail', (select detail from retention_overdue)),
     'composition_gate_closed', jsonb_build_object(
       'pass', (select (detail->>'registered_providers')::integer = 0

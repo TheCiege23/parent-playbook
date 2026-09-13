@@ -1,0 +1,40 @@
+# Scheduled production monitoring.
+#
+# Runs tools/deployment-smoke.cjs against the live site every six hours and on demand. A failing run
+# fails this workflow, and GitHub emails a failed scheduled run to whoever last changed its schedule.
+# It needs no secrets: every request is an anonymous GET, and the private paths it probes must
+# answer 404.
+#
+# The smoke check expects the service-worker version recorded in the repository. A run that lands
+# between a merge to main and the Railway build finishing can fail on that alone; the smoke check
+# rechecks for a few seconds, not minutes, so re-run it before treating one failure as an outage.
+#
+# Not watched here, deliberately:
+#   - database posture. tests/db/posture.sql needs a read-only database credential, and whether one
+#     should live in this repository's secrets is the owner's decision.
+#   - a buyer's SDK host. Run tools/sdk-host-smoke.cjs against it from wherever that host is operated.
+name: Production monitor
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deployment smoke against playbookbp.com
+        run: node tools/deployment-smoke.cjs https://playbookbp.com/

@@ -89,8 +89,11 @@ async function evaluate(base, item) {
   }
 }
 
-async function run(baseValue) {
+async function run(baseValue, options = {}) {
   const base = normalizeBase(baseValue);
+  // Tests pass short settle timings. The command line always uses the defaults above.
+  const settleAttempts = options.settleAttempts ?? SETTLE_ATTEMPTS;
+  const settleDelayMs = options.settleDelayMs ?? SETTLE_DELAY_MS;
   // One plan, index-parallel with checks, so a recheck re-runs the same expectation
   // rather than matching a row back by path.
   const plan = [
@@ -105,9 +108,9 @@ async function run(baseValue) {
   // Recheck only what failed, so a clean run costs exactly what it did before: no delay
   // is waited and no extra request is made unless something is already failing.
   let waitedMs = 0;
-  for (let attempt = 1; attempt <= SETTLE_ATTEMPTS && checks.some(row => !row.ok); attempt++) {
-    await delay(SETTLE_DELAY_MS);
-    waitedMs += SETTLE_DELAY_MS;
+  for (let attempt = 1; attempt <= settleAttempts && checks.some(row => !row.ok); attempt++) {
+    await delay(settleDelayMs);
+    waitedMs += settleDelayMs;
     for (let i = 0; i < checks.length; i++) {
       if (checks[i].ok) continue;
       const { status, ok, error } = await evaluate(base, plan[i]);
@@ -139,4 +142,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { EXPECTED_CACHE, SETTLE_ATTEMPTS, SETTLE_DELAY_MS, normalizeBase, run };
+module.exports = { EXPECTED_CACHE, SETTLE_ATTEMPTS, SETTLE_DELAY_MS, required, forbidden, normalizeBase, run };
