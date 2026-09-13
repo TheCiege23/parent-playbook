@@ -92,7 +92,7 @@ every `.lp-b*` button rule and leaves the buttons with inherited text.
   UI shows a citation only when one exists, so a NULL source correctly reads as "uncited".
   A fabricated citation would be worse than none at all.
 
-## Three rules the Week screen encodes (design handoff, app screens §2)
+## Four rules the Week screen encodes (design handoff, app screens §2; the fourth added 2026-09-13)
 
 These look like styling choices and are not. Each one is load-bearing:
 
@@ -110,6 +110,12 @@ These look like styling choices and are not. Each one is load-bearing:
    carries into next week.**
 3. **No red anywhere.** A missed day is grey and dashed. Clay is reserved for game day.
    `rebalanceWeek` returns `t:'moved'`, which maps to the grey `.t-moved` tag.
+4. **A parent can change one day a week, and only toward rest** (`applyWeekChange`, table
+   `week_exceptions`). Skip a home session, move it to a rest day later in the week, or swap it for
+   a card of the same kind. A skip adds rest; a move or a swap leaves the rest and work counts
+   unchanged. Nothing moves onto a practice, a game, another session, a cancelled team day or the
+   evening before a game, and a change made against a plan that has since changed is ignored rather
+   than forced. The streak rebuilds each past week with its own cancellations and its own change.
 
 `rebalanceWeek` is a view transform, not a write — the plan regenerates every render, so
 there is nothing to persist and nothing that can drift out of sync.

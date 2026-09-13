@@ -111,6 +111,8 @@ async function screenActivity(){
 
       ${(ctx&&ctx.teamSession)?H`<button class="btn ghost" id="actCancel" style="margin-top:16px">${ctx.cancelled?'It happened after all':'Mark cancelled (rain, called off)'}</button>`:''}
       ${(ctx&&ctx.cancelled&&!ctx.teamSession)?H`<button class="btn ghost" id="actUncancel" style="margin-top:12px">Put the team session back</button>`:''}
+      ${(ctx&&ctx.changeOptions&&state.canEdit!==false)?H`<button class="btn ghost" id="actChange" style="margin-top:16px">Change this day</button>`:''}
+      ${(ctx&&ctx.changedHere&&state.canEdit!==false)?H`<button class="btn ghost" id="actUndoChange" style="margin-top:12px">Undo this week's change</button>`:''}
 
       ${(!loop&&!stills)?H`<div class="act-ask">
         <b>Got a clip of this drill?</b>
@@ -129,6 +131,8 @@ async function screenActivity(){
     if(b) b.onclick=()=>done?undoSessionDone(ctx,b):markSessionDone({...ctx,title:act.title},b); }
   { const c=$("#actCancel"); if(c) c.onclick=()=>markCancelled(ctx,c,!ctx.cancelled); }
   { const u=$("#actUncancel"); if(u) u.onclick=()=>markCancelled(ctx,u,false); }
+  { const c=$("#actChange"); if(c) c.onclick=()=>openWeekChange(ctx); }
+  { const u=$("#actUndoChange"); if(u) u.onclick=()=>undoWeekChange(ctx,u); }
   // "Slow it down" — the single most useful control on a movement clip, and the reason
   // a parent can copy the shape rather than just watch it.
   { const s=$("#actSlow"), v=$("#actVid");
