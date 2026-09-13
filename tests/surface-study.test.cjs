@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const Study=require('../tools/reconstruction/surface-study.js'),Evidence=require('../tools/reconstruction/evidence-report.js');
 const progress=JSON.parse(fs.readFileSync(path.join(__dirname,'../tools/parity-progress.json'),'utf8'));
+const rubricPercent=progress.categories.reduce((n,c)=>n+c.weight*c.stage,0).toFixed(1)+'%';
 const options={permissionConfirmed:true,location:'Recorded test level',procedure:'Independent synthetic analytical reference for testing only.'};
 function setup({hold=false,holdFetch=false}={}){
   const elements={},jobs=[],downloads=[],stats={terminated:0},fetches=[];
@@ -42,7 +43,7 @@ test('unknown imported metadata and geometry never appear in the reference resul
 });
 test('presentation brief escapes supplied text, includes rejected rows and uses fixed parity without auto-credit',async()=>{
   const r=await Study.run(await fixtures(),{...options,location:'<img src=x onerror=alert(1)>',procedure:'<script>bad()</script>'});
-  const html=Evidence.render(r,progress,{synthetic:true});assert.ok(html.includes('42.8%'));assert.ok(html.includes('SYNTHETIC FIXTURE'));assert.ok(html.includes('Repeated saved surface'));
+  const html=Evidence.render(r,progress,{synthetic:true});assert.ok(html.includes(rubricPercent));assert.ok(html.includes('SYNTHETIC FIXTURE'));assert.ok(html.includes('Repeated saved surface'));
   assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.ok(!html.includes('<iframe'));assert.ok(html.includes('Mean absolute error'));assert.ok(html.includes('SYNTHETIC BOX FIXTURE'));
   const bad={...progress,categories:[{weight:100,stage:1.5}]};assert.throws(()=>Evidence.render(r,bad),/rubric/);
 });
@@ -56,7 +57,7 @@ test('actual queued file inputs produce exportable reports and invalidate previe
   for(const c of cases){s.el('participant').value=c.participantCode;s.el('plane').value=String(c.planeCm);s.el('tape').value=String(c.referenceCm);s.el('obj').files=[new Blob([c.objBytes])];s.el('method').files=[new Blob([c.methodText])];s.el('add').onclick();}
   assert.equal(s.el('queue').children.length,2);await s.el('run').onclick();assert.equal(s.el('json').disabled,false);
   s.el('json').onclick();const data=JSON.parse(await s.downloads[0].text());assert.equal(data.summary.computed,2);
-  await s.el('preview').onclick();assert.equal(s.el('html').disabled,false);s.el('html').onclick();assert.match(await s.downloads[1].text(),/42.8%/);
+  await s.el('preview').onclick();assert.equal(s.el('html').disabled,false);s.el('html').onclick();assert.ok((await s.downloads[1].text()).includes(rubricPercent));
   s.el('procedure').oninput();assert.equal(s.el('evidence-frame').srcdoc,'');assert.equal(s.el('html').disabled,true);assert.equal(s.el('json').disabled,true);
 });
 test('clearing an active computation cancels its worker and late results cannot restore the report',async()=>{

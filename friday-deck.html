@@ -105,10 +105,10 @@
   <p class="eyebrow">Slide 2</p>
   <h2>Capability against FIT:MATCH, stated plainly</h2>
   <div class="stat">
-    <div><b>42.75%</b><span>weighted, 43% rounded</span></div>
-    <div><b>0 / 13</b><span>categories fully accepted</span></div>
+    <div><b>39%</b><span>weighted, 39 of 100 points</span></div>
+    <div><b>0 / 16</b><span>categories fully accepted</span></div>
     <div><b>3</b><span>categories deployed &amp; demonstrated</span></div>
-    <div><b>1</b><span>category with nothing shipped</span></div>
+    <div><b>2</b><span>categories with nothing shipped</span></div>
   </div>
   <table>
     <tr><th>Stage</th><th>Meaning</th><th>Categories</th></tr>
@@ -116,17 +116,22 @@
       <td>Body-insights portal, integration and portable results, data protection and operation</td></tr>
     <tr><td>0.5</td><td>Core workflow with automated checks</td>
       <td>Guided capture, personalized 3D body, 25+ anthropometrics, PHV and maturity offset,
-        predicted adult height, static asymmetry, history and reference comparisons, presentation</td></tr>
-    <tr><td>0.25</td><td>Partial</td><td>Circumferences</td></tr>
-    <tr><td>0</td><td>Nothing shipped</td><td><strong>Body composition</strong></td></tr>
+        predicted adult height, static asymmetry, history and repeat comparisons, presentation</td></tr>
+    <tr><td>0.25</td><td>Partial</td><td>Circumferences, population benchmarking, authenticated results API</td></tr>
+    <tr><td>0</td><td>Nothing shipped</td><td><strong>Body composition</strong>, iOS and mobile embedding</td></tr>
   </table>
-  <p class="sub">Fixed rubric, recorded in <code>tools/parity-progress.json</code>. Stages are
-    engineering judgments, not measured accuracy.</p>
-  <div class="notes"><b>Notes.</b> The weights matter more than the total. Body composition (15) and
-    circumferences (10) are the two weakest: 25 of 100 points, with 2.5 earned. Personalized 3D body
-    is the heaviest category (20) and is only halfway. Say it before they find it. The score did not move during this build cycle and was not meant to — the recent work
-    was operational evidence, not new measurement capability. What moves it is licensed technology
-    and validation studies, not more code.</div>
+  <p class="sub">Fixed rubric, recorded in <code>tools/parity-progress.json</code> and rebaselined on
+    September 13 against FIT:MATCH's current public pages. Stages are engineering judgments, not
+    measured accuracy, and the total is not independently verified parity.</p>
+  <div class="notes"><b>Notes.</b> The weights matter more than the total. The September 13 rebaseline
+    added three things FIT:MATCH claims and the first rubric did not score — population benchmarking,
+    an authenticated results API and iOS and mobile embedding — and the total fell from 42.75% to 39%
+    with no stage changed. Body composition (15), circumferences (10), benchmarking (4), the results API
+    (4) and iOS embedding (3) are the weakest: 36 of 100 points, with 4.5 earned. Personalized 3D body
+    is the heaviest category (16), is only halfway and has no USDZ export. Say it before they find it.
+    Some of what moves the score is code — the results API, mobile embedding and avatar files — and
+    some is not: composition needs a licensed, DEXA-validated model, and the measurement categories
+    need reference studies.</div>
 </section>
 
 <section class="slide">
@@ -240,11 +245,11 @@
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
     <tr><td>Deployed build</td><td><code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v113</code>, 29/29</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>757/757</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>759/759</td></tr>
     <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>298/298</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>7/7 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>
-    <tr><td>Weighted parity</td><td><code>node tools/parity-progress.cjs</code></td><td>42.75%</td></tr>
+    <tr><td>Weighted parity</td><td><code>node tools/parity-progress.cjs</code></td><td>39%</td></tr>
   </table>
 </section>
 

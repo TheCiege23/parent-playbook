@@ -14,11 +14,11 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 29/29 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 757/757 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 759/759 |
 | Database suite | `node tests/db/run.cjs` | 298/298 on a disposable cluster built from the real migrations: 281 security cases plus a 17-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 202/202, exclusions clean, contracts 318/318, database 298/298, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
-| Weighted parity | `node tools/parity-progress.cjs` | 42.75%, 43% rounded, 0 of 13 categories fully accepted |
+| Weighted parity | `node tools/parity-progress.cjs` | 39%, 0 of 16 categories fully accepted |
 
 ---
 
@@ -42,22 +42,27 @@ records and the SDK are live; composition is gated off and produces nothing.
 
 ## Slide 2 — Capability against FIT:MATCH, stated plainly
 
-Thirteen weighted categories, scored on a fixed rubric in `tools/parity-progress.json`.
-**42.75% weighted, 43% rounded. Zero of thirteen categories are fully accepted.**
+Sixteen weighted categories, scored on a fixed rubric in `tools/parity-progress.json` and rebaselined
+on September 13 against FIT:MATCH's current public pages (`FITMATCH-CLAIM-MAP.md`).
+**39% weighted, 39 of 100 points. Zero of sixteen categories are fully accepted.**
 
 | Stage | Meaning | Categories |
 | --- | --- | --- |
 | 0.75 — deployed and demonstrated | Body-insights portal, integration and portable results, data protection and operation | FM10, FM11, FM12 |
-| 0.5 — core workflow with automated checks | Guided capture, personalized 3D body, 25+ anthropometrics, PHV/maturity, predicted adult height, static asymmetry, history and reference comparisons, presentation | FM01, FM02, FM03, FM06, FM07, FM08, FM09, FM13 |
-| 0.25 — partial | Circumferences | FM04 |
-| 0 — nothing shipped | **Body composition** | FM05 |
+| 0.5 — core workflow with automated checks | Guided capture, personalized 3D body, 25+ anthropometrics, PHV/maturity, predicted adult height, static asymmetry, history and repeat comparisons, presentation | FM01, FM02, FM03, FM06, FM07, FM08, FM09, FM13 |
+| 0.25 — partial | Circumferences, population benchmarking, authenticated results API | FM04, FM14, FM15 |
+| 0 — nothing shipped | **Body composition**, iOS and mobile embedding | FM05, FM16 |
 
-*Speaker notes.* The weights matter more than the total. Body composition (15) and circumferences
-(10) are the two weakest: 25 of 100 points, with 2.5 earned. Personalized 3D body is the heaviest
-category (20) and is only halfway. Say this before they find it. The score
-has not moved through this work and it was not supposed to — the recent work was operational
-evidence, not new measurement capability. What moves it is licensed technology and validation
-studies, not more code. Rubric stages are engineering judgments, not measured accuracy.
+*Speaker notes.* The weights matter more than the total. The September 13 rebaseline added three
+things FIT:MATCH claims and the first rubric did not score — population benchmarking, an
+authenticated results API and iOS and mobile embedding — and the total fell from 42.75% to 39% with
+no stage changed. Body composition (15), circumferences (10), benchmarking (4), the results API (4)
+and iOS embedding (3) are the weakest: 36 of 100 points, with 4.5 earned. Personalized 3D body is
+the heaviest category (16), is only halfway and has no USDZ export. Say this before they find it.
+Some of what moves the score is code — the results API, mobile embedding and avatar files — and
+some is not: composition needs a licensed, DEXA-validated model, and the measurement categories need
+reference studies. Rubric stages are engineering judgments, not measured accuracy, and the total is
+not independently verified parity.
 
 ---
 

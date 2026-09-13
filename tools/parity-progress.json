@@ -1,28 +1,91 @@
 {
-  "scope": "FITMATCH sports-science parity plus acquisition operation; parent/marketplace expansion is secondary",
-  "updated": "2026-09-11",
+  "scope": "FITMATCH sports-science parity plus acquisition operation, as FITMATCH publicly described it on 2026-09-13 (FITMATCH-CLAIM-MAP.md); parent/marketplace expansion is secondary",
+  "updated": "2026-09-13",
   "method": "Weighted engineering estimate. Stage 0 = no applicable output; 0.25 = partial implementation; 0.5 = core local workflow integrated with automated checks; 0.75 = demonstrated on intended devices and deployed infrastructure; 1 = agreed feature coverage and supporting acceptance evidence. A local workflow can still have additional feature gaps. Stage assignments are engineering judgments, not measured probabilities or accuracy scores.",
+  "rubric_version": 2,
+  "rebaselines": [
+    {
+      "date": "2026-09-13",
+      "from_version": 1,
+      "to_version": 2,
+      "claim_map": "FITMATCH-CLAIM-MAP.md",
+      "reason": "FITMATCH's public pages describe avatar files, a results API, iOS delivery and population-norm comparison, which rubric version 1 did not score separately. Eleven weight points moved, only from categories at stage 0.5 or above to categories at 0.25 or below, so the move could not raise the total. No stage changed.",
+      "previous_weighted_points": 42.75,
+      "weighted_points": 39,
+      "previous_weights": {
+        "FM01": 10,
+        "FM02": 20,
+        "FM03": 15,
+        "FM04": 10,
+        "FM05": 15,
+        "FM06": 7,
+        "FM07": 3,
+        "FM08": 3,
+        "FM09": 5,
+        "FM10": 4,
+        "FM11": 4,
+        "FM12": 3,
+        "FM13": 1
+      },
+      "weights": {
+        "FM01": 9,
+        "FM02": 16,
+        "FM03": 13,
+        "FM04": 10,
+        "FM05": 15,
+        "FM06": 6,
+        "FM07": 3,
+        "FM08": 3,
+        "FM09": 3,
+        "FM10": 4,
+        "FM11": 3,
+        "FM12": 3,
+        "FM13": 1,
+        "FM14": 4,
+        "FM15": 4,
+        "FM16": 3
+      },
+      "stages": {
+        "FM01": 0.5,
+        "FM02": 0.5,
+        "FM03": 0.5,
+        "FM04": 0.25,
+        "FM05": 0,
+        "FM06": 0.5,
+        "FM07": 0.5,
+        "FM08": 0.5,
+        "FM09": 0.5,
+        "FM10": 0.75,
+        "FM11": 0.75,
+        "FM12": 0.75,
+        "FM13": 0.5,
+        "FM14": 0.25,
+        "FM15": 0.25,
+        "FM16": 0
+      }
+    }
+  ],
   "categories": [
     {
       "id": "FM01",
       "name": "Guided four-view capture",
-      "weight": 10,
+      "weight": 9,
       "stage": 0.5,
-      "evidence": "Live preview/static guide, shutter/fallback, lifecycle cleanup, provisional photo checks, consent refresh, distinct-file enforcement and processing-time provenance tested locally. Synthetic browser capture/reuse rejection verified; physical-device performance and thresholds unvalidated."
+      "evidence": "Live preview/static guide, shutter/fallback, lifecycle cleanup, provisional photo checks, consent refresh, distinct-file enforcement and processing-time provenance tested locally. Synthetic browser capture/reuse rejection verified; physical-device performance and thresholds unvalidated. Rebaseline 2026-09-13 (rubric version 2): stage unchanged; weight 10 -> 9, moved to categories FITMATCH claims that version 1 did not score."
     },
     {
       "id": "FM02",
       "name": "Personalized 3D body",
-      "weight": 20,
+      "weight": 16,
       "stage": 0.5,
-      "evidence": "The reconstruction workflow now runs end to end under automated checks, against a subject whose true dimensions are known. tests/surface-pipeline.test.cjs builds a synthetic body-shaped solid (head, neck, torso, pelvis and two legs with a gap between them), projects it to four orthographic silhouettes the way the mask reader consumes them, and runs the real reconstruct(): the hull is connected with NO topology adjustment, closed (every edge shared by exactly two triangles), deterministic across runs, correct in height exactly and in width and depth to within one voxel step at three resolutions, monotone under one-pixel dilation and erosion of every view, and body-shaped rather than convex — the gap between the legs survives while the torso stays solid. The containment helper carries a negative control, and two deliberate mutations of js/visual-hull.js (a 5% scale inflation and round-to-floor in the mask reader) are both caught. This replaces a position where the only end-to-end evidence was one manual session that required an operator to select bounded lower-artifact removal before any surface was accepted. THE GROUND TRUTH IS SYNTHETIC. It establishes the geometry and scaling arithmetic, not anatomy: a clothed human silhouette is not a union of boxes, real cameras are not orthographic, and no physical measurement appears anywhere in it. Anatomical accuracy, repeatability across separate real captures, intended-device performance and population validation remain unproven, which is what holds this below 0.75."
+      "evidence": "The reconstruction workflow now runs end to end under automated checks, against a subject whose true dimensions are known. tests/surface-pipeline.test.cjs builds a synthetic body-shaped solid (head, neck, torso, pelvis and two legs with a gap between them), projects it to four orthographic silhouettes the way the mask reader consumes them, and runs the real reconstruct(): the hull is connected with NO topology adjustment, closed (every edge shared by exactly two triangles), deterministic across runs, correct in height exactly and in width and depth to within one voxel step at three resolutions, monotone under one-pixel dilation and erosion of every view, and body-shaped rather than convex — the gap between the legs survives while the torso stays solid. The containment helper carries a negative control, and two deliberate mutations of js/visual-hull.js (a 5% scale inflation and round-to-floor in the mask reader) are both caught. This replaces a position where the only end-to-end evidence was one manual session that required an operator to select bounded lower-artifact removal before any surface was accepted. THE GROUND TRUTH IS SYNTHETIC. It establishes the geometry and scaling arithmetic, not anatomy: a clothed human silhouette is not a union of boxes, real cameras are not orthographic, and no physical measurement appears anywhere in it. Anatomical accuracy, repeatability across separate real captures, intended-device performance and population validation remain unproven, which is what holds this below 0.75. Rebaseline 2026-09-13 (rubric version 2): FITMATCH's SDK page says its 3D avatar is delivered as a USDZ or OBJ file, so avatar file delivery is now part of this category's agreed coverage. An experimental OBJ writer exists (VisualHull.toOBJ, used by the silhouette lab); there is no USDZ export, no avatar file in the company results contract and no avatar in the portal. The stage is unchanged, because 0.5 already allows feature gaps; weight 20 -> 16."
     },
     {
       "id": "FM03",
       "name": "25+ anthropometrics",
-      "weight": 15,
+      "weight": 13,
       "stage": 0.5,
-      "evidence": "A versioned local workflow now returns up to 25 defined length and landmark-distance estimates, including 18 bilateral proxies. One real adult four-photo set returned all 25. Metric equivalence, physical accuracy, repeatability and population validation remain unproven."
+      "evidence": "A versioned local workflow now returns up to 25 defined length and landmark-distance estimates, including 18 bilateral proxies. One real adult four-photo set returned all 25. Metric equivalence, physical accuracy, repeatability and population validation remain unproven. Rebaseline 2026-09-13 (rubric version 2): FITMATCH describes its outputs as lengths, circumferences and ratios. pose-measure.js also computes three descriptive proportions (wingspan, leg length and shoulder width, each over height); circumferences remain FM04. Stage unchanged; weight 15 -> 13."
     },
     {
       "id": "FM04",
@@ -41,9 +104,9 @@
     {
       "id": "FM06",
       "name": "PHV and maturity offset",
-      "weight": 7,
+      "weight": 6,
       "stage": 0.5,
-      "evidence": "A versioned local Mirwald 2002 combined-sample workflow computes maturity offset and estimated age at PHV from one coherent manual standing-height, sitting-height and body-mass session for ages 8–16. Parent Growth/Body Insights and authorized individual organization views are integrated; roster export and ranking are excluded. A minimum ±1-year uncertainty and individual/population limits are displayed. Intended-device, independent-reference and buyer acceptance remain unverified."
+      "evidence": "A versioned local Mirwald 2002 combined-sample workflow computes maturity offset and estimated age at PHV from one coherent manual standing-height, sitting-height and body-mass session for ages 8–16. Parent Growth/Body Insights and authorized individual organization views are integrated; roster export and ranking are excluded. A minimum ±1-year uncertainty and individual/population limits are displayed. Intended-device, independent-reference and buyer acceptance remain unverified. Rebaseline 2026-09-13 (rubric version 2): stage unchanged; weight 7 -> 6, moved to categories FITMATCH claims that version 1 did not score."
     },
     {
       "id": "FM07",
@@ -61,10 +124,10 @@
     },
     {
       "id": "FM09",
-      "name": "History and reference comparisons",
-      "weight": 5,
+      "name": "History and repeat comparisons",
+      "weight": 3,
       "stage": 0.5,
-      "evidence": "Integrated parent history and stature references plus a company repeat-assessment utility. The company comparator reauthorizes two records, requires the same organization, adult reference, SDK, engine, model and unit, and reports signed descriptive changes only for shared scalar outputs. It is deployed in the signed-in portal and correctly remains inactive with the current single real record. A second independent real capture, whole-body reference cohorts and device validation remain."
+      "evidence": "Integrated parent history and stature references plus a company repeat-assessment utility. The company comparator reauthorizes two records, requires the same organization, adult reference, SDK, engine, model and unit, and reports signed descriptive changes only for shared scalar outputs. It is deployed in the signed-in portal and correctly remains inactive with the current single real record. A second independent real capture, whole-body reference cohorts and device validation remain. Rebaseline 2026-09-13 (rubric version 2): comparison with population norms is now scored separately as FM14 and took two points of this category's weight with it (5 -> 3). This category now covers longitudinal history and repeat-assessment comparison, which its 0.5 stage already rested on, so the stage is unchanged."
     },
     {
       "id": "FM10",
@@ -76,16 +139,16 @@
     {
       "id": "FM11",
       "name": "Integration and portable results",
-      "weight": 4,
+      "weight": 3,
       "stage": 0.75,
-      "evidence": "Versioned measurements/exports, same-origin browser SDK and experimental OBJ/method portability are implemented. The production company SDK demo processed the authorized 74-inch adult four-photo set in the user's Windows Chrome twice: all four capture checks passed, all 25 outputs returned, and the in-memory company host contract saved the scalar assessment. The latest scan completed in 14.4 seconds, freshly reauthorized export, and created a 25-output company JSON file whose parsed payload had zero forbidden photo/landmark/geometry keys. A separate organization-scoped adult-reference adapter, strict importer and no-athlete-FK migration are deployed. The authorized adult record is stored in live Supabase under Bergenfield Bears and can reopen/export through fresh tenant checks. On pp-v83, the main signed-in organization dashboard listed this record in an adult history separate from its one child roster entry, opened all 25 scalar outputs and completed authorized JSON export with zero browser warnings or errors. Production deletion, buyer-host deployment, intended-phone and restore acceptance remain. The portable handoff now includes the same fail-closed repeat-assessment and CSV utility."
+      "evidence": "Versioned measurements/exports, same-origin browser SDK and experimental OBJ/method portability are implemented. The production company SDK demo processed the authorized 74-inch adult four-photo set in the user's Windows Chrome twice: all four capture checks passed, all 25 outputs returned, and the in-memory company host contract saved the scalar assessment. The latest scan completed in 14.4 seconds, freshly reauthorized export, and created a 25-output company JSON file whose parsed payload had zero forbidden photo/landmark/geometry keys. A separate organization-scoped adult-reference adapter, strict importer and no-athlete-FK migration are deployed. The authorized adult record is stored in live Supabase under Bergenfield Bears and can reopen/export through fresh tenant checks. On pp-v83, the main signed-in organization dashboard listed this record in an adult history separate from its one child roster entry, opened all 25 scalar outputs and completed authorized JSON export with zero browser warnings or errors. Production deletion, buyer-host deployment, intended-phone and restore acceptance remain. The portable handoff now includes the same fail-closed repeat-assessment and CSV utility. Rebaseline 2026-09-13 (rubric version 2): a server-to-server results API is now scored separately as FM15, and iOS and mobile embedding as FM16. This category keeps the browser SDK, portable package and exports; FITMATCH's own web-SDK guide also returns results to the page through a completion callback. Stage unchanged; weight 4 -> 3."
     },
     {
       "id": "FM12",
       "name": "Data protection and operation",
       "weight": 3,
       "stage": 0.75,
-      "evidence": "Consent and retention flows, payload allowlisting, tenant RLS, mutation audit triggers and scheduled deletion jobs are deployed in the live ParentPlaybook Supabase project. The separate adult-reference table is also deployed with organization-admin RLS, strict scalar-only validation, null athlete audit linkage and its own retention sweep. A rollback-only authenticated-role transaction verified roster-linked save/read/delete, cross-account denial and audit events with zero retained fixtures. One authorized adult reference is now persisted under Bergenfield Bears with retention through October 10, 2026; fresh-session reopen and export passed. Backup deletion, restore, buyer handover and operating evidence remain."
+      "evidence": "Consent and retention flows, payload allowlisting, tenant RLS, mutation audit triggers and scheduled deletion jobs are deployed in the live ParentPlaybook Supabase project. The separate adult-reference table is also deployed with organization-admin RLS, strict scalar-only validation, null athlete audit linkage and its own retention sweep. A rollback-only authenticated-role transaction verified roster-linked save/read/delete, cross-account denial and audit events with zero retained fixtures. One authorized adult reference is now persisted under Bergenfield Bears with retention through October 10, 2026; fresh-session reopen and export passed. Backup deletion, restore, buyer handover and operating evidence remain. Rebaseline 2026-09-13 (rubric version 2): FITMATCH publicly cites encryption in transit and at rest, a SOC 2 report under NDA, HIPAA BAAs, GDPR, penetration testing and compliance monitoring. Those are third-party attestations and agreements, so stage 1 here requires whatever equivalents a buyer agrees to be obtained independently, never self-asserted. None is held or claimed. Stage and weight unchanged."
     },
     {
       "id": "FM13",
@@ -93,6 +156,27 @@
       "weight": 1,
       "stage": 0.5,
       "evidence": "Body-insights UI, six editable slides and a self-contained presentation evidence brief are prepared. A dedicated buyer Demo Room is deployed at /friday-demo with direct links to the production SDK, signed-in adult persistence, composition validation gate, parent Body Insights, movement video and organization tools, plus an eight-minute run of show and visible claim boundary. Deployment 18af9078-3b56-4503-9d21-a1b0ee8c0e35 passed 22/22 production route/privacy checks against cache pp-v85; the final seven-step Demo Room, live composition room and signed-in Bergenfield Bears dashboard rendered with zero browser errors. Native PowerPoint and full spoken rehearsal remain."
+    },
+    {
+      "id": "FM14",
+      "name": "Population benchmarking",
+      "weight": 4,
+      "stage": 0.25,
+      "evidence": "Added in the 2026-09-13 rebaseline (rubric version 2), split from FM09, because FITMATCH's home page separately describes comparison with population norms. CDC 2000 stature-for-age, a stadiometer reference whose definition matches what a parent records, is integrated into the growth views. js/reference-cohort.mjs defines a versioned cohort contract and percentile statistics that refuse any metric without an established definitional equivalence, enforced by tests/reference-cohort.test.cjs. js/reference-cohorts.js loads zero cohorts, so no body-scan output can be compared with a population. Stature alone is not whole-body benchmarking, which holds this at partial implementation. A cohort whose protocol matches our outputs, per-metric equivalence and intended-population review remain."
+    },
+    {
+      "id": "FM15",
+      "name": "Authenticated results API",
+      "weight": 4,
+      "stage": 0.25,
+      "evidence": "Added in the 2026-09-13 rebaseline (rubric version 2), because FITMATCH's SDK page describes a guided scan with secure upload and results delivered via API. Typed, versioned company assessment and adult-reference tables are deployed in Supabase under organization row-level security, and tested adapters (js/body-sdk-supabase.mjs, js/body-sdk-reference-supabase.mjs) read and write them as a signed-in user. tools/sdk-host.cjs serves the SDK's static files and /healthz only. There is no server-to-server results API: no organization API credentials or rotation, no versioned request and response schema, pagination, idempotent retrieval, rate limiting or deletion endpoint, and no buyer-host deployment. Partial implementation. The in-page callback path is scored in FM11."
+    },
+    {
+      "id": "FM16",
+      "name": "iOS and mobile embedding",
+      "weight": 3,
+      "stage": 0,
+      "evidence": "Added in the 2026-09-13 rebaseline (rubric version 2), because FITMATCH's SDK page lists an iOS 17+ SDK beside the web SDK and its web-SDK guide describes WebView embedding for iOS, Android and Flutter. No native iOS SDK, Swift package or documented WebView integration exists, and no intended-phone trial is recorded; FM01, FM10 and FM11 each still list one as remaining. The browser SDK itself is scored in FM11. Stage 0."
     }
   ],
   "history": [
@@ -340,6 +424,11 @@
       "date": "2026-09-11",
       "earned_points": 42.75,
       "note": "FM02 0.25 -> 0.5. The rubric defines 0.5 as a core local workflow integrated with automated checks. Until now the workflow had unit checks on its pieces (prepareMask rejections, an analytical box, the connectivity refusal, the cleanup bounds) and one manual real-person session, but no automated run of the whole path and no ground-truth comparison of any kind. tests/surface-pipeline.test.cjs adds nine checks that do both, and is mutation-tested against the reconstruction core. No product code changed, and no claim about real people is made or implied: the subject is synthetic and the evidence string says so. Reference measurement studies against real people on intended devices remain what 0.75 requires."
+    },
+    {
+      "date": "2026-09-13",
+      "earned_points": 39,
+      "note": "Rebaseline to rubric version 2, against FITMATCH's public pages as fetched on 2026-09-13 (FITMATCH-CLAIM-MAP.md). Version 1 did not separately score avatar files, a results API, iOS delivery or population norms. Three categories added: FM14 population benchmarking at 0.25 (split from FM09), FM15 authenticated results API at 0.25, and FM16 iOS and mobile embedding at 0. FM02 gained OBJ/USDZ delivery and FM12 third-party attestations as acceptance criteria. Eleven weight points moved, only from categories at stage 0.5 or above to categories at 0.25 or below, so the move could not raise the total. No stage changed; the version 1 weights at these stages still give 42.75. The total falls to 39 because scope was added, not because work was undone. Earlier entries were scored under version 1 and are not comparable with this total."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Buyer delivery target — rescheduled to next week
 
-Planning baseline: September 9, when weighted completion was 37.75%. Current weighted completion is 42.75%, using tools/parity-progress.json. This document is a forecast, not additional completion credit or a guarantee.
+Planning baseline: September 9, when weighted completion was 37.75%. Current weighted completion is 39%, using tools/parity-progress.json, after the September 13 rebaseline added three categories. This document is a forecast, not additional completion credit or a guarantee.
 
 ## What “mirror” covers
 
@@ -11,9 +11,10 @@ The vendor's current [sports-science page](https://www.fitmatch.ai/sports-scienc
 ## Forecast based on the existing rubric
 
 > **Superseded forecast.** This section was written against the September 9 baseline of 37.75%. The
-> rubric has since reached 42.75%, past both the range and the 40.25% projection below; see
-> `tools/parity-progress.json` for what earned each increment. It is kept as the record of what was
-> forecast.
+> rubric reached 42.75% under its first version, past both the range and the 40.25% projection below,
+> then was rebaselined to 39% on September 13 when three categories FITMATCH claims were added (see
+> `FITMATCH-CLAIM-MAP.md`). Neither figure is comparable with this forecast, which is kept as the record
+> of what was forecast.
 
 A reasonable planning range is approximately 38–42% weighted functional parity for the rescheduled presentation, conditional on completing acceptance work. Continuous coding does not supply missing reference data, model rights or physical accuracy evidence. The score can still remain unchanged despite additional product features when those features lack required acceptance evidence.
 
