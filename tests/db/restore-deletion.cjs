@@ -187,6 +187,31 @@ check('D07', 'deletion', 'tenant roles cannot run the retention sweep themselves
 });
 
 // =============================================================== R. restore rehearsal
+// =============================================================== D. the live deletion rehearsal
+// tests/company-deletion-live-rls.sql is written to run against production, with the owner's
+// authorization, as an organization administrator under row-level security. It is only worth running
+// there once it is known to pass where it should and fail where it should, so both are proven here.
+const LIVE_DELETION = fs.readFileSync(path.join(__dirname, '..', 'company-deletion-live-rls.sql'), 'utf8');
+const rehearsalResidue = () => sql(`select (select count(*) from public.teams where name = 'Synthetic Deletion Organization')
+  + (select count(*) from public.company_body_assessments where assessment_id like 'deletion-rehearsal-%')
+  + (select count(*) from public.company_reference_assessments where assessment_id like 'deletion-rehearsal-%')
+  + (select count(*) from public.access_log where detail->>'assessment_id' like 'deletion-rehearsal-%');`);
+
+check('D08', 'deletion', 'the live deletion rehearsal passes under row-level security and leaves nothing behind', () => {
+  const out = sql(LIVE_DELETION);
+  if (!/"ok" : true/.test(out)) throw new Error('the rehearsal did not report ok: ' + out.slice(-300));
+  eq(rehearsalResidue(), 0, 'rows left behind by a rehearsal that ends in rollback');
+});
+
+check('D09', 'deletion', 'the live deletion rehearsal fails when another account is allowed to delete', () => {
+  const marker = "select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true); -- another account";
+  if (LIVE_DELETION.split(marker).length !== 2) throw new Error('the other-account step was not found exactly once');
+  const broken = LIVE_DELETION.replace(marker, "select set_config('request.jwt.claim.sub', (select actor_id::text from company_deletion_context), true); -- another account");
+  const message = sql(broken, { expectError: true });
+  if (!/row-level security did not refuse it/.test(message)) throw new Error('the rehearsal failed for a different reason: ' + message);
+  eq(rehearsalResidue(), 0, 'rows left behind by the failed rehearsal');
+});
+
 const DUMP = path.join(os.tmpdir(), 'pp-rehearsal-dump.sql');
 const RESTORED = 'pp_restore_rehearsal';
 
