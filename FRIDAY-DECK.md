@@ -13,9 +13,9 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v117`; local production-shaped smoke 29/29; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 893/893 |
-| Database suite | `node tests/db/run.cjs` | 369/369 on a disposable cluster built from the real migrations: 348 security cases plus a 21-case restore and deletion rehearsal |
+| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v118`; local production-shaped smoke 29/29; live verification pending deployment |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 896/896 |
+| Database suite | `node tests/db/run.cjs` | 371/371 on a disposable cluster built from the real migrations: 350 security cases plus a 21-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 215/215, exclusions clean, contracts 330/330, database 369/369, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
@@ -31,7 +31,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
   predicted adult height.
 - An organization side: rostered athletes, consent, an organization-scoped record with audit and
   retention, and an SDK a company can host itself.
-- Build `pp-v117` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
+- Build `pp-v118` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
 
 *Speaker notes.* Lead with the journey, not the measurement — the measurement is a feature of a
 product parents already use for training, rest and schedule. Do not open on parity percentages.

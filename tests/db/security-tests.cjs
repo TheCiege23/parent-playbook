@@ -1441,6 +1441,22 @@ add('V13', 'week-changes', 'no one can edit a change in place, and anon cannot r
       and (select relrowsecurity from pg_class where oid = 'public.week_exceptions'::regclass))::text;`,
     expect: 'ok', expectOut: 'true' });
 
+// =========================================================== W. deleting one measurement
+//
+// Growth deletes a single reading directly through meas_del. It had no executed case: these hold it to edit rights,
+// so the privacy page's "delete a measurement from Growth" is true for the family and refused for a view-only adult.
+const READING_ID = 'd8000000-0000-4000-8000-000000000001';
+const reading = `insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by)
+  values ('${READING_ID}', '${ATH_A}', 'height', 55, 'in', 'manual', current_date, '${MEMBER_C}');`;
+const readingCount = `select count(*)::text from public.measurements where id = '${READING_ID}';`;
+
+add('W01', 'measurement-delete', "a guardian who can edit deletes one of the athlete's measurements",
+  { setup: reading, ...asScanParent, sql: `delete from public.measurements where id = '${READING_ID}';reset role;` + readingCount,
+    expect: 'ok', expectOut: '0' });
+add('W02', 'measurement-delete', 'a family viewer cannot delete a measurement',
+  { setup: reading + scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
+    sql: `delete from public.measurements where id = '${READING_ID}';reset role;` + readingCount, expect: 'ok', expectOut: '1' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

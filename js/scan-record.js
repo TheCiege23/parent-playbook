@@ -79,3 +79,17 @@ async function saveScanRecord(record){
   }
   if(error) throw error;
 }
+
+// How one saved measurement is deleted. A body scan's outputs belong to one scan record and go together, from the
+// scan hub, so a scan is never left half-deleted. Everything else is deleted on its own from Growth, including a scan
+// output saved before scan records existed. Deleting one of the three readings behind a growth-spurt estimate is
+// allowed, and the parent is told the estimate changes.
+function measurementDeleteRule(row){
+  if(!row||!row.id) return {kind:'none'};
+  if(row.scan_assessment_id) return {kind:'scan'};
+  let maturityInput=false;
+  if(row.source==='manual'&&typeof row.note==='string'&&row.note.charAt(0)==='{'){
+    try{ maturityInput=JSON.parse(row.note).schema==='PP_MATURITY_INPUT_V1'; }catch(_){ maturityInput=false; }
+  }
+  return {kind:'single', maturityInput};
+}

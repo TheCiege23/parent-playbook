@@ -204,7 +204,7 @@ async function screenGrowth(){
           }
           const bars=trendBars(list, !!mm.lower_is_better);
           const oldest=run[Math.min(run.length,5)-1]||latest;
-          return H`<div class="mtrend">
+          return H`<div class="mtrend" data-measure-history="${esc(k)}" role="button" tabindex="0" aria-label="${esc(metricName(k))}: every reading">
             <div class="mt-h"><b>${esc(metricName(k))}</b>${chip}
               <span class="mt-v">${esc(fmtMeasure(k,latest.value,latest.unit||mm.unit))}</span></div>
             ${bars?H`${bars}<div class="mt-x"><span>${esc(new Date(oldest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span><span>${esc(new Date(latest.measured_on+'T00:00:00').toLocaleDateString(undefined,{month:'short'}))}</span></div>`
@@ -319,6 +319,8 @@ async function screenGrowth(){
         t.setAttribute('aria-expanded',String(open)); t.classList.toggle('open',open); };
       t.onclick=go; t.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; } }
   { const b=$("#addMeas"); if(b) b.onclick=()=>openAddMeasure(); }
+  // Tap a measurement to see every reading, and to delete one.
+  $("#screen").querySelectorAll('[data-measure-history]').forEach(el=>clickableCard(el,()=>openMeasureHistory(el.dataset.measureHistory)));
   { const b=$("#heroRecord"); if(b&&leadKey) b.onclick=()=>openAddMeasure(leadKey); }
   { const b=$("#mpBanner"); clickableCard(b,openMarketplace); }
   { const j=$("#growthToJourney"); clickableCard(j,()=>renderApp('journey')); }
