@@ -16,7 +16,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 29/29 checks, `ok: true` |
 | JavaScript suite | `node --test "tests/*.test.cjs"` | 779/779 |
 | Database suite | `node tests/db/run.cjs` | 321/321 on a disposable cluster built from the real migrations: 304 security cases plus a 17-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 202/202, exclusions clean, contracts 318/318, database 298/298, signature verified, host serving |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 207/207, exclusions clean, contracts 324/324, database 321/321, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 39%, 0 of 16 categories fully accepted |
 
