@@ -14,7 +14,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 28/28 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 728/728 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 729/729 |
 | Database suite | `node tests/db/run.cjs` | 298/298 on a disposable cluster built from the real migrations: 281 security cases plus a 17-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 202/202, exclusions clean, contracts 316/316, database 298/298, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
@@ -48,12 +48,13 @@ Thirteen weighted categories, scored on a fixed rubric in `tools/parity-progress
 | Stage | Meaning | Categories |
 | --- | --- | --- |
 | 0.75 — deployed and demonstrated | Body-insights portal, integration and portable results, data protection and operation | FM10, FM11, FM12 |
-| 0.5 — core workflow with automated checks | Guided capture, 25+ anthropometrics, PHV/maturity, predicted adult height, static asymmetry, history and reference comparisons, presentation | FM01, FM03, FM06, FM07, FM08, FM09, FM13 |
-| 0.25 — partial | Personalized 3D body, circumferences | FM02, FM04 |
+| 0.5 — core workflow with automated checks | Guided capture, personalized 3D body, 25+ anthropometrics, PHV/maturity, predicted adult height, static asymmetry, history and reference comparisons, presentation | FM01, FM02, FM03, FM06, FM07, FM08, FM09, FM13 |
+| 0.25 — partial | Circumferences | FM04 |
 | 0 — nothing shipped | **Body composition** | FM05 |
 
-*Speaker notes.* The weights matter more than the total: body composition (15) and personalized 3D
-body (20) carry 35 of 100 points and are the two weakest. Say this before they find it. The score
+*Speaker notes.* The weights matter more than the total. Body composition (15) and circumferences
+(10) are the two weakest: 25 of 100 points, with 2.5 earned. Personalized 3D body is the heaviest
+category (20) and is only halfway. Say this before they find it. The score
 has not moved through this work and it was not supposed to — the recent work was operational
 evidence, not new measurement capability. What moves it is licensed technology and validation
 studies, not more code. Rubric stages are engineering judgments, not measured accuracy.
