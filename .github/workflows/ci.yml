@@ -1,0 +1,48 @@
+# Continuous integration: the JavaScript suite and the database suite, on every pull request and every push
+# to main.
+#
+# Until this existed, every run of the suites happened on one Windows workstation. Neither suite needs a
+# secret or an external service. The database suite builds a throwaway PostgreSQL cluster from the migrations,
+# runs every case as restricted roles, and destroys it; it never connects to a server it did not create.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  javascript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: JavaScript suite
+        run: node --test "tests/*.test.cjs"
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # The runner image ships PostgreSQL outside PATH; use the newest version it has.
+      - name: Locate PostgreSQL
+        run: |
+          bin="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          "$bin/initdb" --version
+          echo "PP_PG_BIN=$bin" >> "$GITHUB_ENV"
+      - name: Database suite
+        run: node tests/db/run.cjs

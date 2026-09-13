@@ -12,6 +12,7 @@ schedule stated here stops matching the workflow.
 
 | What | Where | Schedule | Carried out? |
 | --- | --- | --- | --- |
+| Continuous integration | `.github/workflows/ci.yml` runs the JavaScript suite and `tests/db/run.cjs` on GitHub's Ubuntu runners | Every pull request and every push to `main` | Added 2026-09-13; its first run was on its own pull request |
 | Production smoke check | `.github/workflows/production-monitor.yml` runs `tools/deployment-smoke.cjs` against playbookbp.com | `17 */6 * * *` (every six hours, at 17 minutes past) and on demand | Merged 2026-09-13; not yet observed running on GitHub |
 | Retention sweeps | `cron.job` in the live project | `biometric-retention` 03:20 UTC, `company-body-assessment-retention` 03:35, `company-reference-assessment-retention` 03:40, `company-composition-result-retention` 03:50, `external-composition-retention` 03:55 | The first four were observed succeeding on 2026-09-11. `external-composition-retention` has not been observed |
 | Notification pushes | `cron.job` in the live project | `weekly-plan-push` and `gameday-push`, which call edge functions through `net.http_post` | Running in production; they message real families |
