@@ -13,10 +13,19 @@
 // The logic lives here, apart from the Deno entry point, so it runs under Node's test runner
 // (tests/notify-measure-function.test.cjs). Send policy is in ../_shared/push-policy.mjs.
 
-import { isScheduler, bearerOf, inQuietHours, localHour, weeklyCounts, optedOut, namesByGuardian, joinNames, deliver, vapidMissing } from '../_shared/push-policy.mjs';
+import { APP_TZ, isScheduler, bearerOf, inQuietHours, localHour, weeklyCounts, optedOut, namesByGuardian, joinNames, deliver, vapidMissing } from '../_shared/push-policy.mjs';
 
 export const CAP_HEADROOM = 2;
 export const STALE_DAYS = 30;
+
+// The job runs every Sunday, and only the month's first Sunday sends. A cron line cannot say "first Sunday": when a
+// schedule sets both a day of the month and a day of the week, cron runs it when EITHER matches, which is how this
+// nudge came to go out every Sunday and on days 1 to 7 besides. See
+// supabase/migrations/20260913140500_notification_schedules.sql.
+export const FIRST_WEEK_DAYS = 7;
+export function localDayOfMonth(now) {
+  return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: APP_TZ, day: 'numeric' }).format(now), 10);
+}
 
 // No guilt, no streak, no "you haven't...". A two-minute job with the honest reason attached.
 export function measureMessage(names) {
@@ -39,6 +48,7 @@ export function createNotifyMeasureHandler({ db, push, env = {}, now = () => new
       const force = params.get('force') === '1';
       const at = now();
       if (!dry && !force && inQuietHours(at)) return json({ ok: true, skipped: 'quiet_hours', hour: localHour(at) });
+      if (!dry && !force && localDayOfMonth(at) > FIRST_WEEK_DAYS) return json({ ok: true, skipped: 'not_first_week', day: localDayOfMonth(at) });
 
       // Only athletes a growth read can do something with: the percentile needs a sex, and the reference spans 2 to 20.
       const { data: children, error } = await db.from('athletes')

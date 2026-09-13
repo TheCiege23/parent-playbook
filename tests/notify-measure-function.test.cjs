@@ -10,8 +10,8 @@ const { fakeSupabase, fakeWebPush } = require('./support/fake-supabase.cjs');
 
 const load = () => import(pathToFileURL(path.join(__dirname, '../supabase/functions/notify-measure/handler.mjs')).href);
 const ENV = { SERVICE_KEY: 'sb_secret_synthetic', VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
-const NOW = new Date('2026-09-13T20:00:00Z');
-const run = () => new Request('https://project.supabase.co/functions/v1/notify-measure', { method: 'POST', headers: { Authorization: 'Bearer sb_secret_synthetic' } });
+const NOW = new Date('2026-09-06T14:14:00Z'); // the first Sunday of September, when the job sends
+const run = (query = '') => new Request('https://project.supabase.co/functions/v1/notify-measure' + query, { method: 'POST', headers: { Authorization: 'Bearer sb_secret_synthetic' } });
 
 const world = (extra = {}) => fakeSupabase({
   athletes: [
@@ -33,7 +33,7 @@ const world = (extra = {}) => fakeSupabase({
   notification_log: [],
   ...extra,
 });
-const handlerWith = async (db, push) => (await load()).createNotifyMeasureHandler({ db, push, env: ENV, now: () => NOW });
+const handlerWith = async (db, push, at = NOW) => (await load()).createNotifyMeasureHandler({ db, push, env: ENV, now: () => at });
 
 test('only children the reference covers, whose last height is stale or missing, and only writers, are nudged', async () => {
   const db = world();
@@ -50,8 +50,26 @@ test('only children the reference covers, whose last height is stale or missing,
 
 test('it yields to a household that has already had two messages this week', async () => {
   const push = fakeWebPush();
-  const log = [{ guardian_id: 'g1', sent_at: '2026-09-11T12:00:00Z' }, { guardian_id: 'g1', sent_at: '2026-09-12T12:00:00Z' }];
+  const log = [{ guardian_id: 'g1', sent_at: '2026-09-04T12:00:00Z' }, { guardian_id: 'g1', sent_at: '2026-09-05T12:00:00Z' }];
   const body = await (await (await handlerWith(world({ notification_log: log }), push))(run())).json();
   assert.equal(body.yielded, 1);
   assert.deepEqual(push.sent, []);
+});
+
+test('it sends only in the first seven days of the month, New York time, unless the run is forced or dry', async () => {
+  const { localDayOfMonth, FIRST_WEEK_DAYS } = await load();
+  assert.equal(FIRST_WEEK_DAYS, 7);
+  assert.equal(localDayOfMonth(new Date('2026-10-01T02:00:00Z')), 30, 'still 30 September in New York');
+  assert.equal(localDayOfMonth(new Date('2026-09-07T03:59:00Z')), 6, 'still Sunday 6 September in New York');
+
+  const secondSunday = new Date('2026-09-13T14:14:00Z');
+  const push = fakeWebPush();
+  const skipped = await (await handlerWith(world(), push, secondSunday))(run());
+  assert.deepEqual(await skipped.json(), { ok: true, skipped: 'not_first_week', day: 13 });
+  assert.deepEqual(push.sent, []);
+
+  assert.equal((await (await (await handlerWith(world(), push, secondSunday))(run('?force=1'))).json()).sent, 1);
+  const dry = fakeWebPush();
+  assert.equal((await (await (await handlerWith(world(), dry, secondSunday))(run('?dry=1'))).json()).sent, 1);
+  assert.deepEqual(dry.sent, []);
 });

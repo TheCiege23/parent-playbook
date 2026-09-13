@@ -184,6 +184,12 @@ a dead toggle would defeat it:
 |---|---|---|
 | `notify-weekly` | `0 22 * * 0` | Sunday, "your week is ready" |
 | `notify-gameday` | `0 23 * * *` | Nightly; sends only if TOMORROW is a game day for someone in season and not cancelled |
+| `notify-daily` | `12 20 * * *` | 4:12pm Eastern in daylight saving; only for a child whose published plan has something today and nothing done yet |
+| `notify-measure` | `14 14 * * 0` | Sunday morning; sends only in the first seven days of the month (New York time), for a child whose last height is over 30 days old |
+
+All four are scheduled in `supabase/migrations`, and `tests/notify-schedules.test.cjs` holds them to these times.
+A cron line cannot express "the first Sunday of the month": when both day fields are set, cron runs the job when
+either matches. So `measure-nudge` runs every Sunday and `notify-measure` itself skips the other Sundays.
 
 `notify-gameday` takes `?dry=1` and `?for=YYYY-MM-DD` so it can be tested on a day that
 isn't a game day. It uses Mon=0 indexing to match `DAY_LABELS` — `getUTCDay()` is Sun=0
