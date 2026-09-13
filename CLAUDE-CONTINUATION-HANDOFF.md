@@ -1,6 +1,6 @@
 # Parent Playbook continuation handoff
 
-Updated September 10, 2026. Verify this checkpoint against the repository before editing.
+Updated September 13, 2026. Verify this checkpoint against the repository before editing.
 
 ## Primary objective
 
@@ -32,9 +32,9 @@ After each coherent increment, produce a review artifact addressed to a fresh Cl
 - Proposed weighted score
 - One recommended next task
 
-For an adversarial pass, the user runs `/code-review ultra`. It is user-triggered and billed; Claude cannot launch it. It works against the local branch and does **not** need a push, which matters here because this increment is uncommitted and `main` on GitHub legitimately 404s for every new file.
+For an adversarial pass, the user runs `/code-review ultra`. It is user-triggered and billed; Claude cannot launch it. It works against the local branch and does **not** need a push.
 
-**Commit each increment to its own branch before review.** The working tree currently carries 159 dirty status entries and 144 untracked files from weeks of prior work. A branch holding only the increment makes every review sharper, including Claude's own.
+**Commit each increment to its own branch before review**, cut from a clean worktree of `origin/main`. A branch holding only the increment makes every review sharper, including Claude's own. The main checkout was clean on 2026-09-13, and a parallel session works in the same repository, so check the branch before staging and never commit on `main`.
 
 ## Verified checkpoint
 
@@ -43,13 +43,13 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Company SDK: https://playbookbp.com/company-sdk-demo
 - Adult persistence: https://playbookbp.com/company-persistence-demo
 - Composition gate: https://playbookbp.com/company-composition-demo
-- Git: `main` is at `720a545`, having taken PR #1 (composition storage and the provider registry), PR #2 (the second correctness pass) and PR #3 (the v15 archive record). Baseline `54a19fe` is still the commit that first tracked the 139 previously-uncommitted files production was already serving. Work continues on `product-correctness-pass-3`. The repository is private.
+- Git: `main` is at `cd827c2` (PR #66, the v38 package record), 2026-09-13. Every change lands through a pull request, `.github/workflows/ci.yml` runs both suites on each, and merged branches are deleted. The repository is private.
 - Service-worker release: **`pp-v113` live in production**, verified 2026-09-13 01:27 UTC against `main` at `ddf3ec5`. The deployment id was not recorded when it shipped and is not recorded here. Production smoke **29/29**, `ok: true`. Verified against the deployed files: `sw.js` declares `pp-v113` (last modified 2026-09-13 00:20:06 UTC), and `sw.js`, `js/invites.js`, `js/sheets.js`, `js/screen-week.js`, `js/screen-profile.js` and `emails/invite.html` are byte-identical to the repository once line endings are normalised. The release’s backend is live too: migration `20260912123000_family_wide_parent_invites` is applied to the ParentPlaybook project with a version matching its filename, and the `send-invite` (v8, 00:22:51 UTC) and `send-invite-sms` (v7, 00:23:05 UTC) edge functions were redeployed after `2178f8f`, the last commit to touch them, and carry its household-wide invite logic. No invite was sent to verify delivery, because that would email or text a real person. Before that, `pp-v112` live in production, built from `main` at `5e8b500` (deployment `e758c005-0c80-4ef4-a079-233de0a47aec`, 2026-09-12 08:16 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files: `js/org-composition.js`, `js/composition-sharing-ui.js`, `js/composition-import-supabase.mjs`, `js/org-insights.js`, `js/body-insights.js` and `sw.js` are byte-identical to the repository once line endings are normalised; all seven app scripts load in dependency order; the service worker precaches both new scripts; the shared-measurements section is guarded so it cannot take the roster screen down; and the deployed org source still orders by athlete name, carries no sort control, and names the uses these readings are not for. Before that, `pp-v111` live in production, built from `main` at `6b8a011` (deployment `a60831e8-eb89-4df9-9283-59a9e6972d8f`, 2026-09-12 08:02 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files rather than the cache assertion: `js/composition-import.mjs`, `js/composition-import-ui.js`, `js/composition-import-supabase.mjs`, `js/body-composition-reference.mjs`, `js/body-insights.js` and `css/body-insights.css` are all byte-identical to the repository once line endings are normalised; `index.html` loads the import screen after `dates.js` and `core.js` (it needs `localDay` and `esc` from them); the service worker precaches the three import modules; and `body-insights.js` carries the Import button and opens the sheet. Before that, `pp-v110` ran from `ecab430` (deployment `c93bac6d-f44e-48eb-8dfa-bc121c23e0f8`, 2026-09-11 19:51 UTC), smoke 29/29. Verified against the deployed file: `/js/device-evidence.js` is byte-identical to the repository once line endings are normalised, and carries the viewport guard, the `unknown` device class and the `served-sw.js` build fallback. Before that, `pp-v109` ran from `dfec45d` (deployment `2ab8fcb6`, 19:25 UTC). Before that, `pp-v108` ran from `fe495d3` (deployment `9e4515d8`, 18:59 UTC). Before that, `pp-v107` ran from `cdff443` (deployment `750e7051`, 16:52 UTC). Before that, `pp-v106` ran from `7bb5290` (deployment `d8f4498c`, 16:14 UTC). Before that, `pp-v105` ran from `e43df43` (deployment `793577ce`, 15:40 UTC). Before that, `pp-v104` ran from `720a545` (deployment `2b16a88a-0583-4df8-89e6-2a54cc1ab987`, SUCCESS 14:05 UTC). Earlier, `pp-v97` (deployment `5b3e8959-4af3-45eb-83a8-79a350fcfd78`) was verified against the deployed files rather than the cache version: `js/dates.js` byte-identical to the repository and returning the local day for a 23:30 local timestamp, the biometric consent gate in the deployed `js/body-scan.js` filtering on `todayISO()`, and no UTC-day expression left in it.
 - Railway deployment: `2b16a88a-0583-4df8-89e6-2a54cc1ab987` (SUCCESS, 2026-09-11). Project `a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2`, service `caf9bbfb-1084-422b-913a-2b90d004410f`, environment production. The service source is branch `main` with `checkSuites: false`. Pushing a feature branch still does not deploy, but **merging to `main` now does**: the PR #2 and PR #3 merges each produced a build carrying `commitHash` and `branch: main` in its metadata, where every earlier deployment carried only `reason: deploy` from a `railway up` upload.
 - Full JavaScript suite: **871/871 passing** — `node --test "tests/*.test.cjs"`. `.github/workflows/ci.yml` also runs it, and the database suite, on every pull request and every push to `main`
 - Executable database tests: **336/336 passing** (315 security cases plus a 21-case restore and deletion rehearsal) — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
 - Migration replay into a disposable cluster: **86 of 87 applied**; only `20260812174514_enable_cron_and_net.sql` fails, because pg_cron and pg_net binaries are unavailable outside Supabase
-- Production smoke: **28/28** — `node tools/deployment-smoke.cjs https://playbookbp.com/`.
+- Production smoke: **29/29**, `ok: true`, re-run 2026-09-13 — `node tools/deployment-smoke.cjs https://playbookbp.com/` (24 paths that must serve, 5 that must stay private). `.github/workflows/production-monitor.yml` runs it every six hours; its first scheduled run, at 18:28 UTC on 2026-09-13, succeeded.
 - Supabase migration **committed to the live project on 2026-09-10** (`xqvqjkdxykowwpcmyudz`, Postgres 17.6), after three rollback-only rehearsals. Applied in one transaction that also recorded `supabase_migrations.schema_migrations` at version `20260910190000`, matching the repository filename, so a later `supabase db push` sees it as applied. All seven function body md5s match the local cluster byte for byte. `company_composition_providers` and `company_composition_results` both exist, both have RLS enabled, both hold **zero rows**, `anon` has no privilege on either and is denied through the public API, and `authenticated` holds exactly `SELECT` on the registry and CRUD on results. Supabase security advisors report **no new findings** attributable to this migration.
 - Weighted parity: 40.75/100, reported as 40.75% or 41% rounded, under rubric version 2 (adopted 2026-09-13 at 39, when three FITMATCH-claimed categories were added; the same stages scored 42.75 under version 1). FM15 has since moved 0.25 -> 0.5 on the locally tested results API, and FM16 0 -> 0.25 on the Node-tested WebView message bridge. An internal engineering estimate, not independently verified parity.
 - SDK ZIP: **current handoff build** `tools/sdk-releases/parent-playbook-sdk-0.13.0-friday-final-v38.zip`, SHA-256 `F075545EB1CE67DC0036B5A72C2CC4EAEA2D4D41D5299AEFE9CC9567D52B59E1`, 623,289 bytes, 213 payload files plus `manifest.json` and `signature.json` (216 archive entries (215 files and one empty directory entry)), payload digest `d91e365125fce8822b31cdb7bb325cad769b3ee12007cd2ba2c60bfcb35da44c`. Cut 2026-09-13 from `main` at `8f41bd5` (after PRs #64 and #65), in a clean worktree. Signed with key `0cc2d189c342212d23d250264f8ab71d`; public half committed as `SIGNING-KEY.pub.pem` and deliberately not bundled. The private key lives outside the repository at `~/.parent-playbook-signing/`; back it up. Its payload digest differs from v37’s (`c58b9440a1b9c863f5d645c288f79d1317471e7ffe857fe07b5e2784ba270f92`) because the package gained two migrations and changed four files: `20260913140000_stripe_webhook_ordering.sql` (one payment row per Stripe payment intent, and subscription events applied only if not older than the last one applied) and `20260913140500_notification_schedules.sql` (the daily and measure push jobs, which had existed only in the live project, with the measure job corrected to run weekly and send only in the first week of the month); `tools/sdk-files.cjs` lists them, `tests/db/security-tests.cjs` gains the 11 cases that check them, and `HANDOVER.md` and `tests/db/README.md` carry the new database counts. The contract count is unchanged at 330; the database cases rise from 325 to 336. v37 and earlier are stale. Verified from the extracted copy: `node tools/acceptance.cjs` with `PP_SDK_PUBLIC_KEY` set -> **7/7** (manifest 213/213, exclusions clean, contracts 330/330, database 336/336, on a disposable cluster built from the package’s own 87 migrations — 315 security cases plus a 21-case restore and deletion rehearsal — signature verified against the repository copy of the public key, host serving modules that match the manifest).
@@ -68,13 +68,27 @@ There is no licensed body-composition model, real composition output or independ
 
 ## Next implementation targets, in order
 
-1. **Observe the retention cron actually firing.** The job is registered and active (`jobid` 11,
-   `50 3 * * *`, `select private.sweep_company_composition_retention();`) but has never run: it was
-   created at 17:34 UTC and is first due at 03:50 UTC. pg_cron demonstrably works in this project —
-   `company-body-assessment-retention` ran at 03:35 UTC on 2026-09-10 — but that is evidence about
-   the mechanism, not about this job. Check `cron.job_run_details` for `jobid` 11 after 03:50 UTC and
-   confirm a `succeeded` row. Note that `company-reference-assessment-retention` has also never run,
-   for the same benign reason: it was scheduled after its own daily slot had already passed.
+1. **Deploy what is merged but not live.** This needs the user's authorization in the session that does it.
+   As of 2026-09-13, checked read-only:
+   - **Edge functions.** The 14 deployed functions all predate their `handler.mjs` refactors (the newest
+     deploy is `send-invite-sms` v7 at 00:23 UTC on 2026-09-13). Production therefore still runs bugs that
+     are fixed on `main`: `notify-weekly` ignores the week-ahead opt-out, `notify-booking` lets either side
+     of a booking send any update, and several functions return runtime error text to the caller.
+     `company-results-api` is not deployed at all. Each function now imports its own `handler.mjs`, and
+     several import `supabase/functions/_shared/`, so deploy the function with those files, not a lone
+     `index.ts`.
+   - **`20260913140000_stripe_webhook_ordering.sql` is not applied.** Apply it and redeploy `stripe-webhook`
+     in the same window: the new webhook calls `apply_stripe_subscription_event`, which the live schema does
+     not have. `payments` and `subscriptions` both held zero rows when checked.
+   - **`20260913140500_notification_schedules.sql` is not applied.** The live `measure-nudge` still runs
+     `14 14 1-7 * 0`, so it fires on days 1 to 7 and every Sunday. Deploy `notify-measure` and apply the
+     migration back to back. Either order leaves a short window of extra sends: the new function on the old
+     schedule sends on days 1 to 7, and the old function on the new schedule sends every Sunday.
+   - Supabase `apply_migration` stamps its own version. Afterwards, set
+     `supabase_migrations.schema_migrations.version` to the filename's timestamp, or `supabase db push` will
+     try to run the migration again.
+   - After each step, re-run `node tools/deployment-smoke.cjs https://playbookbp.com/`, read the function's
+     logs, and for the schedules read `cron.job`.
 2. **Close the last grant residual.** `20260910200000` revoked TRUNCATE, TRIGGER, REFERENCES and
    MAINTAIN from anon and authenticated on all 53 public tables, and tightened default privileges
    for the `postgres` owner so new tables do not re-inherit them. `supabase_admin`'s defaults are
@@ -86,6 +100,16 @@ There is no licensed body-composition model, real composition output or independ
    Separately, and deliberately NOT changed: `anon` still holds INSERT/UPDATE/DELETE on most public
    tables. That is Supabase's default with row-level security as the boundary, it is what the
    application relies on, and narrowing it is a much larger decision than this one.
+3. **Blocked on evidence the code cannot supply.** Body composition (FM05) needs a licensed model and its
+   DEXA validation. Circumference and length accuracy (FM03, FM04) need tape references at marked heights and
+   a repeat capture. Mobile embedding (FM16) needs a trial in a real iOS or Android WebView on the intended
+   phone. The repeat comparator (FM09) needs a second authorized real record. None of these may be filled
+   with a created personal record, demonstration values or synthetic results.
+
+Resolved, and removed from this list: observing the retention sweeps fire. As of 2026-09-13 every job in
+`cron.job` has run and succeeded, including `company-composition-result-retention` (three runs, the latest at
+03:50 UTC) and `external-composition-retention` (one run, 03:55 UTC). A succeeded run shows the sweep
+statement executed; it does not show that anything was due for deletion.
 
 ## Deploy and migration ordering
 
