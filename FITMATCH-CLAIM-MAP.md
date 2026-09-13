@@ -70,6 +70,9 @@ Weights at the rebaseline. Stages are those held on 2026-09-13; no stage changed
 
 The weighted total moves from **42.75%** to **39%**.
 
+The tables above record the rebaseline itself. Stages move after it through dated history entries in
+`tools/parity-progress.json`, so the current total is whatever `node tools/parity-progress.cjs` reports.
+
 ### How the weights were set
 
 1. No stage moved. The version 1 weights at today's stages still give 42.75, the last recorded total, so the fall to 39 is added scope, not undone work.

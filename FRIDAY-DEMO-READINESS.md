@@ -34,7 +34,7 @@ The company SDK demo now displays readable overall measurements, four bilateral 
 
 The actual adult reference photographs populated the new dashboard with all 13 estimates. Desktop layout and switching to centimeters were checked in the browser. The run used the unchanged length engine and did not attempt 3D; it is not an additional independent accuracy observation.
 
-See `FRIDAY-DELIVERY-TARGET.md` for the conditional planning range and its weighted assumptions. Current internal rubric completion is 39%, an engineering estimate rather than verified parity. A polished live prototype is credible; validated full FITMATCH equivalence still requires reference evidence and model work.
+See `FRIDAY-DELIVERY-TARGET.md` for the conditional planning range and its weighted assumptions. Current internal rubric completion is 40%, an engineering estimate rather than verified parity. A polished live prototype is credible; validated full FITMATCH equivalence still requires reference evidence and model work.
 
 ## Opposite-view comparison — SDK 0.7.0 local build
 
@@ -237,7 +237,7 @@ Consent policy is now `2026-09-09.ondevice.v2` with the additional outputs descr
 
 Current checks: 42 JavaScript tests pass, alongside four Python reconstruction-artifact checks (46 total). Desktop and 390px mobile rendering were inspected with synthetic data, including expanded definitions and exclusion of future side readings at an earlier selected date. Real camera/model accuracy and production persistence remain unverified.
 
-Current parity engineering estimate: **39%** (39 of 100 weighted points under rubric version 2, adopted September 13; see `FITMATCH-CLAIM-MAP.md`). See the fixed weighting and recorded evidence in `tools/parity-progress.json`. Anthropometric, surface and maturity workflows remain provisional; anatomical circumference validation and a licensed body-composition model remain absent. The deployed composition contract is integration readiness, not a composition output or scientific-validation stage.
+Current parity engineering estimate: **40%** (40 of 100 weighted points under rubric version 2, adopted September 13; see `FITMATCH-CLAIM-MAP.md`). See the fixed weighting and recorded evidence in `tools/parity-progress.json`. Anthropometric, surface and maturity workflows remain provisional; anatomical circumference validation and a licensed body-composition model remain absent. The deployed composition contract is integration readiness, not a composition output or scientific-validation stage.
 
 ## Calibrated mesh assessment increment
 
