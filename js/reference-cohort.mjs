@@ -186,14 +186,17 @@ export function referencePercentile(cohort, { metricKey, value, unit, ageMonths 
     fail('SEX_NOT_COVERED', 'This cohort covers ' + cohort.population.sex + ' subjects only.');
   }
 
+  // Every cohort states the ages it represents, so every distribution is refused outside them. A mean/SD
+  // distribution used to skip this, which meant an adult reference would have answered for a ten-year-old.
+  if (!Number.isFinite(ageMonths)) fail('AGE_REQUIRED', 'An age in months is required: every cohort represents a stated age range.');
+  if (ageMonths < cohort.population.ageRange.minMonths || ageMonths > cohort.population.ageRange.maxMonths) {
+    fail('AGE_OUT_OF_RANGE', 'This cohort covers ' + cohort.population.ageRange.minMonths + '-' + cohort.population.ageRange.maxMonths + ' months.');
+  }
+
   let z;
   if (metric.distribution.type === 'mean_sd') {
     z = (value - metric.distribution.mean) / metric.distribution.sd;
   } else {
-    if (!Number.isFinite(ageMonths)) fail('AGE_REQUIRED', 'An age in months is required for an age-varying reference.');
-    if (ageMonths < cohort.population.ageRange.minMonths || ageMonths > cohort.population.ageRange.maxMonths) {
-      fail('AGE_OUT_OF_RANGE', 'This cohort covers ' + cohort.population.ageRange.minMonths + '-' + cohort.population.ageRange.maxMonths + ' months.');
-    }
     const p = lmsAt(metric.distribution.rows, ageMonths);
     if (!p) fail('AGE_OUT_OF_RANGE', 'The cohort table does not cover this age.');
     // CDC's own formula: Z = ((X/M)^L - 1) / (L*S), and the L=0 limit is log(X/M)/S.

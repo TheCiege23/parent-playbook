@@ -87,14 +87,14 @@ test('a metric without established equivalence yields no percentile, only a refu
   const usable = cohort(); usable.metrics[0].equivalence = established();
   const ready = validateReferenceCohort(usable);
   assert.deepEqual(usableMetrics(ready), ['synthetic_length_in']);
-  assert.equal(referencePercentile(ready, { metricKey: 'synthetic_length_in', value: 60, unit: 'in' }).percentile.toFixed(4), '50.0000');
+  assert.equal(referencePercentile(ready, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', ageMonths: 120 }).percentile.toFixed(4), '50.0000');
 });
 
 test('mean/SD z-scores match values computable by hand', async () => {
   const { validateReferenceCohort, referencePercentile } = await import('../js/reference-cohort.mjs');
   const c = cohort(); c.metrics[0].equivalence = established();
   const ready = validateReferenceCohort(c);
-  const at = value => referencePercentile(ready, { metricKey: 'synthetic_length_in', value, unit: 'in' });
+  const at = value => referencePercentile(ready, { metricKey: 'synthetic_length_in', value, unit: 'in', ageMonths: 120 });
   // mean 60, sd 5 — so these z-scores are arithmetic, not approximation.
   assert.equal(at(60).z, 0);
   assert.equal(at(65).z, 1);
@@ -184,15 +184,33 @@ test('a subject the cohort does not represent gets a refusal, not an extrapolati
   maleOnly.metrics[0].equivalence = established();
   maleOnly.population.sex = 'male';
   const m = validateReferenceCohort(maleOnly);
-  assert.throws(() => referencePercentile(m, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', sex: 'female' }), { code: 'SEX_NOT_COVERED' });
-  assert.ok(referencePercentile(m, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', sex: 'male' }).percentile > 0);
+  assert.throws(() => referencePercentile(m, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', sex: 'female', ageMonths: 120 }), { code: 'SEX_NOT_COVERED' });
+  assert.ok(referencePercentile(m, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', sex: 'male', ageMonths: 120 }).percentile > 0);
+});
+
+test('a mean/SD cohort refuses a subject outside its age range, as an age-varying one does', async () => {
+  const { validateReferenceCohort, referencePercentile } = await import('../js/reference-cohort.mjs');
+  const adults = cohort();
+  adults.metrics[0].equivalence = established();
+  adults.population.ageRange = { minMonths: 240, maxMonths: 960 };
+  const ready = validateReferenceCohort(adults);
+  const ask = extra => referencePercentile(ready, { metricKey: 'synthetic_length_in', value: 60, unit: 'in', ...extra });
+
+  // A mean/SD distribution used to skip the age check entirely, so an adult reference answered for a child.
+  assert.throws(() => ask({ ageMonths: 120 }), { code: 'AGE_OUT_OF_RANGE' });
+  assert.throws(() => ask({ ageMonths: 961 }), { code: 'AGE_OUT_OF_RANGE' });
+  // And leaving the age out is not a way around it.
+  assert.throws(() => ask({}), { code: 'AGE_REQUIRED' });
+  assert.throws(() => ask({ ageMonths: NaN }), { code: 'AGE_REQUIRED' });
+  assert.equal(ask({ ageMonths: 240 }).z, 0, 'the lower bound is inside the range');
+  assert.equal(ask({ ageMonths: 960 }).z, 0, 'and so is the upper');
 });
 
 test('a percentile carries the provenance needed to judge it', async () => {
   const { validateReferenceCohort, referencePercentile } = await import('../js/reference-cohort.mjs');
   const c = cohort();
   c.metrics[0].equivalence = established({ maxAbsoluteBias: 0.4, unit: 'in' });
-  const result = referencePercentile(validateReferenceCohort(c), { metricKey: 'synthetic_length_in', value: 65, unit: 'in' });
+  const result = referencePercentile(validateReferenceCohort(c), { metricKey: 'synthetic_length_in', value: 65, unit: 'in', ageMonths: 120 });
   // A number without its cohort is unreadable six months later.
   assert.equal(result.cohortId, 'synthetic-cohort-001');
   assert.equal(result.source.citation, 'Invented for tests. Not a real publication.');
