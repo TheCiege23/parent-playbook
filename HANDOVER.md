@@ -94,6 +94,15 @@ with zero configuration, and the record contract still rejected a forbidden payl
 `CAPTURE_DATA_FORBIDDEN`. Migrations, tests, docs, the manifest and the deployment config were all
 404. The service was deleted afterwards.
 
+**After you deploy, check the deployment itself.** `node tools/sdk-host-smoke.cjs https://your-sdk-host/`
+fetches every SDK module from the running host and compares it with this package's `manifest.json`,
+byte for byte. It also confirms that `/healthz` answers, that the origin is HTTPS (camera capture needs
+a secure context), that the rest of the package (manifest, signature, documents, tests, migrations) is
+refused, and that a POST is refused. Pass `--no-demo` if you did not deploy the demo page. Verify the
+manifest's signature first: the smoke check proves the host serves what the manifest describes, and the
+signature proves the manifest is ours. `tools/acceptance.cjs` runs the same comparison against a local
+host.
+
 `node tools/sdk-verify.cjs` checks the package against its checksum manifest.
 
 ## Dependency and license inventory
@@ -148,11 +157,13 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 298 cases pass as restricted roles: 281 security cases plus a 17-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
-| `node --test tests/<name>.test.cjs` | 107 contract and adapter checks against the shipped modules. The full 431-check suite covers app code that is not part of this package and runs in the source repository, not here |
+| `node tools/sdk-host-smoke.cjs <url>` | A deployed host serves exactly the manifest's modules, over HTTPS, and nothing else from the package |
+| `node --test tests/<name>.test.cjs` | The shipped contract and adapter suites, one file at a time. `tools/acceptance.cjs` runs all of them and reports the count. The full suite in the source repository also covers app code that is not part of this package |
 
-The checksum manifest is unsigned. It detects accidental change, not a determined substitution, and
-it can be replaced alongside modified files. Keep a separately trusted copy if you are verifying a
-package that reached you over an untrusted path.
+The checksum manifest on its own detects accidental change, not a determined substitution: it can be
+replaced alongside modified files. The package also carries a detached ed25519 signature over the
+manifest (`signature.json`). Verify it with `tools/sdk-sign.cjs` against a public key you obtained
+separately from the package, never one found inside it; `BODY-SDK.md` gives the route.
 
 ## Honest limits of this document
 

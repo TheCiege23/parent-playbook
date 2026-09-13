@@ -32,7 +32,7 @@ test('portable bundle includes only allowlisted source, matched imports and an i
   const inRepo=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(n=>n.endsWith('.sql'));
   assert.deepEqual(shipped.sort(),inRepo.sort(),'the package must ship every migration, in order');
   // And the tooling an acquirer needs to verify what they were handed.
-  for(const tool of ['tools/schema-parity.cjs','tools/operations-check.cjs','tools/sdk-verify.cjs',
+  for(const tool of ['tools/schema-parity.cjs','tools/operations-check.cjs','tools/sdk-verify.cjs','tools/sdk-host-smoke.cjs',
     'tests/db/run.cjs','tests/db/inventory.sql','tests/db/posture.sql','HANDOVER.md'])
     assert.ok(fs.existsSync(path.join(output,tool)),'missing from the package: '+tool);
   // The license inventory has to name the two obligations that need a decision.

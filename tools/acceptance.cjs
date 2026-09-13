@@ -256,6 +256,17 @@ async function checkHost() {
     const leak = await get(port, '/manifest.json');
     if (leak.status === 200) return record('host', 'fail', 'the host served /manifest.json, which is outside its allowlist');
 
+    // In an extracted package, every served module is compared with the manifest by the same tool a
+    // buyer points at their own deployment. The development tree has no manifest, so it skips this.
+    let compared = '';
+    const smokeTool = path.join(root, 'tools/sdk-host-smoke.cjs');
+    if (isBundle && fs.existsSync(smokeTool)) {
+      const smoke = await require(smokeTool).run('http://127.0.0.1:' + port + '/', { manifestPath: path.join(root, 'manifest.json') });
+      const failed = smoke.checks.filter(check => !check.ok);
+      if (failed.length) return record('host', 'fail', 'tools/sdk-host-smoke.cjs: ' + failed.map(check => check.id + ' ' + JSON.stringify(check.detail)).join('; '));
+      compared = '; all ' + smoke.manifest.modules + ' served modules match the manifest';
+    }
+
     // The page a buyer actually opens has to carry its own limits. Everything else in this
     // run checks files and contracts; nobody was checking that the one human-readable
     // surface still says what the outputs are and are not. A demo page that quietly lost
@@ -271,7 +282,7 @@ async function checkHost() {
     const missing = required.filter(([re]) => !re.test(page.body || '')).map(([, what]) => what);
     if (missing.length) return record('host', 'fail', 'the demo page is missing ' + missing.join(', '));
 
-    return record('host', 'pass', `serves /healthz and /js/body-sdk.mjs as ${mod.type.split(';')[0]}; off-allowlist paths refused; the demo page keeps its provisional, accuracy, girth/composition and permission disclosures`);
+    return record('host', 'pass', `serves /healthz and /js/body-sdk.mjs as ${mod.type.split(';')[0]}; off-allowlist paths refused; the demo page keeps its provisional, accuracy, girth/composition and permission disclosures${compared}`);
   } finally {
     child.kill();
   }
