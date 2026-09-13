@@ -12,9 +12,9 @@
 //   - a booking's paid_at is set once and not moved by a redelivery;
 //   - a signature failure answers 400 without echoing the verifier's message.
 //
-// Not fixed here, and pinned by the tests: subscription events are applied in the order they arrive, so a
-// late customer.subscription.updated can overwrite a newer cancellation. Fixing that needs the event time
-// stored beside the subscription, which is a schema change.
+// Subscription events go through public.apply_stripe_subscription_event, which ignores an event older than the
+// last one applied to that guardian's row, by Stripe's `created` time. Before it, events were applied in arrival
+// order, so a late customer.subscription.updated could overwrite a newer cancellation.
 
 const JSON_HEADERS = Object.freeze({ 'Content-Type': 'application/json' });
 const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -79,18 +79,23 @@ export function createStripeWebhookHandler({ verifyEvent, db, feeBps = 1500, now
     }
 
     // Premium subscriptions: the subscription carries metadata.guardian_id, set at creation in stripe-subscribe,
-    // so renewals and cancellations resolve the same way a first payment does.
+    // so renewals and cancellations resolve the same way a first payment does. The database applies the event only
+    // if it is not older than the last one applied, so a late "updated" cannot undo a cancellation.
     if (SUBSCRIPTION_EVENTS.includes(event.type)) {
       const subscription = event.data.object;
       const guardianId = subscription.metadata?.guardian_id;
       if (guardianId) {
+        // Stripe stamps every event with `created`, in whole seconds. Without it the event cannot be placed, and a
+        // retry will not add one, so it is refused rather than applied or retried forever.
+        if (!Number.isInteger(event.created) || event.created <= 0) return reply(400, { error: 'The event has no creation time.' });
         const periodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
-        const { error } = await db.from('subscriptions').update({
-          stripe_subscription_id: subscription.id,
-          status: subscriptionStatus(subscription.status),
-          current_period_end: periodEnd,
-          updated_at: now().toISOString(),
-        }).eq('guardian_id', guardianId);
+        const { error } = await db.rpc('apply_stripe_subscription_event', {
+          p_guardian_id: guardianId,
+          p_subscription_id: subscription.id,
+          p_status: subscriptionStatus(subscription.status),
+          p_current_period_end: periodEnd,
+          p_event_at: new Date(event.created * 1000).toISOString(),
+        });
         if (error) return failed();
       }
     }

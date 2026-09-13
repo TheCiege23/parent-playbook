@@ -1,13 +1,28 @@
 // An in-memory stand-in for the parts of the Supabase client the edge-function handlers use: from(table) with
 // select (including {count, head}), insert, update, delete, eq, in, gte, is, not(column, 'is', null), order,
-// limit and maybeSingle, awaited as a query. It records every write, and can be told to fail a given operation on
+// limit and maybeSingle, awaited as a query, plus rpc(name, args). It records every write, and can be told to fail a given operation on
 // a given table, so tests check what was written and what happens when a write fails. It is not a database:
 // filters are simple comparisons, and it enforces no constraint.
-function fakeSupabase(tables = {}, { errors = {} } = {}) {
+function fakeSupabase(tables = {}, { errors = {}, rpcs = {} } = {}) {
   const log = [];
   const client = {
     log,
     tables,
+    // rpc(name, args) answers with rpcs[name](args, tables), a stand-in for the database function that the test
+    // supplies. Fail it with errors['rpc:' + name].
+    rpc(name, args = {}) {
+      const execute = () => {
+        const failure = errors['rpc:' + name];
+        if (failure) {
+          log.push(['rpc failed', name]);
+          return { data: null, error: failure };
+        }
+        if (typeof rpcs[name] !== 'function') throw new Error('fake-supabase has no stand-in for rpc ' + name);
+        log.push(['rpc', name, { ...args }]);
+        return { data: rpcs[name](args, tables), error: null };
+      };
+      return { then(resolve, reject) { try { resolve(execute()); } catch (error) { reject(error); } } };
+    },
     from(table) {
       const state = { op: 'select', values: null, filters: [], single: false, options: null, order: null, limit: null };
       const rows = () => (tables[table] ||= []);

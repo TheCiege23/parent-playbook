@@ -1214,6 +1214,55 @@ add('O23', 'results-api', 'tenant roles cannot write keys, read hashes or reach 
       and (select relrowsecurity from pg_class where oid = 'public.company_api_keys'::regclass))::text;`,
     expect: 'ok', expectOut: 'true' });
 
+// =========================================================== S. Stripe webhook idempotency and ordering
+//
+// Stripe delivers each event at least once and in no promised order. The partial unique index on
+// payments.stripe_payment_intent turns a racing duplicate checkout into the unique violation the webhook already
+// treats as "recorded", and apply_stripe_subscription_event refuses to let an older subscription event overwrite a
+// newer one. The function is what makes a guardian premium, so nobody but the service role may call it.
+const SUB_GUARDIAN = ADMIN_A;
+const APPLY_SIGNATURE = 'public.apply_stripe_subscription_event(uuid,text,text,timestamptz,timestamptz)';
+const subRow = `insert into public.subscriptions(guardian_id, status) values ('${SUB_GUARDIAN}', 'inactive');`;
+const applySub = (status, at) =>
+  `select public.apply_stripe_subscription_event('${SUB_GUARDIAN}', 'sub_synthetic_1', '${status}', '2026-10-13T00:00:00Z', '${at}');`;
+const subState = `select status || '|' || coalesce(to_char(stripe_event_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS'), 'none')
+  from public.subscriptions where guardian_id = '${SUB_GUARDIAN}';`;
+const paymentRow = intent =>
+  `insert into public.payments(amount_cents, status, stripe_payment_intent) values (10000, 'captured', ${intent === null ? 'null' : `'${intent}'`});`;
+
+add('S01', 'stripe-webhook', 'a second payment for the same payment intent is refused as a unique violation',
+  { role: 'service_role', sql: paymentRow('pi_synthetic_1') + paymentRow('pi_synthetic_1'),
+    expect: 'error', expectError: /payments_stripe_payment_intent_key/ });
+add('S02', 'stripe-webhook', 'payments without a payment intent are not constrained by that index',
+  { role: 'service_role', sql: paymentRow(null) + paymentRow(null) + 'select count(*)::text from public.payments where stripe_payment_intent is null;',
+    expect: 'ok', expectOut: '2' });
+add('S03', 'stripe-webhook', "an event is applied to the guardian's row, with its Stripe time recorded",
+  { setup: subRow, role: 'service_role', sql: applySub('active', '2026-09-13T10:00:00Z') + subState,
+    expect: 'ok', expectOut: 'active|2026-09-13T10:00:00' });
+add('S04', 'stripe-webhook', 'THE CASE: an event older than the one applied is ignored, so a late update cannot undo a cancellation',
+  { setup: subRow, role: 'service_role', sql: applySub('canceled', '2026-09-13T12:00:00Z') + applySub('active', '2026-09-13T11:00:00Z') + subState,
+    expect: 'ok', expectOut: 'canceled|2026-09-13T12:00:00' });
+add('S05', 'stripe-webhook', 'and the call reports it as stale',
+  { setup: subRow, role: 'service_role', sql: applySub('canceled', '2026-09-13T12:00:00Z') + applySub('active', '2026-09-13T11:00:00Z'),
+    expect: 'ok', expectOut: 'stale' });
+add('S06', 'stripe-webhook', 'an event stamped the same second as the last one applies, in arrival order',
+  { setup: subRow, role: 'service_role', sql: applySub('canceled', '2026-09-13T12:00:00Z') + applySub('active', '2026-09-13T12:00:00Z') + subState,
+    expect: 'ok', expectOut: 'active|2026-09-13T12:00:00' });
+add('S07', 'stripe-webhook', 'a guardian with no subscription row is reported, and no row is created',
+  { role: 'service_role', sql: applySub('active', '2026-09-13T10:00:00Z'),
+    expect: 'ok', expectOut: 'no_subscription' });
+add('S08', 'stripe-webhook', 'a status the table does not use is refused',
+  { setup: subRow, role: 'service_role', sql: applySub('trialing', '2026-09-13T10:00:00Z'),
+    expect: 'error', expectError: /a guardian, the event time and a known status are required/ });
+add('S09', 'stripe-webhook', 'only the service role holds EXECUTE on it',
+  { sql: `select (not has_function_privilege('anon', '${APPLY_SIGNATURE}', 'EXECUTE')
+      and not has_function_privilege('authenticated', '${APPLY_SIGNATURE}', 'EXECUTE')
+      and has_function_privilege('service_role', '${APPLY_SIGNATURE}', 'EXECUTE'))::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('S10', 'stripe-webhook', 'a signed-in guardian calling it directly to mark themselves premium is refused',
+  { setup: subRow, role: 'authenticated', claims: SUB_GUARDIAN, sql: applySub('active', '2026-09-13T10:00:00Z'),
+    expect: 'error', expectError: /permission denied for function apply_stripe_subscription_event/ });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
