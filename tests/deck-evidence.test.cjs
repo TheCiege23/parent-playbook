@@ -40,14 +40,16 @@ test('the deck cites the service-worker version the smoke check expects', () => 
 });
 
 test('the deck cites the weighted parity score the rubric produces', () => {
-  assert.strictEqual(weighted, 42.75, 'rubric total changed; the deck and this test both need review');
-  assert.ok(deck.includes('42.75%'), 'the deck should state the weighted score');
-  assert.ok(deck.includes('43% rounded'), 'the deck should state the rounded score');
+  assert.strictEqual(weighted, 39, 'rubric total changed; the deck and this test both need review');
+  assert.ok(source.includes('**39% weighted, 39 of 100 points.'), 'the deck should state the weighted score');
+  assert.ok(rendered.includes('<b>39%</b>'), 'the rendered deck should state the weighted score');
   // A deck that quietly claims a category is accepted is the failure this guards.
   const accepted = parity.categories.filter(c => c.stage === 1).length;
   assert.strictEqual(accepted, 0);
-  assert.ok(/[Zz]ero of thirteen categories are fully accepted/.test(deck),
+  assert.ok(/[Zz]ero of sixteen categories are fully accepted/.test(deck),
     'the deck must keep saying no category is fully accepted while that is true');
+  assert.ok(rendered.includes('<b>0 / ' + parity.categories.length + '</b>'),
+    'the rendered deck should count every rubric category');
 });
 
 test('every status document quotes the current parity score, not a stale one', () => {
@@ -117,6 +119,43 @@ test('the deck puts every category in the stage the rubric gives it', () => {
       + ' but the rubric scores it ' + category.stage);
   }
   assert.strictEqual(placed.size, parity.categories.length, 'the stage table lists a category the rubric does not have');
+});
+
+test('category weights change only through a recorded rebaseline that cannot raise the score', () => {
+  // The parity plan says new scope needs a documented rebaseline "rather than silently moving the
+  // denominator". This makes that rule executable. The latest rebaseline records the weights it
+  // replaced, the weights it adopted and the stages it scored them at. Both totals must be
+  // reproducible from those numbers, and the rubric's weights must still be the adopted ones.
+  const rebaselines = parity.rebaselines || [];
+  assert.ok(rebaselines.length > 0, 'the rubric has no recorded rebaseline');
+  const latest = rebaselines[rebaselines.length - 1];
+  const points = (weights, stages) => Object.keys(weights).reduce((n, id) => n + weights[id] * stages[id], 0);
+  const total = weights => Object.values(weights).reduce((n, w) => n + w, 0);
+  assert.strictEqual(parity.rubric_version, latest.to_version);
+  assert.strictEqual(total(latest.previous_weights), 100);
+  assert.strictEqual(total(latest.weights), 100);
+
+  // The old weights at the stages held on the day reproduce the last score recorded before the
+  // rebaseline, so no stage was moved under cover of it.
+  assert.strictEqual(points(latest.previous_weights, latest.stages), latest.previous_weighted_points);
+  const at = parity.history.findIndex(h => h.date === latest.date && /rebaseline/i.test(h.note));
+  assert.ok(at > 0, 'the rebaseline has no history entry');
+  assert.strictEqual(parity.history[at - 1].earned_points, latest.previous_weighted_points);
+  assert.strictEqual(parity.history[at].earned_points, latest.weighted_points);
+  assert.strictEqual(points(latest.weights, latest.stages), latest.weighted_points);
+  assert.ok(latest.weighted_points <= latest.previous_weighted_points, 'a rebaseline added scope and raised the score');
+
+  assert.deepStrictEqual(Object.fromEntries(parity.categories.map(c => [c.id, c.weight])), latest.weights,
+    'a category weight differs from the latest recorded rebaseline');
+});
+
+test('the claim map records the weights and total of the latest rebaseline', () => {
+  const latest = parity.rebaselines[parity.rebaselines.length - 1];
+  const map = read(latest.claim_map);
+  const rows = [...map.matchAll(/^\| (FM\d{2}) \| [^|]+ \| (?:\d+|—) \| (\d+) \|/gm)].map(m => [m[1], Number(m[2])]);
+  assert.deepStrictEqual(Object.fromEntries(rows), latest.weights,
+    latest.claim_map + ' has a weight table that differs from the recorded rebaseline');
+  assert.ok(map.includes('**' + latest.weighted_points + '%**'), latest.claim_map + ' should state the rebaselined total');
 });
 
 test('the deck cites the archive size the bundler actually produces', () => {
