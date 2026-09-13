@@ -296,7 +296,7 @@ const NOT_ESTABLISHED = [
   'Anatomical validity. The surface perimeters are clothed-surface contours, not girths.',
   'Body composition. No model ships and no composition value is ever produced.',
   'FITMATCH equivalence, DEXA equivalence and clinical validity are not claimed or tested.',
-  'Provider backup restore. A logical dump and restore is rehearsed here, including that row-level security and table privileges survive it. Restoring from the hosting provider\u2019s own backups, and point-in-time recovery, are not rehearsed.',
+  'Provider backup restore. A logical dump and restore is rehearsed here, including that row-level security and table privileges survive it. Restoring from the hosting provider\u2019s own backups, and point-in-time recovery, are not rehearsed. tools/restore-drill.cjs is the check to run against one when it is made.',
   'Buyer-host deployment and physical-device capture have not been performed.',
   'Package authenticity, unless the signature check above passed against a public key you obtained independently of this package. A checksum manifest on its own detects accidental change, not substitution.',
 ];

@@ -178,9 +178,10 @@ Pin it exactly before relying on the demos in a regulated environment.
 | `node tools/acceptance.cjs` | All of the below that can run here, with skips named |
 | `node tools/package-scan.cjs .` | No images, capture geometry or credentials were packaged |
 | `node tools/sdk-verify.cjs` | Package contents match the checksum manifest; no extra files, no symlinks |
-| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 323 cases pass as restricted roles: 304 security cases plus a 19-case restore and deletion rehearsal |
+| `node tests/db/run.cjs` | Every migration applies to a throwaway cluster, then 325 cases pass as restricted roles: 304 security cases plus a 21-case restore and deletion rehearsal |
 | `node tools/schema-parity.cjs --capture <f>` | The migrations alone reproduce a full schema |
 | `node tools/operations-check.cjs --verify <f>` | A running database is in the expected posture |
+| `node tools/restore-drill.cjs` | A restored database matches its source on schema, row-level security, tenant privileges, retention jobs and row counts (connection strings in `PP_RESTORE_SOURCE` and `PP_RESTORE_TARGET`) |
 | `node tools/sdk-host-smoke.cjs <url>` | A deployed host serves exactly the manifest's modules, over HTTPS, and nothing else from the package |
 | `node --test tests/<name>.test.cjs` | The shipped contract and adapter suites, one file at a time. `tools/acceptance.cjs` runs all of them and reports the count. The full suite in the source repository also covers app code that is not part of this package |
 
@@ -196,6 +197,8 @@ dumps this schema, restores it into an empty database, and checks that the objec
 set of tables with row-level security enabled, and the table privileges all come back unchanged — then
 damages the restored copy on purpose to prove those last two checks can fail. **Restoring from a hosting
 provider’s own backups is not proven**, and neither is point-in-time recovery or backup deletion; those
-remain open in `CLAUDE-CONTINUATION-HANDOFF.md`. Deployment to
+remain open in `CLAUDE-CONTINUATION-HANDOFF.md`. When such a restore is made, `tools/restore-drill.cjs` compares it with its
+source: schema inventory, row-level security, tenant privileges, retention jobs and row counts. It is proven here only
+against a logical dump and restore. Deployment to
 a buyer-controlled host has not been performed. Nothing here establishes any FITMATCH parity claim,
 and running these commands successfully proves reproducibility, not scientific validity.
