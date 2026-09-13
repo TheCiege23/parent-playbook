@@ -56,6 +56,18 @@ test('scan history groups all outputs from one body scan into one session',()=>{
   assert.equal(grouped[0].rows.length,2);
 });
 
+test('scan history lists scan records, and only a guardian who can edit can delete one',()=>{
+  const scan=read('js/screen-scan.js');
+  assert.match(scan,/sb\.from\('body_scan_assessments'\)/);
+  // Rows that belong to a scan record are not listed a second time.
+  assert.match(scan,/if\(hasScanRecords\) rowQuery=rowQuery\.is\('scan_assessment_id',null\)/);
+  assert.match(scan,/state\.canEdit!==false&&s\.assessment/);
+  // Scoped to the athlete on screen, asks first, and checks that a row was actually deleted.
+  assert.match(scan,/\.delete\(\)\.eq\('id',btn\.dataset\.delScan\)\.eq\('athlete_id',a\.id\)\.select\('id'\)/);
+  assert.match(scan,/if\(!confirm\('Delete this body scan/);
+  assert.match(scan,/if\(error \|\| !data \|\| !data\.length\)/);
+});
+
 test('a youth body scan records guardian permission and child agreement before capture',()=>{
   const body=read('js/body-scan.js');
   assert.match(body,/2026-09-13\.ondevice\.v5/);

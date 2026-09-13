@@ -1,5 +1,6 @@
-// Versioned scan provenance in measurements.note (an existing text column).
-// Kept beside each measurement so existing export, RLS and retention apply together.
+// Versioned scan provenance. A saved body scan is one row in body_scan_assessments, and each output
+// row in measurements references it. The same metadata is still written to measurements.note, so every
+// existing reader, export and legacy comparison keeps working.
 // Only allowlisted scalar metadata is serialized: never frames, landmarks or asset URLs.
 const SCAN_NOTE_PREFIX = 'PP_SCAN_V1:';
 function scanFinite(value){ return typeof value==='number' && Number.isFinite(value) ? value : null; }
@@ -35,7 +36,7 @@ function buildScanRecord(result, context){
     // biSnapshot then filters out of its own day. The jump, sprint and speed scans already
     // stamp todayISO(), so this also had the flagship 25-output scan disagreeing with the
     // other three about what day it was.
-    return {id:uuid(),athlete_id:context.athleteId,metric_key:key,value,unit,source:'photo',measured_on:localDay(new Date(capturedAt)),created_by:context.actorId,note};
+    return {id:uuid(),athlete_id:context.athleteId,metric_key:key,value,unit,source:'photo',measured_on:localDay(new Date(capturedAt)),created_by:context.actorId,note,scan_assessment_id:meta.id};
   });
   if(!rows.length) throw new Error('No measurements to save');
   return JSON.parse(JSON.stringify({meta,rows})); // detach from mutable provider/global state
@@ -54,12 +55,27 @@ function scanCompatibility(a,b){
   if(!x && !y) return true; // legacy same-method comparisons remain available
   return !!(x && y && x.engine.id===y.engine.id && x.engine.version===y.engine.version && x.engine.model===y.engine.model);
 }
+// The provenance stored on the scan's own row in body_scan_assessments. The same allowlisted
+// metadata as the note, with one key renamed: the database refuses any key naming a photo, and
+// photo_reuse_check describes a check that the four files were distinct, not a photo.
+function scanAssessmentPayload(record){
+  const m=record.meta;
+  return {id:m.id,athlete_id:m.athlete_id,consent_id:m.consent_id,captured_at:m.captured_at,engine:m.engine,
+    record:{processing:m.processing,reuse_check:m.photo_reuse_check,output_dictionary:m.output_dictionary,side_method:m.side_method,input_height:m.input_height,quality:m.quality}};
+}
 async function saveScanRecord(record){
   if(state.user?.id!==record.rows[0].created_by) throw new Error('Sign in to the account that started this scan before saving.');
   const live=await loadScanConsent(record.meta.athlete_id,record.meta.engine.id);
   if(!live || live.id!==record.meta.consent_id) throw new Error('Permission changed. Start a new assessment before saving.');
   if(state.user?.id!==record.rows[0].created_by) throw new Error('Sign in to the account that started this scan before saving.');
-  // Stable row IDs make retry safe if the connection drops after the server commits.
-  const {error}=await sb.from('measurements').upsert(record.rows,{onConflict:'id',ignoreDuplicates:true});
+  // One call saves the scan and its outputs in one transaction. Stable IDs make a retry after a
+  // dropped connection a no-op on the server rather than a duplicate.
+  let {error}=await sb.rpc('save_body_scan_assessment',{p_assessment:scanAssessmentPayload(record),p_rows:record.rows});
+  // The site can reach families before the database migration that adds scan records does. Until
+  // it has, the outputs are saved exactly as before, and that migration links them to a scan.
+  if(error && (error.code==='PGRST202' || error.code==='42883')){
+    const rows=record.rows.map(({scan_assessment_id,...row})=>row);
+    ({error}=await sb.from('measurements').upsert(rows,{onConflict:'id',ignoreDuplicates:true}));
+  }
   if(error) throw error;
 }

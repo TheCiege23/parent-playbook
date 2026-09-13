@@ -87,7 +87,8 @@ retention_overdue as (
     'company_composition_results', (select count(*) from public.company_composition_results where retention_until <= now()),
     'company_body_assessments',    (select count(*) from public.company_body_assessments where retention_until <= now()),
     'company_reference_assessments',(select count(*) from public.company_reference_assessments where retention_until <= now()),
-    'external_composition_records', (select count(*) from public.external_composition_records where retention_until <= now())
+    'external_composition_records', (select count(*) from public.external_composition_records where retention_until <= now()),
+    'body_scan_assessments',        (select count(*) from public.body_scan_assessments where retention_until <= now())
   ) as detail
 ),
 
@@ -129,7 +130,8 @@ select jsonb_pretty(jsonb_build_object(
       'pass', (select (detail->>'company_composition_results')::integer = 0
                   and (detail->>'company_body_assessments')::integer = 0
                   and (detail->>'company_reference_assessments')::integer = 0
-                  and (detail->>'external_composition_records')::integer = 0 from retention_overdue),
+                  and (detail->>'external_composition_records')::integer = 0
+                  and (detail->>'body_scan_assessments')::integer = 0 from retention_overdue),
       'detail', (select detail from retention_overdue)),
     'composition_gate_closed', jsonb_build_object(
       'pass', (select (detail->>'registered_providers')::integer = 0

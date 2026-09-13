@@ -25,9 +25,18 @@ async function screenScan(){
   const a = state.active;
   const age=ageFrom(a.birthdate), minor=age!=null&&age<18, ageKnown=age!=null;
 
-  const [{ data: recent },{ data: heightRows }] = await Promise.all([sb.from('measurements')
+  // A body scan is one row in body_scan_assessments. Movement results and any photo row saved before
+  // scan records existed are still grouped from measurements. On a database the scan-records migration
+  // has not reached yet, the table does not exist, and every photo row is grouped as it was before.
+  const { data: assessments, error: assessmentError } = await sb.from('body_scan_assessments')
+    .select('id,captured_at,measured_on,output_count')
+    .eq('athlete_id', a.id).order('captured_at', { ascending:false }).limit(6);
+  const hasScanRecords=!assessmentError;
+  let rowQuery=sb.from('measurements')
     .select('id,athlete_id,metric_key,value,unit,measured_on,source,created_at,note')
-    .eq('athlete_id', a.id).in('source', ['photo','video','guided'])
+    .eq('athlete_id', a.id).in('source', ['photo','video','guided']);
+  if(hasScanRecords) rowQuery=rowQuery.is('scan_assessment_id',null);
+  const [{ data: recent },{ data: heightRows }] = await Promise.all([rowQuery
     // Order fully before taking six. measured_on is a DATE and one body scan writes
     // twenty-five rows sharing it, so ordering by date alone left the database to choose
     // which six appeared and the list changed between visits with no new data. created_at
@@ -36,7 +45,10 @@ async function screenScan(){
     .limit(80),
     sb.from('measurements').select('value,unit,measured_on').eq('athlete_id',a.id).eq('metric_key','height').eq('unit','in').order('measured_on',{ascending:false}).limit(1),
   ]);
-  const recentSessions=scanHistorySessions(recent).slice(0,6);
+  const scanSessions=(hasScanRecords?assessments||[]:[]).map(s=>({ key:s.id, on:s.measured_on, at:s.captured_at, assessment:s }));
+  const rowSessions=scanHistorySessions(recent).map(s=>({ ...s, at:s.record?.captured_at||s.on }));
+  const recentSessions=[...scanSessions, ...rowSessions]
+    .sort((x,y)=>String(y.at||y.on||'').localeCompare(String(x.at||x.on||''))).slice(0,6);
   const hasHeight=!!(heightRows&&heightRows.length);
 
   $("#screen").innerHTML = H`
@@ -107,10 +119,15 @@ async function screenScan(){
       <div class="sec-title" style="margin-top:22px">Recent scans</div>
       ${recentSessions.length ? H`
       <div class="card app-pad">
-        ${recentSessions.map(s=>{const first=s.rows[0], body=!!s.record;
+        ${recentSessions.map(s=>{
+          if(s.assessment){ const n=s.assessment.output_count;
+            return H`<div class="mrow scan-history-row">
+              <span><b>Body scan</b><small>${esc(fmtDate(s.on))} · ${n} output${n===1?'':'s'}</small></span>
+              ${state.canEdit!==false&&s.assessment?H`<button class="btn sm ghost" data-del-scan="${esc(s.assessment.id)}" data-n="${n}">Delete</button>`:H`<b>${n} saved</b>`}</div>`; }
+          const first=s.rows[0], body=!!s.record;
           return H`<div class="mrow scan-history-row">
             <span><b>${body?'Body scan':esc(metricName(first.metric_key))}</b><small>${esc(fmtDate(s.on))}${body?' · '+s.rows.length+' outputs':''}</small></span>
-            <b>${body?s.rows.length+' saved':esc(fmtMeasure(first.metric_key,first.value,first.unit))}</b></div>`;}).join('')}
+            <b>${body?s.rows.length+' saved':esc(fmtMeasure(first.metric_key, first.value, first.unit))}</b></div>`;}).join('')}
       </div>`
       : H`<p class="empty">Nothing yet — run either above and it shows here, and on Growth with everything
           else.</p>`}
@@ -139,4 +156,20 @@ async function screenScan(){
     if(b){ const open=()=>openSprintScan(a);
       b.onclick=open; b.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } }; } }
   { const b=$("#scanToGrowth"); if(b) b.onclick=()=>renderApp('growth'); }
+  // Deleting one scan removes it and every output it saved, from here and from Growth. Only a guardian
+  // who can edit sees the button; the database refuses anyone else regardless.
+  document.querySelectorAll('#screen [data-del-scan]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const n=Number(btn.dataset.n)||0;
+      if(!confirm('Delete this body scan and its '+n+' measurement'+(n===1?'':'s')+'? This cannot be undone.')) return;
+      btn.disabled=true;
+      const { data, error }=await sb.from('body_scan_assessments').delete().eq('id',btn.dataset.delScan).eq('athlete_id',a.id).select('id');
+      if(error || !data || !data.length){
+        if(error){ console.error(error); if(typeof reportError==='function') reportError(error,'scan:delete'); }
+        toast('Could not delete that scan'); btn.disabled=false; return;
+      }
+      toast('Scan deleted');
+      renderApp('scan');
+    };
+  });
 }
