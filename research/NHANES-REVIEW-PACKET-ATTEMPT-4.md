@@ -21,7 +21,8 @@ whatever the result.
    in those files is "clearly NOT missing at random" and that it "does not recommend analysis based
    on only complete cases with original sampling weights". The rule removed 1,700 of 9,686 eligible
    early-cycle adults (17.6%). The cohort flow then counted them under "no DXA record" rather than
-   as imputed, so the exclusion was not visible where §2 says it must be.
+   as imputed, so the exclusion was not visible where §2 says it must be. That reporting gap has
+   since been fixed (§4). The selection itself has not changed.
 
 ---
 
@@ -216,6 +217,20 @@ gives different intermediate counts for 1999–2000 — under 18 4,409; over 59 
 DXA 601; imputed 350 — while agreeing on the 2,450 included. The table above is what the code
 produces today. The 2001–2004 rows agree exactly.
 
+> **Update, 2026-09-13, after this packet was prepared.** Both record-keeping problems in this
+> section are fixed. The flow now counts early-cycle exclusions by reason:
+>
+> | Cycle | No DXA record | DXA unusable | Imputed |
+> |---|---:|---:|---:|
+> | 1999–2000 | 118 | 14 | 506 |
+> | 2001–2002 | 71 | 74 | 520 |
+> | 2003–2004 | 80 | 22 | 564 |
+>
+> `research/NHANES-DATA-STRUCTURE.md` now matches the code. Included participants, partitions and
+> every result in this packet are unchanged: the cohort was fingerprinted before and after the change
+> and is identical. The tables above are left as prepared, so the record shows what the reviewer
+> was originally sent.
+
 ### Who is in it
 
 | | Women | Men |
@@ -313,7 +328,8 @@ Full tables: Appendix A (attempt 4) and Appendix B (attempt 3).
 3. **Coverage above the label**: 93.5% under "90%" (Q4).
 4. **The audit variable sets most widths** (Q3).
 5. **Unweighted throughout**, against §7 (Q8).
-6. **Measured-only selection** in 1999–2004, against NCHS guidance, and hidden in the cohort flow (Q9).
+6. **Measured-only selection** in 1999–2004, against NCHS guidance (Q9). It was also hidden in the
+   cohort flow; that is now fixed (§4).
 7. **Era shift.** Scanner generation, the imputation regime and the body-size range all change
    between eras; women's miss direction reverses (Q13).
 8. **The conformal guarantee assumes exchangeability,** and cycles are not exchangeable. W1's
@@ -323,7 +339,7 @@ Full tables: Appendix A (attempt 4) and Appendix B (attempt 3).
 10. **The frozen object differs from the evaluated folds** (§5).
 11. **A single-cycle holdout from the same era** as two of the development cycles (Q11).
 12. **Input ranges wider than the training data** (Q12).
-13. **One documentation row disagrees with the code** (§4).
+13. **One documentation row disagreed with the code** (§4). Now fixed.
 
 ---
 

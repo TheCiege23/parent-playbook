@@ -288,3 +288,28 @@ test('hip circumference is not a model feature, because NHANES measured it in on
   // The literature's suggestion, refused by the data. See amendment 5's availability table.
   assert.ok(!C.MODEL_FEATURES.some(key => /hip/i.test(key)));
 });
+
+// ----------------------------------------------------------------- where measured-only exclusions are counted
+
+test('an imputed participant is counted as imputed or unusable, never as having no DXA record', () => {
+  // Under measured_only the replicate collapse removes imputed participants before the exclusions
+  // run. They used to reach the flow with no DXA row and be filed under "No DXA record" -- 1,700
+  // early-cycle adults whose exclusion was deliberate and invisible. The step a participant lands
+  // in must describe why they were excluded, and must not depend on which replicate policy ran.
+  const replicates = (seqn, perVersion) => [1, 2, 3, 4, 5].map(version => ({ ...dxa(seqn), _MULT_: version, ...perVersion(version) }));
+  const rows = [
+    ...replicates(1, () => ({ DXITOT: 0 })),                                  // measured: kept
+    ...replicates(2, version => ({ DXITOT: 1, DXDTOPF: 30 + version / 10 })),  // imputed values
+    ...replicates(3, () => ({ DXITOT: 2, DXDTOPF: null, DXDTOFAT: null, DXDTOLI: null, DXDTOTOT: null })), // nothing usable
+  ];
+  // Participant 4 has demographics and body measures but no DXA row at all.
+  const ids = [1, 2, 3, 4];
+  for (const replicatePolicy of ['measured_only', 'single_imputation']) {
+    const result = C.buildCohort([{ cycle: '1999-2000', role: 'development',
+      demo: ids.map(id => demo(id)), bmx: ids.map(id => bmx(id)), dxa: rows, replicatePolicy }]);
+    assert.equal(step(result, 0, 'no_dxa_record').excluded, 1, replicatePolicy + ': only participant 4 has no DXA record');
+    assert.equal(step(result, 0, 'dxa_not_usable').excluded, 1, replicatePolicy + ': participant 3');
+    assert.equal(step(result, 0, 'dxa_imputed').excluded, 1, replicatePolicy + ': participant 2');
+    assert.deepEqual(result.participants.map(p => p.seqn), [1], replicatePolicy);
+  }
+});

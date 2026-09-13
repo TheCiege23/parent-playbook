@@ -224,3 +224,25 @@ test('the findings record why exam status cannot be the validity test', () => {
   assert.match(findings, /2,596 of 3,706/);
   assert.match(findings, /never asked/);
 });
+
+test('measured_only names who it dropped and whether each had an imputed value', () => {
+  // The cohort flow needs to know who left the file here: they are gone before any exclusion runs,
+  // and without this they were counted as having no DXA record at all.
+  const rows = [
+    ...measured(10, 20.0),
+    ...imputed(11, [30.1, 30.6, 29.8, 30.3, 30.0]),
+    ...[1, 2, 3, 4, 5].map(version => ({ SEQN: 12, _MULT_: version, DXITOT: 2, DXAEXSTS: 6, DXDTOPF: null })),
+  ];
+  const out = R.collapseReplicates(rows, { policy: 'measured_only' });
+  assert.deepEqual(out.droppedParticipants.map(d => [d.id, d.hasValue]), [[11, true], [12, false]]);
+  assert.equal(out.report.participantsDropped, 2);
+  assert.equal(out.report.droppedWithImputedValue, 1);
+  assert.equal(out.report.droppedWithoutValue, 1);
+  assert.ok(Object.isFrozen(out.droppedParticipants));
+
+  // Only measured_only removes anyone, and a file that needed no collapsing removes no one.
+  for (const policy of ['single_imputation', 'all_imputations']) {
+    assert.deepEqual([...R.collapseReplicates(rows, { policy }).droppedParticipants], []);
+  }
+  assert.deepEqual([...R.collapseReplicates(LATE).droppedParticipants], []);
+});
