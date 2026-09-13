@@ -14,11 +14,11 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Deployed build | `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v113`, 29/29 checks, `ok: true` |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 801/801 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 807/807 |
 | Database suite | `node tests/db/run.cjs` | 325/325 on a disposable cluster built from the real migrations: 304 security cases plus a 21-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 209/209, exclusions clean, contracts 324/324, database 325/325, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
-| Weighted parity | `node tools/parity-progress.cjs` | 40%, 0 of 16 categories fully accepted |
+| Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
 
 ---
 
@@ -44,23 +44,23 @@ records and the SDK are live; composition is gated off and produces nothing.
 
 Sixteen weighted categories, scored on a fixed rubric in `tools/parity-progress.json` and rebaselined
 on September 13 against FIT:MATCH's current public pages (`FITMATCH-CLAIM-MAP.md`).
-**40% weighted, 40 of 100 points. Zero of sixteen categories are fully accepted.**
+**40.75% weighted, 41% rounded. Zero of sixteen categories are fully accepted.**
 
 | Stage | Meaning | Categories |
 | --- | --- | --- |
 | 0.75 — deployed and demonstrated | Body-insights portal, integration and portable results, data protection and operation | FM10, FM11, FM12 |
 | 0.5 — core workflow with automated checks | Guided capture, personalized 3D body, 25+ anthropometrics, PHV/maturity, predicted adult height, static asymmetry, history and repeat comparisons, presentation, authenticated results API | FM01, FM02, FM03, FM06, FM07, FM08, FM09, FM13, FM15 |
-| 0.25 — partial | Circumferences, population benchmarking | FM04, FM14 |
-| 0 — nothing shipped | **Body composition**, iOS and mobile embedding | FM05, FM16 |
+| 0.25 — partial | Circumferences, population benchmarking, iOS and mobile embedding | FM04, FM14, FM16 |
+| 0 — nothing shipped | **Body composition** | FM05 |
 
 *Speaker notes.* The weights matter more than the total. The September 13 rebaseline added three
 things FIT:MATCH claims and the first rubric did not score: population benchmarking, an
 authenticated results API and iOS and mobile embedding. That lowered the total from 42.75% to 39% with
 no stage changed. The results API has since been built and tested locally, which moved it to 0.5 and
-the total to 40%; it is not deployed. Body composition (15), circumferences (10), benchmarking (4) and
-iOS embedding (3) are the weakest: 32 of 100 points, with 3.5 earned. Personalized 3D body is the
+the total to 40%; it is not deployed. A tested WebView message bridge then moved iOS and mobile embedding to 0.25 (40.75%); no WebView or phone has run it. Body composition (15), circumferences (10), benchmarking (4) and
+iOS embedding (3) are the weakest: 32 of 100 points, with 4.25 earned. Personalized 3D body is the
 heaviest category (16), is only halfway and has no USDZ export. Say this before they find it.
-Some of what moves the score is code (mobile embedding, avatar files, deploying the results API) and
+Some of what moves the score is code (a native iOS SDK, avatar files, deploying the results API) and
 some is not: composition needs a licensed, DEXA-validated model, and the measurement categories need
 reference studies. Rubric stages are engineering judgments, not measured accuracy, and the total is
 not independently verified parity.

@@ -1,6 +1,6 @@
 # Buyer delivery target — rescheduled to next week
 
-Planning baseline: September 9, when weighted completion was 37.75%. Current weighted completion is 40%, using tools/parity-progress.json. The September 13 rebaseline added three categories and lowered it to 39%; the results API has since earned one point. This document is a forecast, not additional completion credit or a guarantee.
+Planning baseline: September 9, when weighted completion was 37.75%. Current weighted completion is 40.75% (41% rounded), using tools/parity-progress.json. The September 13 rebaseline added three categories and lowered it to 39%; the results API and a WebView message bridge have since earned 1.75 points. This document is a forecast, not additional completion credit or a guarantee.
 
 ## What “mirror” covers
 

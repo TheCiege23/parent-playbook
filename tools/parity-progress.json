@@ -175,8 +175,8 @@
       "id": "FM16",
       "name": "iOS and mobile embedding",
       "weight": 3,
-      "stage": 0,
-      "evidence": "Added in the 2026-09-13 rebaseline (rubric version 2), because FITMATCH's SDK page lists an iOS 17+ SDK beside the web SDK and its web-SDK guide describes WebView embedding for iOS, Android and Flutter. No native iOS SDK, Swift package or documented WebView integration exists, and no intended-phone trial is recorded; FM01, FM10 and FM11 each still list one as remaining. The browser SDK itself is scored in FM11. Stage 0."
+      "stage": 0.25,
+      "evidence": "Added in the 2026-09-13 rebaseline (rubric version 2), because FITMATCH's SDK page lists an iOS 17+ SDK beside the web SDK and its web-SDK guide describes WebView embedding for iOS, Android and Flutter. No native iOS SDK, Swift package or documented WebView integration exists, and no intended-phone trial is recorded; FM01, FM10 and FM11 each still list one as remaining. The browser SDK itself is scored in FM11. Stage 0. 2026-09-13: 0 -> 0.25. js/body-sdk-embed.mjs is the page side of a WebView message bridge. It finds a WKScriptMessageHandler or an androidx.webkit web message listener under one name, sends only the allowlisted PP_BODY_SDK_SUMMARY_V1 summary, a photo review's codes, an error or a status line, refuses any result carrying 3D surface geometry, re-checks every message for photo, landmark and geometry keys, and caps its size. tests/sdk-embed-bridge.test.cjs covers it with stand-in native handlers and ships as a package contract test. BODY-SDK.md documents serving over HTTPS, network and CSP, the Android file chooser, iOS camera usage, content-process termination and the native handlers. The Swift and Kotlin in that guide have never been compiled, no WebView has loaded the SDK, no intended phone has run it, and no native iOS SDK exists. That is partial implementation."
     }
   ],
   "history": [
@@ -434,6 +434,11 @@
       "date": "2026-09-13",
       "earned_points": 40,
       "note": "FM15 0.25 -> 0.5. The rubric defines 0.5 as a core local workflow integrated with automated checks. The organization results API now exists as database functions and an edge-function handler: hashed, scoped, expiring, rate-limited and revocable keys; service_role-only list, get and delete with paging, consent filtering and audit. 23 disposable-database cases and 6 handler tests cover it, and it shipped in the v34 package whose acceptance re-ran those cases. Nothing is deployed and the Deno entry point has never executed, which holds it below 0.75. Weights are unchanged from rubric version 2."
+    },
+    {
+      "date": "2026-09-13",
+      "earned_points": 40.75,
+      "note": "FM16 0 -> 0.25. The rubric defines 0.25 as partial implementation. A page-side WebView bridge (js/body-sdk-embed.mjs) now carries only the allowlisted summary, review codes, errors and status to an iOS or Android native handler, refuses 3D geometry and capture keys, and is covered by Node tests with stand-in handlers; BODY-SDK.md documents the native side. Nothing has run in a real WebView or on a phone, and there is no native iOS SDK. Weights are unchanged from rubric version 2."
     }
   ]
 }
