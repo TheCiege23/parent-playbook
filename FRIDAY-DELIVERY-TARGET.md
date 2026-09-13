@@ -1,6 +1,6 @@
 # Buyer delivery target — rescheduled to next week
 
-Planning baseline: September 9. Current weighted completion is 37.75%, using tools/parity-progress.json. This document is a forecast, not additional completion credit or a guarantee.
+Planning baseline: September 9, when weighted completion was 37.75%. Current weighted completion is 42.75%, using tools/parity-progress.json. This document is a forecast, not additional completion credit or a guarantee.
 
 ## What “mirror” covers
 
@@ -10,7 +10,12 @@ The vendor's current [sports-science page](https://www.fitmatch.ai/sports-scienc
 
 ## Forecast based on the existing rubric
 
-A reasonable planning range is approximately 38–42% weighted functional parity for the rescheduled presentation, conditional on completing acceptance work. Continuous coding does not supply missing reference data, model rights or physical accuracy evidence. The current 37.75% can still remain unchanged despite additional product features when those features lack required acceptance evidence.
+> **Superseded forecast.** This section was written against the September 9 baseline of 37.75%. The
+> rubric has since reached 42.75%, past both the range and the 40.25% projection below; see
+> `tools/parity-progress.json` for what earned each increment. It is kept as the record of what was
+> forecast.
+
+A reasonable planning range is approximately 38–42% weighted functional parity for the rescheduled presentation, conditional on completing acceptance work. Continuous coding does not supply missing reference data, model rights or physical accuracy evidence. The score can still remain unchanged despite additional product features when those features lack required acceptance evidence.
 
 The real production body-portal detail/export rehearsal has now earned its one-point increment. A physical-phone capture and deployment check could add 2.5 points and bring the same fixed rubric to 40.25%. The product-presentation increment is already earned through the deployed Demo Room; the remaining increments still require their listed acceptance evidence.
 

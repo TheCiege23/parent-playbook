@@ -50,6 +50,48 @@ test('the deck cites the weighted parity score the rubric produces', () => {
     'the deck must keep saying no category is fully accepted while that is true');
 });
 
+test('every status document quotes the current parity score, not a stale one', () => {
+  // The deck stayed right because the test above checks it, while four other documents went on
+  // saying 37.75% after the rubric reached 42.75%. Any statement of the CURRENT score in a status
+  // document has to match the rubric. Dated history ("was 37.75% at that baseline") is left
+  // alone: none of these patterns reads a past-tense statement.
+  const docs = ['FITMATCH-PARITY-PLAN.md', 'FRIDAY-DELIVERY-TARGET.md', 'FRIDAY-DEMO-READINESS.md', 'BODY-SDK.md',
+    'CLAUDE-CONTINUATION-HANDOFF.md', 'FRIDAY-DECK.md', 'friday-deck.html', 'OWNED-BODY-COMPOSITION-PLAN.md',
+    'HANDOVER.md', 'README.md'];
+  const rounded = Math.round(weighted);
+  const currentClaims = [
+    /\bcurrent\b[^.\n%]{0,60}?\b(?:completion|estimate|parity)\b[^\n%]{0,40}?(\d+(?:\.\d+)?)%/gi,
+    /\bthe current (\d+(?:\.\d+)?)%/gi,
+    /\brubric is now (\d+(?:\.\d+)?)%/gi,
+    /\bweighted completion is\b[^.\n%]{0,20}?(\d+(?:\.\d+)?)%/gi,
+  ];
+  // A rounded figure is checked only where it qualifies a current-score statement, as in
+  // "42.75% (43% rounded)". Dated history such as "raising completion to 27.25% (27% rounded)"
+  // is left alone, like every other past-tense record.
+  const roundedAfter = /\b(\d+(?:\.\d+)?)% rounded\b/i;
+  const stale = [];
+  let checked = 0;
+  for (const name of docs) {
+    const file = path.join(root, name);
+    if (!fs.existsSync(file)) continue;
+    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      for (const pattern of currentClaims) {
+        for (const m of line.matchAll(pattern)) {
+          checked++;
+          const value = Number(m[1]);
+          if (value !== weighted && value !== rounded) stale.push(name + ':' + (i + 1) + ' says ' + m[1] + '% as the current score');
+          const tail = line.slice(m.index + m[0].length, m.index + m[0].length + 60).match(roundedAfter);
+          if (tail && Number(tail[1]) !== rounded) stale.push(name + ':' + (i + 1) + ' says ' + tail[1] + '% rounded');
+        }
+      }
+    });
+  }
+  assert.ok(checked > 0, 'no current-score statement was found at all; the patterns have stopped matching the documents');
+  assert.deepStrictEqual(stale, [],
+    'these documents state a current parity score that is not the rubric\'s ' + weighted + '% (' + rounded + '% rounded)');
+});
+
 test('the deck puts every category in the stage the rubric gives it', () => {
   // The total alone let this go stale. The slide listed FM02 as partial (0.25) while the rubric
   // scored it 0.5, and 42.75% still matched because nothing added the table up. So each row's
