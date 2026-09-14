@@ -21,13 +21,14 @@
 <!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out. -->
 <div class="wrap" id="root"></div>
 <script>
-  // Open straight into Your training for the synthetic account, which has Adult Training and no child profile.
-  history.replaceState(null, '', location.pathname + location.search + '#adult');
+  // ?scenario=family opens the synthetic child's week, against a database shaped like production today. Otherwise it
+  // opens Your training for the synthetic account, which has Adult Training and no child profile.
+  history.replaceState(null, '', location.pathname + location.search + (new URLSearchParams(location.search).get('scenario') === 'family' ? '#week' : '#adult'));
 </script>
 <script src="/js/dates.js"></script>
 <script src="/js/device-evidence.js"></script>
 <script src="/js/monitoring.js"></script>
-<script src="/tools/adult-harness/fake-supabase.js?v=73b0f311622c"></script>
+<script src="/tools/adult-harness/fake-supabase.js?v=a1d4f8c79e67"></script>
 <script src="/js/core.js"></script>
 <script src="/js/offline.js"></script>
 <script src="/js/background.js"></script>

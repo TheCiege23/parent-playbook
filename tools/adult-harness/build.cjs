@@ -5,7 +5,9 @@
 //
 // To use it: serve the repository root over HTTP (python -m http.server 8792) and open
 // http://localhost:8792/tools/adult-harness/index.html. It opens Your training for a synthetic parent with Adult
-// Training and no child; window.__harness.db holds every row the screens write, and "Start again" resets it. It is
+// Training and no child; add ?scenario=family for a parent with one synthetic child against a database shaped like
+// production today (unapplied migrations answer as missing). window.__harness.db holds every row the screens write,
+// and "Start again" resets it. It is
 // never deployed (the Dockerfile copies tools/ file by file) and never packaged.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -50,8 +52,9 @@ ${styles.map(s => `<link rel="stylesheet" href="${s}" />`).join('\n')}
 <!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out. -->
 <div class="wrap" id="root"></div>
 <script>
-  // Open straight into Your training for the synthetic account, which has Adult Training and no child profile.
-  history.replaceState(null, '', location.pathname + location.search + '#adult');
+  // ?scenario=family opens the synthetic child's week, against a database shaped like production today. Otherwise it
+  // opens Your training for the synthetic account, which has Adult Training and no child profile.
+  history.replaceState(null, '', location.pathname + location.search + (new URLSearchParams(location.search).get('scenario') === 'family' ? '#week' : '#adult'));
 </script>
 ${tags.join('\n')}
 </body>

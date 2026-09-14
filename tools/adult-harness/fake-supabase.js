@@ -7,12 +7,53 @@
 // constraints and every other rule are the database's job and are tested in tests/db, not here.
 (function(){
   const USER = Object.freeze({ id:'00000000-0000-4000-8000-0000000000aa', email:'synthetic-parent@example.invalid' });
-  // The app will not start without its reference catalogue (js/reference.js refuses an empty sports list), so the
-  // harness carries one synthetic sport. Nothing else is seeded: the account has Adult Training and no child.
-  const db = {
+  // Two scenarios, chosen with ?scenario= in the page address.
+  //   adult (the default): a parent with Adult Training and no child. The app will not start without a reference
+  //     catalogue (js/reference.js refuses an empty sports list), so it carries one synthetic sport.
+  //   family: a parent with one synthetic child who plays football, and a database shaped like production today:
+  //     the tables and functions of migrations not yet applied to the live project answer as missing, so the
+  //     screens' fallbacks are what runs. The football catalogue rows are the public reference seed
+  //     (20260730143332_seed_football.sql), not personal data.
+  const SCENARIO = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('scenario')) || 'adult';
+  const day = offset => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
+  const db = SCENARIO === 'family' ? familySeed() : {
     adult_training_access:[{ guardian_id:USER.id, granted_at:new Date().toISOString(), note:'synthetic harness account' }],
     sports:[{ key:'synthetic_sport', name:'Synthetic sport', selectable:true, sort:1 }],
   };
+  function familySeed(){
+    const family = '00000000-0000-4000-8000-0000000000fa', athlete = '00000000-0000-4000-8000-0000000000c1';
+    const birth = new Date(); birth.setFullYear(birth.getFullYear() - 11); birth.setMonth(2, 14);
+    return {
+      sports:[
+        { key:'general', name:'General Athleticism', level_vocab:[], selectable:false, sort:99 },
+        { key:'football', name:'Football', level_vocab:['Flag', 'Pee Wee', 'Junior', 'Senior', 'Freshman', 'JV', 'Varsity'], selectable:true, sort:1 },
+      ],
+      positions:[{ sport_key:'football', code:'RB', name:'Running Back', sort:2 }, { sport_key:'football', code:'WR', name:'Wide Receiver', sort:3 }],
+      metrics:[
+        { sport_key:'general', key:'height', name:'Height', unit:'in', lower_is_better:false, is_general:true, sort:1 },
+        { sport_key:'general', key:'weight', name:'Weight', unit:'lb', lower_is_better:false, is_general:true, sort:2 },
+        { sport_key:'football', key:'dash_40', name:'40-yard dash', unit:'s', lower_is_better:true, is_general:false, sort:1 },
+      ],
+      guardians:[{ id:USER.id, display_name:'Synthetic parent', created_at:day(-60) }],
+      families:[{ id:family, name:'Synthetic family', created_by:USER.id, created_at:day(-60) }],
+      family_members:[{ family_id:family, guardian_id:USER.id, role:'owner', created_at:day(-60) }],
+      athletes:[{ id:athlete, family_id:family, first_name:'Sam', nickname:null, birthdate:birth.toISOString().slice(0, 10), dominant_hand:null, created_by:USER.id, created_at:day(-60) }],
+      athlete_sports:[{ id:'00000000-0000-4000-8000-0000000000e1', athlete_id:athlete, sport_key:'football', positions:['RB'], level:'Junior', is_primary:true,
+        practice_days:[1, 3], game_day:5, season_start:day(-30), season_end:day(60), season_state:null, parent_experience:null, created_at:day(-60) }],
+      measurements:[
+        { id:'00000000-0000-4000-8000-0000000000d1', athlete_id:athlete, metric_key:'height', value:56, unit:'in', measured_on:day(-40), source:'manual', created_by:USER.id, created_at:day(-40) },
+        { id:'00000000-0000-4000-8000-0000000000d2', athlete_id:athlete, metric_key:'height', value:56.5, unit:'in', measured_on:day(-5), source:'manual', created_by:USER.id, created_at:day(-5) },
+        { id:'00000000-0000-4000-8000-0000000000d3', athlete_id:athlete, metric_key:'weight', value:80, unit:'lb', measured_on:day(-5), source:'manual', created_by:USER.id, created_at:day(-5) },
+      ],
+    };
+  }
+  // What production does not have yet: the tables and functions of the migrations after 20260912123000.
+  const MISSING_TABLES = SCENARIO !== 'family' ? [] : [
+    'week_exceptions', 'body_scan_assessments', 'company_api_keys', 'adult_training_access', 'adult_profiles', 'adult_goals',
+    'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_nutrition_preferences', 'adult_recipes',
+    'adult_meal_plan_items', 'adult_nutrition_days', 'adult_health_records', 'adult_health_import_batches',
+  ];
+  const MISSING_FUNCTIONS = SCENARIO !== 'family' ? [] : ['save_body_scan_assessment', 'apply_stripe_subscription_event', 'save_adult_health_import'];
   const calls = [];
   const now = () => new Date().toISOString();
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(16).slice(2));
@@ -56,6 +97,10 @@
       return { data, error:null, ...extra };
     };
     const run = () => {
+      if (MISSING_TABLES.includes(name)) {
+        calls.push([st.op + ' (missing)', name]);
+        return { data:null, error:{ code:'PGRST205', message:"Could not find the table 'public." + name + "' in the schema cache" } };
+      }
       const rows = table(name);
       if (st.op === 'select') {
         let out = rows.filter(matches);
@@ -133,6 +178,7 @@
     from:query,
     rpc:async (name, args) => {
       calls.push(['rpc', name]);
+      if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
       return { data:null, error:null };
     },
@@ -154,5 +200,5 @@
   };
 
   window.supabase = { createClient:() => client };
-  window.__harness = { db, calls, USER };
+  window.__harness = { db, calls, USER, SCENARIO, MISSING_TABLES, MISSING_FUNCTIONS };
 })();

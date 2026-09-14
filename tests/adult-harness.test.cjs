@@ -42,6 +42,27 @@ test('it is never deployed and never packaged', () => {
   assert.ok(!BUNDLE_FILES.some(f => /adult-harness/.test(f)));
 });
 
+test('the family scenario answers like production today: unapplied migrations are missing', async () => {
+  const vm = require('node:vm');
+  const ctx = vm.createContext({ console, crypto: require('node:crypto').webcrypto, Date, Math, JSON, Number, String, Array, Object, Set, URLSearchParams, location: { search: '?scenario=family' } });
+  ctx.window = ctx;
+  vm.runInContext(read('tools/adult-harness/fake-supabase.js'), ctx);
+  const sb = ctx.window.supabase.createClient();
+  const h = ctx.window.__harness;
+  assert.equal(h.SCENARIO, 'family');
+  // Every table a migration after the live head creates is missing, and nothing older is.
+  const migrations = fs.readdirSync(path.join(base, 'supabase/migrations')).filter(f => f > '20260912123000' && f.endsWith('.sql'));
+  const created = migrations.flatMap(f => [...read('supabase/migrations/' + f).matchAll(/create table if not exists public\.([a-z_]+) \(/g)].map(m => m[1]));
+  const dropped = new Set(migrations.flatMap(f => [...read('supabase/migrations/' + f).matchAll(/drop table (?:if exists )?public\.([a-z_]+);/g)].map(m => m[1])));
+  assert.deepEqual([...h.MISSING_TABLES].sort(), created.filter(t => !dropped.has(t)).sort());
+  const missing = await sb.from('week_exceptions').select('*');
+  assert.equal(missing.error.code, 'PGRST205');
+  assert.equal((await sb.rpc('save_body_scan_assessment', {})).error.code, 'PGRST202');
+  const athletes = await sb.from('athletes').select('*');
+  assert.equal(athletes.data.length, 1);
+  assert.equal(athletes.data[0].first_name, 'Sam');
+});
+
 test('the fake applies the cascades the screens rely on and the import dedupes like the database', async () => {
   const vm = require('node:vm');
   const ctx = vm.createContext({ console, crypto: require('node:crypto').webcrypto, Date, Math, JSON, Number, String, Array, Object, Set });
