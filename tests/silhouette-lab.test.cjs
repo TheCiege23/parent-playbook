@@ -2,6 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const VisualHull=require('../tools/reconstruction/visual-hull.js'),crypto=require('node:crypto');
 const SurfaceReference=require('../tools/reconstruction/surface-reference.js');
 const SurfaceArchive=require('../tools/reconstruction/surface-archive.js');
+const AvatarFiles=require('../tools/reconstruction/avatar-files.js');
 function mask(){const width=80,height=120,data=new Float32Array(width*height);for(let y=10;y<110;y++)for(let x=25;x<55;x++)data[y*width+x]=1;return VisualHull.prepareMask({width,height,data,centerX:39.5});}
 function setup({hold=false}={}){
   const elements={},downloads=[],jobs=[],stats={terminated:0,closed:0};
@@ -16,12 +17,13 @@ function setup({hold=false}={}){
     });if(!hold)queueMicrotask(()=>jobs.shift()());}
     terminate(){stats.terminated++;}
   }
-  const c=vm.createContext({VisualHull,Worker,console,crypto:crypto.webcrypto,TextEncoder,Blob,Uint8Array,Float32Array,setTimeout,clearTimeout,window:{addEventListener(){}},URL:{createObjectURL(blob){downloads.push(blob);return 'blob:test';},revokeObjectURL(){}},document:{getElementById:el,createElement:()=>el('created-'+Math.random()),body:{appendChild(){}}},createImageBitmap:async()=>({width:80,height:120,close(){stats.closed++;}})});
+  const c=vm.createContext({VisualHull,AvatarFiles,Worker,console,crypto:crypto.webcrypto,TextEncoder,Blob,Uint8Array,Float32Array,setTimeout,clearTimeout,window:{addEventListener(){}},URL:{createObjectURL(blob){downloads.push(blob);return 'blob:test';},revokeObjectURL(){}},document:{getElementById:el,createElement:()=>el('created-'+Math.random()),body:{appendChild(){}}},createImageBitmap:async()=>({width:80,height:120,close(){stats.closed++;}})});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../tools/reconstruction/silhouette-lab.js'),'utf8'),c);
   return {c,el,downloads,jobs,stats};
 }
 test('four distinct image inputs build a fingerprinted experimental export; invalid alignment blocks build',async()=>{
   const {c,el,downloads}=setup();el('authorize').checked=true;el('authorize').onchange();
+  assert.equal(el('usdz').disabled,true,'no USDZ before there is a surface');
   for(const view of VisualHull.VIEWS)await c.segment(view,new Blob([view],{type:'image/png'}));
   assert.equal(el('build').disabled,true);
   for(const view of VisualHull.VIEWS){el('reviewed-'+view).checked=true;el('reviewed-'+view).onchange();}
@@ -30,10 +32,12 @@ test('four distinct image inputs build a fingerprinted experimental export; inva
   el('center-front').value='49.375';el('center-front').oninput();assert.equal(el('build').disabled,true);
   for(const view of VisualHull.VIEWS){el('reviewed-'+view).checked=true;el('reviewed-'+view).onchange();}
   assert.equal(el('build').disabled,false);
-  el('height').value='180';await el('build').onclick();assert.equal(el('output').hidden,false);
+  el('height').value='180';await el('build').onclick();assert.equal(el('output').hidden,false);assert.equal(el('usdz').disabled,false);
   el('obj').onclick();el('manifest').onclick();assert.equal(downloads.length,2);
   const obj=await downloads[0].text(),record=JSON.parse(await downloads[1].text());
   assert.equal(record.meshSha256,crypto.createHash('sha256').update(obj).digest('hex'));
+  el('usdz').onclick();const usdz=downloads.at(-1);assert.equal(usdz.type,'model/vnd.usdz+zip');
+  assert.equal(new TextDecoder().decode(new Uint8Array(await usdz.arrayBuffer()).subarray(64,75)),'#usda 1.0\n(');
   assert.equal(record.views.length,4);assert.equal(record.experimental,true);assert.equal(record.scaleStatus,'assumed-stature-not-validated');assert.ok(!JSON.stringify(record).includes('digest'));assert.ok(!JSON.stringify(record).includes('bits'));
   assert.ok(record.views.every(v=>v.review.protocol==='manual-view-review-v1'&&v.review.confirmed===true));assert.equal(record.previews,undefined);
   assert.equal(el('reference-panel').hidden,false);
@@ -43,7 +47,7 @@ test('four distinct image inputs build a fingerprinted experimental export; inva
   assert.equal(updated.referenceComparison.status,'computed');assert.equal(updated.referenceComparison.referenceCm,210);assert.equal(updated.referenceComparison.points,undefined);assert.equal(updated.meshSha256,record.meshSha256);
   el('reference-plane').value='190';el('reference-plane').oninput();assert.equal(el('reference-contour').hidden,true);
   await el('compare').onclick();el('manifest').onclick();updated=JSON.parse(await downloads.at(-1).text());assert.equal(updated.referenceComparison.status,'rejected');assert.match(updated.referenceComparison.reason,/below/);
-  el('height').value='181';el('height').oninput();assert.equal(el('output').hidden,true);
+  el('height').value='181';el('height').oninput();assert.equal(el('output').hidden,true);{const before=downloads.length;el('usdz').onclick();assert.equal(downloads.length,before,'a changed input takes the USDZ away with the surface');}
   assert.equal(el('reference-panel').hidden,true);
   c.clearSession();assert.equal(el('authorize').checked,false);assert.equal(el('file-front').disabled,true);
 });
@@ -106,6 +110,7 @@ test('a full export/reopen keeps exact OBJ bytes, clears photo views and can rec
   assert.match(el('summary').textContent,/REOPENED/);assert.equal(oldPreview.width,0);assert.equal(el('review-count').textContent,'0 of 4 views reviewed');assert.equal(el('height').disabled,true);assert.equal(el('reference-cm').value,210);
   assert.equal(vm.runInContext('record.referenceComparison',c),undefined);await el('compare').onclick();assert.match(el('reference-status').textContent,/Surface perimeter/);
   el('obj').onclick();assert.equal(await downloads.at(-1).text(),await obj.text());
+  el('usdz').onclick();assert.equal(downloads.at(-1).type,'model/vnd.usdz+zip');
   const oldMesh=vm.runInContext('mesh',c);el('saved-obj').files=[new Blob(['bad'])];el('saved-method').files=[method];await el('reopen').onclick();assert.equal(vm.runInContext('mesh',c),oldMesh);assert.match(el('status').textContent,/do not match/);
   const buffer=vm.runInContext('originalOBJ',c);c.clearSession();assert.ok(buffer.every(n=>n===0));assert.equal(el('output').hidden,true);
   let respond;

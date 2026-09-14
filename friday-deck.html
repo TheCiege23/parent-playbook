@@ -130,7 +130,7 @@
     with no stage changed. The results API has since been built and tested locally, moving it to 0.5 and
     the total to 40%; it is not deployed. A tested WebView message bridge then moved iOS and mobile embedding to 0.25 (40.75%); no WebView or phone has run it. Body composition (15), circumferences (10), benchmarking (4) and
     iOS embedding (3) are the weakest: 32 of 100 points, with 4.25 earned. Personalized 3D body is the
-    heaviest category (16), is only halfway and has no USDZ export. Say it before they find it. Some of
+    heaviest category (16), is only halfway and writes USDZ only in the research lab. Say it before they find it. Some of
     what moves the score is code (a native iOS SDK, avatar files, deploying the results API) and some is
     not: composition needs a licensed, DEXA-validated model, and the measurement categories need
     reference studies.</div>
@@ -247,7 +247,7 @@
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
     <tr><td>Release candidate</td><td>Local Docker smoke, then <code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v127</code>; local 29/29; live pending</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>964/964</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>969/969</td></tr>
     <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>412/412</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>7/7 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>

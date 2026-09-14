@@ -24,7 +24,7 @@ Stages are the rubric's: 0 no applicable output, 0.25 partial, 0.5 core workflow
 | Guided capture from four photos, in seconds | home, sports-science | FM01 | 0.5 | Guided four-view capture with per-photo checks, tested locally; no intended-phone trial |
 | An iOS 17+ SDK beside the web SDK; WebView embedding for iOS, Android and Flutter | sdk, web-sdk guide | FM16 (new) | 0 | A browser SDK only (scored in FM11); no native iOS SDK and no documented or tested WebView integration |
 | An AI-generated 3D avatar or digital twin | home, sports-science | FM02 | 0.5 | Four-silhouette reconstruction under automated checks against a synthetic subject; one accepted real clothed surface |
-| The avatar delivered as a USDZ or OBJ file | sdk | FM02 (criterion added) | 0.5 | An experimental OBJ writer used by the silhouette lab; no USDZ, and no avatar file in company results |
+| The avatar delivered as a USDZ or OBJ file | sdk | FM02 (criterion added) | 0.5 | Experimental OBJ and USDZ writers in the silhouette lab; neither in the SDK, and no avatar file in company results |
 | 25+ lengths, circumferences and ratios | home, sports-science | FM03, FM04 | 0.5, 0.25 | 25 provisional length estimates and three descriptive proportions; three experimental clothed-surface sections, not anatomical circumferences |
 | Circumferences described as high confidence | sdk | FM04 | 0.25 | FITMATCH publishes no accuracy figure; ours are unvalidated |
 | Lean mass and bone mineral content, DEXA-trained | sdk, sports-science | FM05 | 0 | A provider gate that shows no values until a licensed, DEXA-validated model is connected |
