@@ -64,7 +64,7 @@ test('only what works now has a button; the rest show their status; the child ru
 test('the page connects nothing and stores nothing', () => {
   const src = read('js/connections.js');
   assert.doesNotMatch(src, /\bsb\.|fetch\(|localStorage|sessionStorage|navigator\.|indexedDB|XMLHttpRequest/);
-  assert.match(src, /const env = \{ adultTraining:adultTrainingOn\(\), hasChild:hasActiveAthlete\(\) \};/);
+  assert.match(src, /const env = \{ adultTraining:adultTrainingOn\(\), hasChild:hasActiveAthlete\(\), calendarSync:typeof calendarSyncAvailable === 'function' && calendarSyncAvailable\(\) \};/);
   assert.doesNotMatch(src, /state\.active/);
 });
 

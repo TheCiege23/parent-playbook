@@ -17,8 +17,9 @@ const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const LEFT_OUT = ['/js/landing.js'];
 const scripts = [...index.matchAll(/<script src="(\/js\/[a-z0-9-]+\.js)"><\/script>/g)].map(m => m[1]).filter(s => !LEFT_OUT.includes(s));
 const styles = [...index.matchAll(/<link rel="stylesheet" href="(\/css\/[a-z0-9-]+\.css)" \/>/g)].map(m => m[1]).filter(s => s !== '/css/landing.css');
-// The fake is loaded with a content hash in its URL, so a browser never runs a stale copy after it changes.
-const fakeVersion = require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'fake-supabase.js'))).digest('hex').slice(0, 12);
+// The fake is loaded with a content hash in its URL, so a browser never runs a stale copy after it changes. Line
+// endings are normalised first: a Windows checkout has CRLF and CI has LF, and both must build the same page.
+const fakeVersion = require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'fake-supabase.js'), 'utf8').replace(/\r\n/g, '\n')).digest('hex').slice(0, 12);
 const fonts = (index.match(/<link href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]+" rel="stylesheet" \/>/) || [''])[0];
 
 const tags = [];

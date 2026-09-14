@@ -174,6 +174,66 @@
     return { batch:batch.id, saved:batch.rows_saved, duplicates:batch.rows_duplicate };
   }
 
+  // Google, in the family scenario: a sign-in that grants the scope it is asked for, and an in-memory Calendar API
+  // answering the calls js/calendar-sync.js makes. Calendar requests never leave the page; anything else passes through.
+  const gcal = { calendars:{}, events:{}, requests:[] };
+  if (SCENARIO === 'family') {
+    window.google = { accounts:{ oauth2:{ initTokenClient(cfg){
+      return { requestAccessToken(){ setTimeout(() => cfg.callback({ access_token:'synthetic-google-token', expires_in:3600, scope:cfg.scope }), 0); } };
+    } } } };
+    const passThrough = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+    const reply = (status, body) => ({ status, ok:status >= 200 && status < 300, json:async () => body });
+    window.fetch = async (input, init) => {
+      const url = String((input && input.url) || input);
+      if (!url.startsWith('https://www.googleapis.com/calendar/v3')) return passThrough ? passThrough(input, init) : reply(503, null);
+      const method = ((init && init.method) || 'GET').toUpperCase();
+      const auth = init && init.headers && init.headers.Authorization;
+      const u = new URL(url);
+      const p = u.pathname.replace('/calendar/v3', '');
+      const body = init && init.body ? JSON.parse(init.body) : null;
+      const log = status => { gcal.requests.push([method, p, status, auth]); return status; };
+      const missing = () => reply(log(404), { error:{ message:'Not Found' } });
+      if (auth !== 'Bearer synthetic-google-token') return reply(log(401), { error:{ message:'Invalid Credentials' } });
+      let m;
+      if (method === 'GET' && p === '/users/me/calendarList') return reply(log(200), { items:Object.values(gcal.calendars) });
+      if (method === 'POST' && p === '/calendars') {
+        const id = 'synthetic-calendar-' + (Object.keys(gcal.calendars).length + 1) + '@group.calendar.google.com';
+        gcal.calendars[id] = { id, ...body }; gcal.events[id] = {};
+        return reply(log(200), gcal.calendars[id]);
+      }
+      if ((m = p.match(/^\/calendars\/([^/]+)$/)) && method === 'GET') {
+        const cal = gcal.calendars[decodeURIComponent(m[1])];
+        return cal ? reply(log(200), cal) : missing();
+      }
+      if ((m = p.match(/^\/calendars\/([^/]+)\/events$/))) {
+        const events = gcal.events[decodeURIComponent(m[1])];
+        if (!events) return missing();
+        if (method === 'GET') {
+          const marked = u.searchParams.get('privateExtendedProperty') === 'ppSync=1';
+          return reply(log(200), { items:Object.values(events).filter(e => e.status !== 'cancelled'
+            && (!marked || (e.extendedProperties && e.extendedProperties.private && e.extendedProperties.private.ppSync === '1'))) });
+        }
+        if (method === 'POST') {
+          // Google keeps an event's id after it is deleted, so inserting it again is refused.
+          if (events[body.id]) return reply(log(409), { error:{ message:'The requested identifier already exists.' } });
+          events[body.id] = { ...body, status:'confirmed' };
+          return reply(log(200), events[body.id]);
+        }
+      }
+      if ((m = p.match(/^\/calendars\/([^/]+)\/events\/([^/]+)$/))) {
+        const events = gcal.events[decodeURIComponent(m[1])], id = decodeURIComponent(m[2]);
+        if (!events) return missing();
+        if (method === 'PUT') { events[id] = { ...body, id, status:'confirmed' }; return reply(log(200), events[id]); }
+        if (method === 'DELETE') {
+          if (!events[id] || events[id].status === 'cancelled') return reply(log(410), null);
+          events[id].status = 'cancelled';
+          return reply(log(204), null);
+        }
+      }
+      return reply(log(400), { error:{ message:'The harness does not answer ' + method + ' ' + p } });
+    };
+  }
+
   const client = {
     from:query,
     rpc:async (name, args) => {
@@ -200,5 +260,6 @@
   };
 
   window.supabase = { createClient:() => client };
-  window.__harness = { db, calls, USER, SCENARIO, MISSING_TABLES, MISSING_FUNCTIONS };
+  window.__harness = { db, calls, USER, SCENARIO, MISSING_TABLES, MISSING_FUNCTIONS, gcal,
+    calendarClientId:SCENARIO === 'family' ? 'synthetic-harness-client.apps.googleusercontent.com' : '' };
 })();
