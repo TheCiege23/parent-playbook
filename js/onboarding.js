@@ -178,9 +178,11 @@ function obChild(){ return H`
   <div class="field"><label>Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${todayISO()}"/></div>
   <div class="err" id="oberr"></div>
   <div style="margin-top:8px"><button class="btn" id="n">Continue</button></div>
+  ${state.user&&adultTrainingOn()?`<p class="muted-note" style="margin-top:14px">Just here for your own training? <a href="#" id="obAdult" style="color:var(--green-d)">Go to Your training</a></p>`:''}
   ${state.user?'':`<p class="muted-note" style="margin-top:14px">Already have an account? <a href="#" id="obLogin" style="color:var(--green-d)">Log in</a></p>`}`; }
 function obChildBind(){
   { const l=$("#obLogin"); if(l) l.onclick=e=>{ e.preventDefault(); renderAuth('login'); }; }
+  { const l=$("#obAdult"); if(l) l.onclick=e=>{ e.preventDefault(); renderApp('adult'); }; }
   obBindTeamCodeLink();
   $("#n").onclick=()=>{
     const f=$("#cf").value.trim(), b=$("#cb").value;
