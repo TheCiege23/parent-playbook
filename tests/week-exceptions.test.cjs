@@ -259,6 +259,11 @@ test('the week screen, activity screen and sheet wire the change the way the rul
   assert.match(week, /cancelledByWeek, changesByWeek/);
   // Offered only to a guardian who can edit, and only when this week has no change yet.
   assert.match(week, /state\.canEdit!==false && !weekChange/);
+  // And only once the database has the table: on a database the migration has not reached, the read fails and
+  // the button is not offered, rather than offered and then failing to save.
+  assert.match(week, /\{data:changeRows,error:changeError\}/);
+  assert.match(week, /const weekChangesAvailable=!changeError;/);
+  assert.match(week, /changeOptions:\(weekChangesAvailable && state\.canEdit!==false && !weekChange\)/);
   assert.match(activity, /ctx&&ctx\.changeOptions&&state\.canEdit!==false/);
   assert.match(activity, /ctx&&ctx\.changedHere&&state\.canEdit!==false/);
   assert.match(sheets, /if\(!navigator\.onLine\)/);

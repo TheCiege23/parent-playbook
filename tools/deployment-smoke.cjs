@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const EXPECTED_CACHE = 'pp-v116';
+const EXPECTED_CACHE = 'pp-v117';
 const required = [
   ['/', /Parent Playbook/i],
   ['/sw.js', new RegExp(`const CACHE = ['"]${EXPECTED_CACHE}['"]`)],
