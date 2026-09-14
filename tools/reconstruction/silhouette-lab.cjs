@@ -7,7 +7,8 @@ const files={
  '/visual-hull.js':['../../js/visual-hull.js','text/javascript'],
  '/mesh-section.js':['../../js/mesh-section.js','text/javascript'],
  '/surface-reference.js':['surface-reference.js','text/javascript'],
- '/surface-archive.js':['surface-archive.js','text/javascript']
+ '/surface-archive.js':['surface-archive.js','text/javascript'],
+ '/avatar-files.js':['avatar-files.js','text/javascript'],
 };
 for(const file of ['photo-import.mjs','photo-import-worker.js','heic-decode.js','surface-worker.js','visual-hull.js'])files['/js/'+file]=['../../js/'+file,'text/javascript'];
 const port=Number(process.argv[2]||8771);

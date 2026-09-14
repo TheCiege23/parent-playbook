@@ -13,7 +13,7 @@ function refresh(){
   for(const v of views){$('file-'+v).disabled=busy||!$('authorize').checked;$('center-'+v).disabled=busy||!masks[v];for(const prefix of ['display-','reviewed-','remove-'])$(prefix+v).disabled=busy||!masks[v];}
   $('build').disabled=busy||!$('authorize').checked||!validAlignment()||!views.every(v=>$('reviewed-'+v).checked);
   $('review-count').textContent=views.filter(v=>masks[v]&&$('reviewed-'+v).checked).length+' of 4 views reviewed';
-  $('obj').disabled=!record;$('manifest').disabled=!record;
+  $('obj').disabled=!record;$('usdz').disabled=!record;$('manifest').disabled=!record;
   $('smoke').disabled=busy;$('synthetic').disabled=busy;$('height').disabled=busy||!!originalOBJ;
   for(const id of ['reopen','saved-obj','saved-method'])$(id).disabled=busy||!$('authorize').checked;
   $('compare').disabled=busy||!record;
@@ -178,6 +178,8 @@ $('build').onclick=async()=>{
 };
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('obj').onclick=()=>{if(mesh&&record)download(originalOBJ||VisualHull.toOBJ(mesh),'experimental-silhouette.obj','text/plain');};
+// The same triangles as a USDZ package (tools/reconstruction/avatar-files.js), carrying the same warnings inside the file.
+$('usdz').onclick=()=>{if(!mesh||!record)return;try{download(AvatarFiles.toUSDZ(mesh),'experimental-silhouette.usdz',AvatarFiles.USDZ_MEDIA_TYPE);}catch(error){statusText(error.message);}};
 $('manifest').onclick=()=>{if(record)download(JSON.stringify(record,null,2),'experimental-silhouette-method.json','application/json');};
 $('reopen').onclick=async()=>{
   if(busy||!$('authorize').checked)return;
