@@ -218,3 +218,24 @@ test('the health record never claims what a reading cannot show', () => {
   const claims = /weight[- ]loss|lose weight|calorie|\bbmi\b|body[- ]fat|lean mass|muscle gain|pounds lost/i;
   for (const file of ['js/adult-health-record.js', MIGRATION]) assert.doesNotMatch(read(file), claims, file);
 });
+
+test('Bluetooth sessions on one day are separate workouts: added together, as one source whatever the equipment', () => {
+  const ctx = context();
+  const dates = Array.from({ length: 7 }, (_, i) => '2026-09-' + String(14 + i).padStart(2, '0'));
+  const session = (id, name, metric, value, unit, at) => ({
+    metric_key: metric, value, unit, measured_on: '2026-09-14', source_kind: 'file_import', source_name: name + ' via Bluetooth',
+    method: metric === 'distance' ? 'device_estimated' : 'device_measured', external_id: 'bt-' + id + '-' + (metric === 'distance' ? 'distance' : 'minutes'), created_at: at,
+  });
+  const records = [
+    session('a', 'Synthetic treadmill', 'workout_minutes', 30, 'min', '2026-09-14T07:00:00Z'), session('a', 'Synthetic treadmill', 'distance', 3.1, 'mi', '2026-09-14T07:00:00Z'),
+    session('b', 'Synthetic treadmill', 'workout_minutes', 20, 'min', '2026-09-14T18:00:00Z'), session('b', 'Synthetic treadmill', 'distance', 1.95, 'mi', '2026-09-14T18:00:00Z'),
+    session('c', 'Synthetic chest strap', 'workout_minutes', 15, 'min', '2026-09-14T19:00:00Z'),
+  ];
+  const week = plain(ctx.adultActivityWeek(records, dates));
+  assert.deepEqual([week.workout_minutes.value, week.workout_minutes.days], [65, 1], 'three sessions on two pieces of equipment, not the latest one alone');
+  assert.equal(week.distance.value, 5.05);
+  // A file export of a daily total still takes its largest value, so a re-export never counts twice.
+  const exported = [1, 2].map(n => ({ metric_key: 'workout_minutes', value: 30 * n, unit: 'min', measured_on: '2026-09-15', source_kind: 'file_import',
+    source_name: 'Watch', method: 'device_measured', created_at: '2026-09-15T0' + n + ':00:00Z' }));
+  assert.equal(plain(ctx.adultActivityWeek(exported, dates)).workout_minutes.value, 60);
+});

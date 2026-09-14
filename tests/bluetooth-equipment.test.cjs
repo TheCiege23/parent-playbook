@@ -118,7 +118,7 @@ test('offered only where the browser has Web Bluetooth, saved only as one import
   assert.doesNotMatch(code, /calorie|kcal|energy|resting_heart_rate/i);
   assert.doesNotMatch(code, /state\.active|athlete/i);
   assert.doesNotMatch(code, /localStorage|sessionStorage|indexedDB/);
-  assert.match(code, /releaseAll\(\); bg\.remove\(\); toast\('Workout saved'\);/);
+  assert.match(code, /finished = null; releaseAll\(\); closeSheet\(\); toast\('Workout saved'\);/);
   // The distance shown uses the precision it is saved with (btSessionRecords rounds to hundredths).
   assert.match(code, /const two = n => \(Math\.round\(n \* 100\) \/ 100\)\.toLocaleString\(undefined, \{ minimumFractionDigits:2, maximumFractionDigits:2 \}\);\n  const distanceText = m => miles \? two\(m \/ 1609\.344\) \+ ' mi' : two\(m \/ 1000\) \+ ' km';/);
   assert.match(code, /if \(!bg\.isConnected\) \{ clearInterval\(timer\); releaseAll\(\); return; \}/, 'closing the sheet disconnects the equipment');
@@ -169,4 +169,15 @@ test('the harness strap and treadmill notify frames the real parsers read', asyn
   assert.ok(seen.treadmill.at(-1).distance > seen.treadmill[0].distance);
   await assert.rejects(navigator.bluetooth.requestDevice({ filters: [{ services: [0x1234] }] }), /cancelled/);
   assert.deepEqual([...vm.runInContext('window.__harness.bluetooth.connected', ctx)], []);
+});
+
+test('the sheet asks before discarding a workout, reports only real disconnections, lets go of failed connections, and restarts distance on reconnect', () => {
+  const code = read('js/bluetooth-equipment.js').replace(/\/\/[^\n]*/g, '');
+  assert.match(code, /const closeSheet = bg\.remove;\n  bg\.remove = \(\) => \{\n    if \(\(session \|\| finished\) && !confirm\(/);
+  assert.match(code, /const releaseAll = \(\) => \{ const h = conn\.heart, m = conn\.machine; conn\.heart = conn\.machine = null; release\(h\); release\(m\); \};/);
+  assert.match(code, /if \(conn\.heart\) \{ const c = conn\.heart; conn\.heart = null; release\(c\); paint\(\); \}/);
+  assert.match(code, /if \(conn\.machine\) \{ const c = conn\.machine; conn\.machine = null; if \(session\) session\.lastDistance = null; release\(c\); paint\(\); \}/);
+  assert.match(code, /if \(!bg\.isConnected\) \{ release\(entry\); return; \}/);
+  assert.match(code, /if \(entry && conn\[which\] !== entry\) release\(entry\);\n      else if \(!entry && device\) \{ try \{ device\.gatt\.disconnect\(\); \} catch \(x\) \{\} \}/);
+  assert.equal((code.match(/session\.lastDistance = null/g) || []).length, 3, 'on connecting, on an unexpected disconnection, and on pressing Disconnect');
 });

@@ -38,7 +38,8 @@ test('off until a client id is set, asking Google only for calendars it creates,
   assert.equal(context('').ctx.calendarSyncAvailable(), false, 'without a client id, and outside the harness, it is off');
   assert.equal(context().ctx.calendarSyncAvailable(), true, 'the harness family scenario supplies a synthetic id');
   // The device keeps which calendar and when; never the token, and nothing about Google reaches the database.
-  const stored = [...src.matchAll(/localStorage\.setItem\(([A-Z_]+),/g)].map(m => m[1]);
+  const stored = [...src.matchAll(/localStorage\.setItem\(calendarKey\(([A-Z_]+)\),/g)].map(m => m[1]);
+  assert.doesNotMatch(src, /localStorage\.(get|set)Item\(CALENDAR_SYNC_/, 'every device setting is kept per account');
   assert.deepEqual([...new Set(stored)].sort(), ['CALENDAR_SYNC_LAST', 'CALENDAR_SYNC_OWN', 'CALENDAR_SYNC_STORE']);
   assert.doesNotMatch(src, /sessionStorage|indexedDB|document\.cookie|sb\.from\('[a-z_]*(google|calendar|token)/);
   assert.doesNotMatch(src, /state\.[a-zA-Z]*[Tt]oken/);
@@ -62,12 +63,15 @@ test('each planned day is an all-day, free event with an id Google accepts, stab
   for (const e of events) {
     assert.match(e.id, /^[a-v0-9]{5,1024}$/, 'Google allows 0-9 and a-v in an event id');
     assert.equal(e.transparency, 'transparent');
+    assert.equal(e.status, 'confirmed');
+    assert.ok(e.extendedProperties.private.ppOwner);
     assert.equal(e.extendedProperties.private.ppSync, '1');
     assert.match(e.description, /the next sync replaces edits made here\.$/);
   }
   assert.deepEqual(events.map(e => [e.start.date, e.end.date]).slice(-1)[0], ['2026-12-31', '2027-01-01']);
   assert.equal(new Set(events.map(e => e.id)).size, events.length);
   assert.deepEqual(plain(ctx.calendarEventsFor(sam, days, '2026-09-14')).map(e => e.id), events.map(e => e.id), 'the same plan gives the same ids');
+  assert.doesNotMatch(events[0].description, /15 min/, "a session's note stays in the app");
   assert.notEqual(plain(ctx.calendarEventsFor({ ...sam, id: 'someone-else' }, days, '2026-09-14'))[0].id, events[0].id);
   assert.notEqual(plain(ctx.calendarEventsFor(sam, [{ ...days[1], title: 'Soft hands' }], '2026-09-14'))[0].id, events[0].id, 'a changed day is a different event');
   assert.doesNotMatch(JSON.stringify(events), /0000-4000-8000/, "the child's record id never leaves");
@@ -125,7 +129,7 @@ test('end to end: the first sync fills the calendar, the second changes nothing,
   assert.deepEqual([first.updated, first.removed], [0, 0]);
   assert.equal(Object.keys(h.gcal.calendars).length, 1);
   assert.equal(Object.values(h.gcal.calendars)[0].summary, 'Parent Playbook');
-  assert.equal(store.pp_gcal_calendar, first.calendarId, 'the device remembers the calendar, not the token');
+  assert.equal(store[Object.keys(store).find(k => k.startsWith('pp_gcal_calendar:'))], first.calendarId, 'the device remembers the calendar, per account, not the token');
   assert.ok(!Object.values(store).some(v => /synthetic-google-token/.test(v)));
 
   const second = plain(await ctx.syncGoogleCalendar([sam], today));
@@ -198,8 +202,9 @@ test("a parent's own workouts: named Your training, from today over four weeks, 
   const sam = plain(ctx.calendarEventsFor({ id: '00000000-0000-4000-8000-0000000000c1', first_name: 'Sam' }, [{ date: '2026-10-05', t: 'train', title: 'Lift' }], '2026-09-29'));
   assert.notEqual(sam[0].id, events[1].id, "a parent's workout and a child's session on the same day are different events");
   // Every event id has one shape: pp, the day, who it is for (a child, or the parent as "self"), then what it is.
-  for (const id of [...events.map(e => e.id), sam[0].id]) assert.match(id, /^pp\d{8}[0-9a-f]{16}$/, id);
-  assert.equal(events[1].id.slice(10, 18), ctx.calendarHash('self'));
+  for (const id of [...events.map(e => e.id), sam[0].id]) assert.match(id, /^pp\d{8}[0-9a-f]{24}$/, id);
+  assert.equal(events[1].id.slice(10, 18), ctx.calendarOwner());
+  assert.equal(events[1].id.slice(18, 26), ctx.calendarHash('self'));
   assert.deepEqual(plain(ctx.calendarOwnEventsFor(null, '2026-09-28', '2026-09-29')), []);
 });
 
@@ -259,4 +264,100 @@ test('the box shows only with Your training, and Connections opens the sync for 
   assert.doesNotMatch(ctx.connectionsMarkup({ adultTraining: false, hasChild: false, calendarSync: true }), /data-connection="google_calendar"|own workouts/);
   assert.doesNotMatch(ctx.connectionsMarkup({ adultTraining: true, hasChild: false, calendarSync: false }), /data-connection="google_calendar"/);
   assert.match(read('privacy.html'), /If you use Your training and tick Include my workouts, it also sends the names, days and lengths of your own scheduled workouts\./);
+});
+
+test('only children this account can edit are synced: not another household, not a view-only grant, not a revoked one', async () => {
+  const { ctx } = context('?scenario=family');
+  const h = vm.runInContext('window.__harness', ctx);
+  vm.runInContext('state.user = window.__harness.USER;', ctx);
+  const sam = h.db.athletes[0];
+  const kid = (n, fam) => ({ id: '00000000-0000-4000-8000-0000000000c' + n, first_name: 'Kid' + n, family_id: '00000000-0000-4000-8000-0000000000f' + fam });
+  const other = kid(2, 'b'), viewed = kid(3, 'c'), shared = kid(4, 'd'), revoked = kid(5, 'e');
+  h.db.athlete_access = [
+    { athlete_id: viewed.id, guardian_id: h.USER.id, role: 'family_view', revoked_at: null },
+    { athlete_id: shared.id, guardian_id: h.USER.id, role: 'co_parent', revoked_at: null },
+    { athlete_id: revoked.id, guardian_id: h.USER.id, role: 'co_parent', revoked_at: '2026-09-01T00:00:00Z' },
+    { athlete_id: other.id, guardian_id: '00000000-0000-4000-8000-0000000000ee', role: 'owner', revoked_at: null },
+  ];
+  assert.deepEqual(plain(await ctx.calendarEditableAthletes([sam, other, viewed, shared, revoked])).map(a => a.first_name), ['Sam', 'Kid4']);
+  h.db.family_members[0].role = 'family_view';
+  assert.deepEqual(plain(await ctx.calendarEditableAthletes([sam])), [], 'a household member who can only view syncs nothing');
+  vm.runInContext('state.user = null;', ctx);
+  assert.deepEqual(plain(await ctx.calendarEditableAthletes([sam])), []);
+
+  const src = read('js/calendar-sync.js');
+  assert.match(src, /async function openCalendarSync\(\)\{\n  let athletes;\n  try \{ athletes = await calendarEditableAthletes\(state\.athletes \|\| \[\]\); \}/);
+  assert.match(src, /const r = await syncGoogleCalendar\(athletes, todayISO\(\), ownSource\);/);
+  assert.doesNotMatch(src, /syncGoogleCalendar\(state\.athletes/);
+});
+
+test('a failed read stops the sync before Google is touched, and a passing Google error never makes a second calendar', async () => {
+  const { ctx } = context();
+  const h = vm.runInContext('window.__harness', ctx);
+  vm.runInContext('state.user = window.__harness.USER;', ctx);
+  const sam = h.db.athletes[0];
+  const today = vm.runInContext('todayISO()', ctx);
+
+  h.MISSING_TABLES.push('schedule_exceptions');
+  await assert.rejects(ctx.syncGoogleCalendar([sam], today), /A child’s plan could not be read, so the calendar was left as it was/);
+  h.MISSING_TABLES.pop();
+  assert.deepEqual(Object.keys(h.gcal.calendars), [], 'no calendar made, nothing written');
+  assert.ok(!h.gcal.requests.some(r => r[0] !== 'GET'));
+
+  const first = plain(await ctx.syncGoogleCalendar([sam], today));
+  const realFetch = ctx.fetch;
+  ctx.fetch = async (url, init) => (/\/calendars\/[^/]+$/.test(new URL(String(url)).pathname) && (!init || !init.method || init.method === 'GET'))
+    ? { status: 503, ok: false, json: async () => ({ error: { message: 'Backend Error' } }) }
+    : realFetch(url, init);
+  await assert.rejects(ctx.syncGoogleCalendar([sam], today), /would not open the Parent Playbook calendar: Backend Error/);
+  ctx.fetch = realFetch;
+  assert.equal(Object.keys(h.gcal.calendars).length, 1, 'still one calendar');
+  assert.equal(plain(await ctx.syncGoogleCalendar([sam], today)).unchanged, first.added);
+});
+
+test('two accounts syncing into one Google calendar never remove each other’s events, and no error names a child', async () => {
+  const { ctx } = context();
+  const h = vm.runInContext('window.__harness', ctx);
+  const sam = h.db.athletes[0];
+  const today = vm.runInContext('todayISO()', ctx);
+  vm.runInContext("state.user = { id: 'synthetic-account-a' };", ctx);
+  const a = plain(await ctx.syncGoogleCalendar([sam], today));
+  vm.runInContext("state.user = { id: 'synthetic-account-b' };", ctx);
+  // Even if Google ignored the owner filter and listed every synced event, B must not remove A's.
+  const realFetch = ctx.fetch;
+  ctx.fetch = (url, init) => realFetch(String(url).replace(/&privateExtendedProperty=ppOwner%3D[0-9a-f]+/, ''), init);
+  const b = plain(await ctx.syncGoogleCalendar([sam], today));
+  ctx.fetch = realFetch;
+  assert.equal(b.calendarId, a.calendarId, 'the same "Parent Playbook" calendar');
+  assert.deepEqual([b.added, b.removed], [a.added, 0], "B's sync leaves A's events alone");
+  const live = Object.values(h.gcal.events[a.calendarId]).filter(e => e.status !== 'cancelled');
+  assert.equal(live.length, a.added * 2);
+  assert.equal(new Set(live.map(e => e.extendedProperties.private.ppOwner)).size, 2);
+  vm.runInContext("state.user = { id: 'synthetic-account-a' };", ctx);
+  assert.deepEqual(Object.values(plain(await ctx.syncGoogleCalendar([sam], today))).slice(1), [0, 0, 0, a.added]);
+
+  const src = read('js/calendar-sync.js');
+  assert.doesNotMatch(src, /calendarFailure\([^;]*summary/, 'a failed sync may reach error monitoring, so it never names the event');
+  assert.doesNotMatch(src, /d\.sub/, "a session's note (a growth or season reason) is not sent to Google");
+  assert.match(read('privacy.html'), /\(practices, games, home sessions and rest days, each with its session’s name\)/);
+});
+
+test('a rate limit from Google is waited out and retried, not reported as a failed sync', async () => {
+  const { ctx } = context();
+  const h = vm.runInContext('window.__harness', ctx);
+  vm.runInContext('state.user = window.__harness.USER;', ctx);
+  const today = vm.runInContext('todayISO()', ctx);
+  const realFetch = ctx.fetch;
+  let limited = 0;
+  ctx.fetch = async (url, init) => {
+    if (init && init.method === 'POST' && /\/events$/.test(String(url)) && limited < 1) {
+      limited++;
+      return { status: 403, ok: false, json: async () => ({ error: { message: 'Rate Limit Exceeded', errors: [{ reason: 'rateLimitExceeded' }] } }) };
+    }
+    return realFetch(url, init);
+  };
+  const r = plain(await ctx.syncGoogleCalendar([h.db.athletes[0]], today));
+  ctx.fetch = realFetch;
+  assert.equal(limited, 1);
+  assert.ok(r.added >= 7 && r.removed === 0, JSON.stringify(r));
 });
