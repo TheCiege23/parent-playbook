@@ -44,7 +44,10 @@ const CONNECTION_GROUPS = Object.freeze([['web', 'Works now'], ['planned', 'Plan
 function visibleConnections(env){
   const e = env || {};
   // Google Calendar sync works in the web app once js/calendar-sync.js has a client id; until then it is planned.
-  return CONNECTIONS.map(c => (c.key === 'google_calendar' && e.calendarSync ? { ...c, status:'web', action:{ label:'Set up', open:'calendar' } } : c)).filter(c => (c.who !== 'adult' || e.adultTraining) && (c.who === 'adult' || !c.action || e.hasChild));
+  // With Your training it can also carry the parent's own workouts, so it is offered to a parent with no child.
+  return CONNECTIONS.map(c => (c.key === 'google_calendar' && e.calendarSync ? { ...c, status:'web', action:{ label:'Set up', open:'calendar' } } : c))
+    .map(c => (c.key === 'google_calendar' && e.adultTraining ? { ...c, brings:c.brings + ' With Your training, you can add your own workouts too.' } : c))
+    .filter(c => (c.who !== 'adult' || e.adultTraining) && (c.who === 'adult' || !c.action || e.hasChild || (c.key === 'google_calendar' && e.adultTraining)));
 }
 
 function connectionsMarkup(env){

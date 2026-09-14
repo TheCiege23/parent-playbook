@@ -11,6 +11,9 @@
 // nothing that has not changed, replaces a day whose plan did, and removes what the plan no longer holds. Edits made
 // in Google are replaced by the next sync, and the sheet says so. Past days are left alone.
 //
+// A parent with Your training can tick "Include my workouts" to add their own scheduled workouts the same way, each
+// named "Your training" so it is never read as a child's session. Unticking and syncing again takes them off.
+//
 // Each week is built by planForWeek() in js/program.js, the same function the Week screen uses, so the calendar and
 // the app cannot disagree about a week.
 //
@@ -23,7 +26,9 @@ const CALENDAR_SYNC_WEEKS = 4;
 const CALENDAR_SYNC_NAME = 'Parent Playbook';
 const CALENDAR_SYNC_STORE = 'pp_gcal_calendar';
 const CALENDAR_SYNC_LAST = 'pp_gcal_last';
+const CALENDAR_SYNC_OWN = 'pp_gcal_own';
 const CALENDAR_KIND = Object.freeze({ practice:'Practice', game:'Game day', train:'Home session', gym:'Home session', rest:'Rest day' });
+const CALENDAR_OWN_KIND = Object.freeze({ strength:'Strength', cardio:'Cardio', mobility:'Mobility', sport:'Sport', walk:'Walk', other:'Workout' });
 
 function calendarClientId(){
   if (GOOGLE_CALENDAR_CLIENT_ID) return GOOGLE_CALENDAR_CLIENT_ID;
@@ -62,6 +67,38 @@ function calendarEventsFor(athlete, days, today){
       extendedProperties:{ private:{ ppSync:'1', ppDate:d.date, ppChild:child } },
     };
   });
+}
+
+// The parent's own scheduled workouts from Your training, over the weeks a sync covers, from today on. items are
+// adult_schedule_items rows (weekday 0 is Monday); monday is this week's Monday as YYYY-MM-DD. Each is named "Your
+// training", so it is never read as a child's session. An event's id comes from the workout, not its title, so a
+// renamed workout is rewritten in place rather than removed and added.
+function calendarOwnEventsFor(items, monday, today){
+  const [y, m, d] = String(monday).split('-').map(Number);
+  const self = calendarHash('self');
+  const out = [];
+  for (let w = 0; w < CALENDAR_SYNC_WEEKS; w++) for (const it of items || []) {
+    if (!it || !Number.isInteger(it.weekday) || it.weekday < 0 || it.weekday > 6) continue;
+    const date = localDay(new Date(y, m - 1, d + 7 * w + it.weekday));
+    if (date < today) continue;
+    out.push({
+      id:'pp' + date.replace(/-/g, '') + self + calendarHash(it.id),
+      summary:'Your training · ' + it.title,
+      description:[(it.duration_min ? it.duration_min + ' min · ' : '') + (CALENDAR_OWN_KIND[it.kind] || 'Workout'),
+        'From your own schedule in Parent Playbook. Change it in Your training; the next sync replaces edits made here.'].join('\n\n'),
+      start:{ date }, end:{ date:calendarNextDay(date) },
+      transparency:'transparent',
+      extendedProperties:{ private:{ ppSync:'1', ppDate:date, ppWho:'self' } },
+    });
+  }
+  return out;
+}
+
+// This parent's schedule, and nobody else's. A schedule that cannot be read stops the sync with nothing changed.
+async function calendarOwnSchedule(){
+  const r = await sb.from('adult_schedule_items').select('id,weekday,title,kind,duration_min').eq('guardian_id', state.user.id);
+  if (r.error) throw new Error('Your training’s schedule could not be read, so the calendar was left as it was. Try again.');
+  return r.data || [];
 }
 
 // What a sync has to do: add what is missing, rewrite what changed, remove what the plan no longer holds.
@@ -186,14 +223,18 @@ async function calendarExisting(token, calendarId, from, to){
   return out;
 }
 
-async function syncGoogleCalendar(athletes, today){
+// ownSource: the parent's scheduled workouts (rows, or a function that reads them) when they chose to include them.
+// Without it, a sync takes off any workouts an earlier one added.
+async function syncGoogleCalendar(athletes, today, ownSource){
   await calendarLoadGoogle();
   const token = await calendarToken();
+  // Read before the calendar is touched, so a schedule that cannot be read changes nothing there.
+  const own = typeof ownSource === 'function' ? await ownSource() : (ownSource || null);
   const calendarId = await calendarEnsure(token);
-  let desired = [];
-  for (const a of athletes || []) desired = desired.concat(calendarEventsFor(a, await calendarPlanFor(a), today));
   const monday = mondayOfThisWeek();
   const last = new Date(monday); last.setDate(monday.getDate() + 7 * CALENDAR_SYNC_WEEKS - 1);
+  let desired = own ? calendarOwnEventsFor(own, isoDay(monday), today) : [];
+  for (const a of athletes || []) desired = desired.concat(calendarEventsFor(a, await calendarPlanFor(a), today));
   const plan = calendarSyncPlan(desired, await calendarExisting(token, calendarId, today, isoDay(last)));
   const events = '/calendars/' + encodeURIComponent(calendarId) + '/events';
   for (const e of plan.insert) {
@@ -216,25 +257,41 @@ async function syncGoogleCalendar(athletes, today){
 
 function openCalendarSync(){
   const kids = (state.athletes || []).map(a => a.first_name).filter(Boolean);
-  const names = kids.length > 1 ? kids.slice(0, -1).join(', ') + ' and ' + kids[kids.length - 1] : (kids[0] || 'your child');
-  let last = null;
-  try { last = localStorage.getItem(CALENDAR_SYNC_LAST); } catch (e) {}
+  const names = kids.length > 1 ? kids.slice(0, -1).join(', ') + ' and ' + kids[kids.length - 1] : (kids[0] || '');
+  // A parent's own workouts are offered only to someone with Your training, and added only when they tick the box.
+  const canOwn = typeof adultTrainingOn === 'function' && adultTrainingOn();
+  let last = null, ownOn = false;
+  try { last = localStorage.getItem(CALENDAR_SYNC_LAST); ownOn = canOwn && localStorage.getItem(CALENDAR_SYNC_OWN) === '1'; } catch (e) {}
+  const sends = kids.length
+    ? 'Your children’s first names and each day’s plan' + (canOwn ? ', and, if you tick Include my workouts, your workouts’ names, days and lengths' : '')
+    : 'Your workouts’ names, days and lengths, once you tick Include my workouts';
   const bg = sheet(H`<h3>Google Calendar</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Adds ${esc(names)}’s next four weeks to a separate calendar called “Parent Playbook” in your Google account: practices, games, home sessions and rest days, as all-day events.</p>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">${kids.length
+      ? H`Adds ${esc(names)}’s next four weeks to a separate calendar called “Parent Playbook” in your Google account: practices, games, home sessions and rest days, as all-day events.`
+      : 'Adds your next four weeks of workouts to a separate calendar called “Parent Playbook” in your Google account, as all-day events.'}</p>
+    ${canOwn ? H`<label class="card app-pad" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="gcalOwn" style="margin-top:3px;flex:none"${ownOn ? ' checked' : ''}/>
+      <span><b>Include my workouts</b><br><small style="color:var(--muted)">The workouts scheduled in Your training, by name, day and length, labelled “Your training”. Untick and sync again to take them off.</small></span></label>` : ''}
     <div class="card app-pad">
       <div class="mrow"><span><b>Only its own calendar</b><small>Google is asked for access to calendars this app creates. Your other calendars stay out of reach.</small></span></div>
       <div class="mrow"><span><b>It updates when you press Sync</b><small>Nothing changes on its own. Sync again after the plan changes; edits made in Google are replaced.</small></span></div>
-      <div class="mrow"><span><b>What Google receives</b><small>Your children’s first names and each day’s plan, sent from this device to your Google account. Parent Playbook keeps no Google sign-in or token.</small></span></div>
+      <div class="mrow"><span><b>What Google receives</b><small>${esc(sends)}, sent from this device to your Google account. Parent Playbook keeps no Google sign-in or token.</small></span></div>
       <div class="mrow"><span><b>To stop</b><small>Delete the “Parent Playbook” calendar in Google Calendar, and remove Parent Playbook’s access in your Google account’s security settings.</small></span></div>
     </div>
     <p class="muted-note" id="gcalStatus">${last ? 'Last synced ' + esc(new Date(last).toLocaleString()) + ' on this device.' : 'Not synced from this device yet.'}</p>
     <div class="err" id="gcalErr"></div>
     <button class="btn" id="gcalSync">Sync now</button>`);
-  const btn = bg.querySelector('#gcalSync'), err = bg.querySelector('#gcalErr'), status = bg.querySelector('#gcalStatus');
+  const btn = bg.querySelector('#gcalSync'), err = bg.querySelector('#gcalErr'), status = bg.querySelector('#gcalStatus'), own = bg.querySelector('#gcalOwn');
+  if (own) own.onchange = () => { try { localStorage.setItem(CALENDAR_SYNC_OWN, own.checked ? '1' : '0'); } catch (e) {} };
   btn.onclick = async () => {
-    err.textContent = ''; btn.disabled = true; status.textContent = 'Syncing…';
+    err.textContent = '';
+    const withOwn = !!(own && own.checked);
+    // With no child and the box unticked there is nothing to add, unless an earlier sync left workouts to take off.
+    if (!kids.length && !withOwn && !last) { err.textContent = 'Tick Include my workouts to choose what goes in the calendar.'; return; }
+    btn.disabled = true; status.textContent = 'Syncing…';
     try {
-      const r = await syncGoogleCalendar(state.athletes || [], todayISO());
+      const ownSource = withOwn ? calendarOwnSchedule : null;
+      const r = await syncGoogleCalendar(state.athletes || [], todayISO(), ownSource);
+      last = new Date().toISOString();
       status.textContent = 'Synced: ' + r.added + ' added, ' + r.updated + ' updated, ' + r.removed + ' removed, ' + r.unchanged + ' already up to date.';
       toast('Google Calendar is up to date');
     } catch (e) {

@@ -14,7 +14,10 @@
   //     the tables and functions of migrations not yet applied to the live project answer as missing, so the
   //     screens' fallbacks are what runs. The football catalogue rows are the public reference seed
   //     (20260730143332_seed_football.sql), not personal data.
+  //   family&adult=1: the same family, with Adult Training granted and its migrations applied, for flows that cross
+  //     both (a calendar sync that carries the parent's own workouts beside the child's plan).
   const SCENARIO = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('scenario')) || 'adult';
+  const WITH_ADULT = SCENARIO === 'family' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('adult') === '1';
   const day = offset => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
   const db = SCENARIO === 'family' ? familySeed() : {
     adult_training_access:[{ guardian_id:USER.id, granted_at:new Date().toISOString(), note:'synthetic harness account' }],
@@ -37,6 +40,7 @@
       guardians:[{ id:USER.id, display_name:'Synthetic parent', created_at:day(-60) }],
       families:[{ id:family, name:'Synthetic family', created_by:USER.id, created_at:day(-60) }],
       family_members:[{ family_id:family, guardian_id:USER.id, role:'owner', created_at:day(-60) }],
+      ...(WITH_ADULT ? { adult_training_access:[{ guardian_id:USER.id, granted_at:new Date().toISOString(), note:'synthetic harness account' }] } : {}),
       athletes:[{ id:athlete, family_id:family, first_name:'Sam', nickname:null, birthdate:birth.toISOString().slice(0, 10), dominant_hand:null, created_by:USER.id, created_at:day(-60) }],
       athlete_sports:[{ id:'00000000-0000-4000-8000-0000000000e1', athlete_id:athlete, sport_key:'football', positions:['RB'], level:'Junior', is_primary:true,
         practice_days:[1, 3], game_day:5, season_start:day(-30), season_end:day(60), season_state:null, parent_experience:null, created_at:day(-60) }],
@@ -52,8 +56,9 @@
     'week_exceptions', 'body_scan_assessments', 'company_api_keys', 'adult_training_access', 'adult_profiles', 'adult_goals',
     'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_nutrition_preferences', 'adult_recipes',
     'adult_meal_plan_items', 'adult_nutrition_days', 'adult_health_records', 'adult_health_import_batches',
-  ];
-  const MISSING_FUNCTIONS = SCENARIO !== 'family' ? [] : ['save_body_scan_assessment', 'apply_stripe_subscription_event', 'save_adult_health_import'];
+  ].filter(t => !(WITH_ADULT && t.startsWith('adult_')));
+  const MISSING_FUNCTIONS = (SCENARIO !== 'family' ? [] : ['save_body_scan_assessment', 'apply_stripe_subscription_event', 'save_adult_health_import'])
+    .filter(f => !(WITH_ADULT && f === 'save_adult_health_import'));
   const calls = [];
   const now = () => new Date().toISOString();
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(16).slice(2));
@@ -260,6 +265,6 @@
   };
 
   window.supabase = { createClient:() => client };
-  window.__harness = { db, calls, USER, SCENARIO, MISSING_TABLES, MISSING_FUNCTIONS, gcal,
+  window.__harness = { db, calls, USER, SCENARIO, WITH_ADULT, MISSING_TABLES, MISSING_FUNCTIONS, gcal,
     calendarClientId:SCENARIO === 'family' ? 'synthetic-harness-client.apps.googleusercontent.com' : '' };
 })();

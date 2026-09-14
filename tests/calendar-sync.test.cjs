@@ -39,7 +39,7 @@ test('off until a client id is set, asking Google only for calendars it creates,
   assert.equal(context().ctx.calendarSyncAvailable(), true, 'the harness family scenario supplies a synthetic id');
   // The device keeps which calendar and when; never the token, and nothing about Google reaches the database.
   const stored = [...src.matchAll(/localStorage\.setItem\(([A-Z_]+),/g)].map(m => m[1]);
-  assert.deepEqual([...new Set(stored)].sort(), ['CALENDAR_SYNC_LAST', 'CALENDAR_SYNC_STORE']);
+  assert.deepEqual([...new Set(stored)].sort(), ['CALENDAR_SYNC_LAST', 'CALENDAR_SYNC_OWN', 'CALENDAR_SYNC_STORE']);
   assert.doesNotMatch(src, /sessionStorage|indexedDB|document\.cookie|sb\.from\('[a-z_]*(google|calendar|token)/);
   assert.doesNotMatch(src, /state\.[a-zA-Z]*[Tt]oken/);
 });
@@ -166,4 +166,97 @@ test('Connections offers it only once a client id is set, and the privacy page s
   const at = name => index.indexOf('<script src="/js/' + name + '"></script>');
   assert.ok(at('program.js') < at('calendar-sync.js') && at('connections.js') < at('calendar-sync.js') && at('calendar-sync.js') < at('init.js'));
   assert.match(read('sw.js'), /'\/js\/connections\.js','\/js\/calendar-sync\.js',/);
+});
+
+test("a parent's own workouts: named Your training, from today over four weeks, stable, and never a record id", () => {
+  const { ctx } = context();
+  const items = [
+    { id: '00000000-0000-4000-8000-0000000000b1', weekday: 0, title: 'Lift', kind: 'strength', duration_min: 40 },
+    { id: '00000000-0000-4000-8000-0000000000b2', weekday: 6, title: 'Long walk', kind: 'walk', duration_min: null },
+    { id: '00000000-0000-4000-8000-0000000000b3', weekday: 9, title: 'Not a day', kind: 'other', duration_min: 10 },
+  ];
+  const events = plain(ctx.calendarOwnEventsFor(items, '2026-09-28', '2026-09-29'));
+  assert.deepEqual(events.map(e => [e.start.date, e.summary]), [
+    ['2026-10-04', 'Your training · Long walk'],
+    ['2026-10-05', 'Your training · Lift'], ['2026-10-11', 'Your training · Long walk'],
+    ['2026-10-12', 'Your training · Lift'], ['2026-10-18', 'Your training · Long walk'],
+    ['2026-10-19', 'Your training · Lift'], ['2026-10-25', 'Your training · Long walk'],
+  ], "nothing before today, across the month's end, and nothing for a weekday that does not exist");
+  for (const e of events) {
+    assert.match(e.id, /^[a-v0-9]{5,1024}$/);
+    assert.equal(e.transparency, 'transparent');
+    assert.equal(e.extendedProperties.private.ppSync, '1');
+    assert.match(e.description, /the next sync replaces edits made here\.$/);
+  }
+  assert.match(events[1].description, /^40 min · Strength\n\n/);
+  assert.match(events[0].description, /^Walk\n\n/);
+  assert.deepEqual([events[1].end.date, events[0].end.date], ['2026-10-06', '2026-10-05']);
+  assert.equal(new Set(events.map(e => e.id)).size, events.length);
+  assert.doesNotMatch(JSON.stringify(events), /0000-4000-8000/, "the workout's record id never leaves");
+  const renamed = plain(ctx.calendarOwnEventsFor([{ ...items[0], title: 'Heavy lift' }], '2026-09-28', '2026-09-29'));
+  assert.equal(renamed[0].id, events[1].id, 'a renamed workout is the same event, rewritten');
+  const sam = plain(ctx.calendarEventsFor({ id: '00000000-0000-4000-8000-0000000000c1', first_name: 'Sam' }, [{ date: '2026-10-05', t: 'train', title: 'Lift' }], '2026-09-29'));
+  assert.notEqual(sam[0].id, events[1].id, "a parent's workout and a child's session on the same day are different events");
+  // Every event id has one shape: pp, the day, who it is for (a child, or the parent as "self"), then what it is.
+  for (const id of [...events.map(e => e.id), sam[0].id]) assert.match(id, /^pp\d{8}[0-9a-f]{16}$/, id);
+  assert.equal(events[1].id.slice(10, 18), ctx.calendarHash('self'));
+  assert.deepEqual(plain(ctx.calendarOwnEventsFor(null, '2026-09-28', '2026-09-29')), []);
+});
+
+test('end to end: ticking Include my workouts adds them beside the children, and unticking takes only them off', async () => {
+  const { ctx } = context('?scenario=family&adult=1');
+  const h = vm.runInContext('window.__harness', ctx);
+  assert.equal(h.WITH_ADULT, true);
+  assert.ok(!h.MISSING_TABLES.includes('adult_schedule_items') && h.MISSING_TABLES.includes('week_exceptions'));
+  const sam = h.db.athletes[0];
+  const today = vm.runInContext('todayISO()', ctx);
+  vm.runInContext('state.user = window.__harness.USER;', ctx);
+  await vm.runInContext(`sb.from('adult_schedule_items').insert([
+    { guardian_id: state.user.id, weekday: 0, title: 'Synthetic lift', kind: 'strength', duration_min: 40 },
+    { guardian_id: state.user.id, weekday: 3, title: 'Synthetic walk', kind: 'walk', duration_min: 30 },
+    { guardian_id: '00000000-0000-4000-8000-0000000000ff', weekday: 2, title: 'Someone else', kind: 'other', duration_min: 10 },
+  ])`, ctx);
+  const mine = h.db.adult_schedule_items.filter(i => i.guardian_id === h.USER.id);
+  const expected = plain(ctx.calendarOwnEventsFor(mine, vm.runInContext('isoDay(mondayOfThisWeek())', ctx), today)).length;
+  assert.ok(expected >= 6, 'four weeks of two workouts, less any already past this week');
+
+  const children = plain(await ctx.syncGoogleCalendar([sam], today));
+  const withOwn = plain(await ctx.syncGoogleCalendar([sam], today, ctx.calendarOwnSchedule));
+  assert.deepEqual([withOwn.added, withOwn.updated, withOwn.removed, withOwn.unchanged], [expected, 0, 0, children.added]);
+  const live = () => Object.values(h.gcal.events[children.calendarId]).filter(e => e.status !== 'cancelled');
+  assert.equal(live().filter(e => /^Your training · Synthetic (lift|walk)$/.test(e.summary)).length, expected);
+  assert.ok(!live().some(e => /Someone else/.test(e.summary)), "only this parent's schedule is read");
+
+  const again = plain(await ctx.syncGoogleCalendar([sam], today, ctx.calendarOwnSchedule));
+  assert.deepEqual([again.added, again.updated, again.removed], [0, 0, 0]);
+  const off = plain(await ctx.syncGoogleCalendar([sam], today, null));
+  assert.deepEqual([off.added, off.updated, off.removed, off.unchanged], [0, 0, expected, children.added]);
+  assert.ok(!live().some(e => /^Your training · /.test(e.summary)));
+  assert.ok(live().some(e => /^Sam · /.test(e.summary)), "the children's events stay");
+});
+
+test('a schedule that cannot be read stops the sync before the calendar is touched', async () => {
+  const { ctx } = context('?scenario=family');
+  const h = vm.runInContext('window.__harness', ctx);
+  vm.runInContext('state.user = window.__harness.USER;', ctx);
+  const today = vm.runInContext('todayISO()', ctx);
+  await assert.rejects(ctx.syncGoogleCalendar([h.db.athletes[0]], today, ctx.calendarOwnSchedule), /schedule could not be read, so the calendar was left as it was/);
+  assert.deepEqual(Object.keys(h.gcal.calendars), [], 'no calendar made');
+  assert.ok(!h.gcal.requests.some(r => r[0] !== 'GET'), 'nothing written to Google');
+});
+
+test('the box shows only with Your training, and Connections opens the sync for a parent with Your training and no child', () => {
+  const src = read('js/calendar-sync.js');
+  assert.match(src, /const canOwn = typeof adultTrainingOn === 'function' && adultTrainingOn\(\);/);
+  assert.match(src, /\$\{canOwn \? H`<label class="card app-pad"[^`]*<input type="checkbox" id="gcalOwn"/);
+  assert.match(src, /const ownSource = withOwn \? calendarOwnSchedule : null;/);
+  assert.match(src, /sb\.from\('adult_schedule_items'\)\.select\('id,weekday,title,kind,duration_min'\)\.eq\('guardian_id', state\.user\.id\)/);
+  const ctx = vm.createContext({ console, Object, Array, String, JSON });
+  vm.runInContext(`const H=(s,...v)=>s.reduce((a,x,i)=>a+x+(v[i]??''),''); function esc(v){return String(v??'');}`, ctx);
+  vm.runInContext(read('js/connections.js'), ctx);
+  const adultOnly = ctx.connectionsMarkup({ adultTraining: true, hasChild: false, calendarSync: true });
+  assert.match(adultOnly, /<b>Google Calendar sync<\/b><small>[^<]*you can add your own workouts too\.[^<]*<\/small><\/span>\s*<button class="btn sm ghost" data-connection="google_calendar">Set up</);
+  assert.doesNotMatch(ctx.connectionsMarkup({ adultTraining: false, hasChild: false, calendarSync: true }), /data-connection="google_calendar"|own workouts/);
+  assert.doesNotMatch(ctx.connectionsMarkup({ adultTraining: true, hasChild: false, calendarSync: false }), /data-connection="google_calendar"/);
+  assert.match(read('privacy.html'), /If you use Your training and tick Include my workouts, it also sends the names, days and lengths of your own scheduled workouts\./);
 });
