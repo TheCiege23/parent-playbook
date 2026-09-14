@@ -26,8 +26,9 @@ async function screenAdult(){
     sb.from('adult_schedule_items').select('*').eq('guardian_id', uid).order('weekday').order('created_at'),
     sb.from('adult_schedule_exercises').select('*').eq('guardian_id', uid).order('position').order('created_at'),
     sb.from('adult_workout_logs').select('*').eq('guardian_id', uid).gte('done_on', weekStart).lte('done_on', weekEnd),
-    sb.from('adult_body_entries').select('*').eq('guardian_id', uid)
-      .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).limit(120),
+    sb.from('adult_health_records').select('*').eq('guardian_id', uid)
+      .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).limit(500),
+    sb.from('adult_health_import_batches').select('*').eq('guardian_id', uid).order('received_at', { ascending:false }).limit(50),
   ]);
   const top = adultTopBar();
   if (results.some(r => r.error)) {
@@ -36,13 +37,15 @@ async function screenAdult(){
     $("#adultBack").onclick = () => renderApp('account');
     return;
   }
-  const [prof, goalRows, itemRows, exerciseRows, logRows, bodyRows] = results;
+  const [prof, goalRows, itemRows, exerciseRows, logRows, readingRows, batchRows] = results;
   const profile = prof.data || null, goals = goalRows.data || [], items = itemRows.data || [];
-  const exercises = exerciseRows.data || [], logs = logRows.data || [], body = bodyRows.data || [];
+  const exercises = exerciseRows.data || [], logs = logRows.data || [];
+  const readings = readingRows.data || [], batches = batchRows.data || [];
   const week = adultWeek(items, exercises, logs, dateForDayIndex);
   const sum = adultWeekSummary(week);
   const units = (profile && profile.units) || 'lb';
-  const recorded = Object.keys(ADULT_BODY_METRICS).filter(k => body.some(e => e.metric_key === k));
+  const recorded = Object.keys(ADULT_HEALTH_METRICS).filter(k => ADULT_HEALTH_METRICS[k].group === 'body' && readings.some(r => r.metric_key === k));
+  const activity = adultActivityWeek(readings, [0, 1, 2, 3, 4, 5, 6].map(dateForDayIndex));
   const scheduledDays = week.filter(d => d.items.length);
   const B = ADULT_ACTIVITY_BASELINE;
 
@@ -96,14 +99,22 @@ async function screenAdult(){
 
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">Progress</div>
-        <button class="btn sm ghost" id="adultAddBody">＋ Record</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm ghost" id="adultImport">Import</button>
+          <button class="btn sm ghost" id="adultAddBody">＋ Record</button>
+        </div>
       </div>
       <div class="card app-pad">
-        ${recorded.length ? recorded.map(k => { const t = adultTrend(body, k);
-          return H`<div class="mrow"><span><b>${esc(ADULT_BODY_METRICS[k].label)}</b><small>${esc(fmtDate(t.latest.measured_on))}${t.change != null
+        ${recorded.length ? recorded.map(k => { const t = adultHealthTrend(readings, k);
+          return H`<div class="mrow"><span><b>${esc(ADULT_HEALTH_METRICS[k].label)}</b><small>${esc(fmtDate(t.latest.measured_on))} · ${esc(adultHealthSourceLabel(t.latest))}${t.change != null
             ? ' · ' + (t.change > 0 ? '+' : '') + esc(String(t.change)) + ' ' + esc(t.latest.unit) + ' since ' + esc(fmtDate(t.previous.measured_on)) : ''}</small></span>
             <b>${esc(String(Number(t.latest.value)))} ${esc(t.latest.unit)}</b></div>`; }).join('')
-          : H`<p class="empty" style="margin:0">Nothing recorded yet. Weight comes from your scale and measurements from a tape, both entered by you.</p>`}
+          : H`<p class="empty" style="margin:0">Nothing recorded yet. Type in a reading from your scale, a tape or your watch, or import a file exported from a scale or fitness app.</p>`}
+        ${Object.keys(activity).length ? H`<div class="k-mono" style="margin-top:12px">Activity this week</div>
+          ${Object.values(activity).map(a => H`<div class="mrow"><span><b>${esc(a.label)}</b><small>${a.summary === 'average' ? 'Average over ' : ''}${a.days} day${a.days === 1 ? '' : 's'}${a.otherUnitReadings
+            ? ' · ' + a.otherUnitReadings + ' in another unit not counted' : ''}</small></span>
+            <b>${esc(a.value.toLocaleString())} ${esc(a.unit)}</b></div>`).join('')}` : ''}
+        ${batches.length ? H`<button class="btn sm ghost" id="adultImports" style="margin-top:10px">Your imports (${batches.length})</button>` : ''}
       </div>
 
       <div class="act-stop" style="margin-top:16px"><b>Stop if</b> you feel sharp pain, chest pain, dizziness or unusual shortness of breath. If you have a health condition, check with a doctor before starting something new.</div>
@@ -114,6 +125,8 @@ async function screenAdult(){
   { const b = $("#adultAddGoal"); if (b) b.onclick = () => openAdultGoal(); }
   { const b = $("#adultAddItem"); if (b) b.onclick = () => openAdultItem(null, []); }
   { const b = $("#adultAddBody"); if (b) b.onclick = () => openAdultBodyEntry(units); }
+  { const b = $("#adultImport"); if (b) b.onclick = () => openAdultImport(); }
+  { const b = $("#adultImports"); if (b) b.onclick = () => openAdultImports(batches); }
   $("#screen").querySelectorAll('[data-adult-goal-remove]').forEach(b => b.onclick = async () => {
     b.disabled = true;
     const { error } = await sb.from('adult_goals').delete().eq('id', b.dataset.adultGoalRemove).eq('guardian_id', uid);
@@ -280,10 +293,13 @@ function openAdultItem(item, exercises){
 
 function openAdultBodyEntry(units){
   const today = todayISO();
-  const bg = sheet(H`<h3>Record a measurement</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Weight from your scale, or a measurement from a tape. The same time of day and conditions each time keeps the trend honest.</p>
-    <div class="field"><label>What did you measure?</label>
-      <select id="adBodyMetric">${Object.entries(ADULT_BODY_METRICS).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join('')}</select></div>
+  const entries = Object.entries(ADULT_HEALTH_METRICS);
+  const option = ([k, m]) => `<option value="${k}">${esc(m.label)}</option>`;
+  const bg = sheet(H`<h3>Record a reading</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Weight from your scale, a measurement from a tape, or a number from your watch or phone. The same time of day and conditions each time keeps the trend honest.</p>
+    <div class="field"><label>What are you recording?</label>
+      <select id="adBodyMetric"><optgroup label="Body">${entries.filter(([, m]) => m.group === 'body').map(option).join('')}</optgroup>
+        <optgroup label="Activity">${entries.filter(([, m]) => m.group === 'activity').map(option).join('')}</optgroup></select></div>
     <div class="row2">
       <div class="field"><label>Value</label><input id="adBodyValue" type="number" step="0.1" inputmode="decimal"/></div>
       <div class="field"><label>Unit</label><select id="adBodyUnit"></select></div>
@@ -291,30 +307,114 @@ function openAdultBodyEntry(units){
     <div class="field"><label>Date</label><input id="adBodyDate" type="date" value="${today}" max="${today}"/></div>
     <div class="err" id="adBodyErr"></div>
     <button class="btn" id="adBodySave">Save</button>`);
-  const metricEl = bg.querySelector('#adBodyMetric'), unitEl = bg.querySelector('#adBodyUnit');
+  const metricEl = bg.querySelector('#adBodyMetric'), unitEl = bg.querySelector('#adBodyUnit'), valueEl = bg.querySelector('#adBodyValue');
   const fillUnits = () => {
-    const meta = ADULT_BODY_METRICS[metricEl.value];
-    const preferred = metricEl.value === 'weight' ? units : (units === 'kg' ? 'cm' : 'in');
+    const meta = ADULT_HEALTH_METRICS[metricEl.value];
+    const metric = units === 'kg' ? ['kg', 'cm', 'km'] : ['lb', 'in', 'mi'];
+    const preferred = meta.units.find(u => metric.includes(u)) || meta.units[0];
     unitEl.innerHTML = meta.units.map(u => `<option value="${u}"${u === preferred ? ' selected' : ''}>${u}</option>`).join('');
+    valueEl.step = meta.integer ? '1' : '0.1';
+    valueEl.inputMode = meta.integer ? 'numeric' : 'decimal';
   };
   metricEl.onchange = fillUnits; fillUnits();
   bg.querySelector('#adBodySave').onclick = async e => {
     const err = bg.querySelector('#adBodyErr'); err.textContent = '';
-    const v = adultValidateBodyEntry({ metric_key:metricEl.value, value:bg.querySelector('#adBodyValue').value, unit:unitEl.value,
-      measured_on:bg.querySelector('#adBodyDate').value }, today);
+    const v = adultHealthNormalize({ metric_key:metricEl.value, value:valueEl.value, unit:unitEl.value,
+      measured_on:bg.querySelector('#adBodyDate').value }, { source_kind:'manual', today });
     if (!v.ok) { err.textContent = v.error; return; }
     const btn = e.currentTarget; btn.disabled = true;
-    const { error } = await sb.from('adult_body_entries').insert({ ...v.value, guardian_id:state.user.id });
-    if (error) { adultFail(error, 'adult:body', 'Could not save'); btn.disabled = false; return; }
+    const { metric_key, value, unit, measured_on } = v.record;
+    const { error } = await sb.from('adult_health_records').insert({ guardian_id:state.user.id, metric_key, value, unit, measured_on, source_kind:'manual', method:'entered' });
+    if (error && error.code === '23505') { err.textContent = 'That reading is already recorded for that day.'; btn.disabled = false; return; }
+    if (error) { adultFail(error, 'adult:reading', 'Could not save'); btn.disabled = false; return; }
     bg.remove(); toast('Recorded'); renderApp('adult');
   };
+}
+
+// Readings from a CSV file. The file is read in this browser and never uploaded; the preview says what the import would
+// add, what is already recorded and what can't be used, and the database skips duplicates again when it saves. The
+// already-recorded check reads at most one page of existing readings, so a very large history can show a few rows as
+// new that the save then counts as duplicates.
+function openAdultImport(){
+  const today = todayISO();
+  let plan = null, ctx = null;
+  const bg = sheet(H`<h3>Import readings</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">A CSV file whose first row names the columns <b>date</b>, <b>metric</b>, <b>value</b> and <b>unit</b>, and optionally <b>id</b>. It is read on this device and not kept; only the readings are saved, each labelled with where it came from. Readings already recorded are skipped.</p>
+    <div class="field"><label>Where are they from?</label><input id="adImpName" maxlength="80" placeholder="e.g. Scale app export"/></div>
+    <div class="field"><label>They are</label><select id="adImpOrigin">${Object.entries(ADULT_HEALTH_ORIGINS).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+    <div class="field"><label>File</label><input id="adImpFile" type="file" accept=".csv,text/csv"/></div>
+    <div id="adImpPlan"></div>
+    <p class="muted-note" style="margin:0 2px 12px">Readings this record keeps: ${esc(Object.values(ADULT_HEALTH_METRICS).map(m => m.label.toLowerCase()).join(', '))}. Body-composition values aren't imported.</p>
+    <div class="err" id="adImpErr"></div>
+    <button class="btn" id="adImpSave" disabled>Import</button>`);
+  const nameEl = bg.querySelector('#adImpName'), originEl = bg.querySelector('#adImpOrigin'), fileEl = bg.querySelector('#adImpFile');
+  const planEl = bg.querySelector('#adImpPlan'), saveEl = bg.querySelector('#adImpSave'), err = bg.querySelector('#adImpErr');
+  const preview = async () => {
+    err.textContent = ''; planEl.innerHTML = ''; plan = null; saveEl.disabled = true;
+    const file = fileEl.files && fileEl.files[0];
+    if (!file) return;
+    const name = adultHealthText(nameEl.value, 80);
+    if (!name) { err.textContent = 'Say where these readings are from, so each one is labelled.'; return; }
+    if (file.size > 2 * 1024 * 1024) { err.textContent = 'That file is larger than 2 MB.'; return; }
+    const parsed = adultHealthParseCsv(await file.text());
+    if (!parsed.ok) { err.textContent = parsed.error; return; }
+    ctx = { source_kind:'file_import', source_name:name, origin:originEl.value, today };
+    const dates = parsed.rows.map(r => r.date).filter(adultHealthIsDate).sort();
+    let existing = [];
+    if (dates.length) {
+      const { data, error } = await sb.from('adult_health_records').select('metric_key,value,unit,measured_on,external_id,source_kind,source_name')
+        .eq('guardian_id', state.user.id).eq('source_kind', 'file_import').gte('measured_on', dates[0]).lte('measured_on', dates[dates.length - 1]);
+      if (error) { adultFail(error, 'adult:importExisting', 'Could not check what is already recorded'); return; }
+      existing = (data || []).filter(r => String(r.source_name || '').toLowerCase() === name.toLowerCase()).map(r => adultHealthKey(r, r));
+    }
+    plan = adultHealthPlanImport(parsed.rows, existing, ctx);
+    plan.batchId = uuid();
+    planEl.innerHTML = H`<div class="card app-pad" style="margin-bottom:12px">
+      <div class="mrow"><span>New readings</span><b>${plan.records.length}</b></div>
+      <div class="mrow"><span>Already recorded</span><b>${plan.duplicates}</b></div>
+      <div class="mrow"><span>Can't be used</span><b>${plan.rejected.length}</b></div>
+      ${plan.rejected.slice(0, 5).map(r => H`<p class="muted-note" style="margin:6px 0 0">Line ${r.line}: ${esc(r.error)}</p>`).join('')}
+      ${plan.rejected.length > 5 ? H`<p class="muted-note" style="margin:6px 0 0">And ${plan.rejected.length - 5} more.</p>` : ''}
+    </div>`;
+    if (plan.records.length > ADULT_HEALTH_SAVE_MAX) { err.textContent = 'An import can add up to ' + ADULT_HEALTH_SAVE_MAX + ' readings. Split the file and import each part.'; return; }
+    saveEl.disabled = !plan.records.length;
+  };
+  fileEl.onchange = preview; originEl.onchange = preview; nameEl.onchange = preview;
+  saveEl.onclick = async () => {
+    if (!plan || !plan.records.length || plan.records.length > ADULT_HEALTH_SAVE_MAX) return;
+    saveEl.disabled = true; err.textContent = '';
+    const { data, error } = await sb.rpc('save_adult_health_import', {
+      p_batch:{ id:plan.batchId, source_name:ctx.source_name, origin:ctx.origin, rows_received:plan.received, rows_rejected:plan.rejected.length },
+      p_records:plan.records,
+    });
+    if (error) { adultFail(error, 'adult:import', 'Could not import those readings'); saveEl.disabled = false; return; }
+    const saved = data && data.saved != null ? data.saved : plan.records.length;
+    bg.remove(); toast('Imported ' + saved + (saved === 1 ? ' reading' : ' readings')); renderApp('adult');
+  };
+}
+
+// Each import, and a way to undo one: deleting the import deletes exactly the readings it added.
+function openAdultImports(batches){
+  const bg = sheet(H`<h3>Your imports</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Undoing an import removes exactly the readings it added. Readings you typed in and other imports stay.</p>
+    <div class="card app-pad">${(batches || []).map(b => H`<div class="mrow">
+      <span><b>${esc(b.source_name)}</b><small>${esc(fmtDate(localDay(new Date(b.received_at))))} · ${b.rows_saved} added${b.rows_duplicate ? ' · ' + b.rows_duplicate + ' already recorded' : ''}${b.rows_rejected ? ' · ' + b.rows_rejected + ' not used' : ''}</small></span>
+      <button class="btn sm ghost" data-adult-import-undo="${esc(b.id)}" data-n="${esc(String(b.rows_saved))}">Undo</button></div>`).join('')}</div>`);
+  bg.querySelectorAll('[data-adult-import-undo]').forEach(btn => btn.onclick = async () => {
+    const n = Number(btn.dataset.n) || 0;
+    if (!confirm('Remove this import and the ' + n + (n === 1 ? ' reading' : ' readings') + ' it added?')) return;
+    btn.disabled = true;
+    const { error } = await sb.from('adult_health_import_batches').delete().eq('id', btn.dataset.adultImportUndo).eq('guardian_id', state.user.id);
+    if (error) { adultFail(error, 'adult:importUndo', 'Could not undo that import'); btn.disabled = false; return; }
+    bg.remove(); toast('Import removed'); renderApp('adult');
+  });
 }
 
 // For "Export everything": the parent's own record, even when the account has no athlete. A database without these
 // tables yields nothing rather than failing the export.
 async function adultTrainingExport(){
   if (!state.user) return { hasData:false, data:null };
-  const tables = ['adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_body_entries',
+  const tables = ['adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_health_records', 'adult_health_import_batches',
     'adult_nutrition_preferences', 'adult_recipes', 'adult_meal_plan_items', 'adult_nutrition_days'];
   const results = await Promise.all(tables.map(t => sb.from(t).select('*').eq('guardian_id', state.user.id)));
   const data = {}; let hasData = false;

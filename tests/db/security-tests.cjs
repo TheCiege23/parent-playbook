@@ -1470,7 +1470,7 @@ const adultGoal = guardian => `insert into public.adult_goals(guardian_id, kind,
 const adultItem = (id, guardian) => `insert into public.adult_schedule_items(id, guardian_id, weekday, title, kind, duration_min) values ('${id}', '${guardian}', 1, 'Synthetic workout', 'strength', 40);`;
 const adultGoalCount = `select count(*)::text from public.adult_goals where guardian_id = '${MEMBER_C}';`;
 const coParentB = `insert into public.family_members(family_id, guardian_id, role) values ('${SCAN_FAMILY}', '${ADMIN_B}', 'co_parent');`;
-const ADULT_TABLE_LIST = ['adult_training_access', 'adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_body_entries'];
+const ADULT_TABLE_LIST = ['adult_training_access', 'adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_health_import_batches', 'adult_health_records'];
 
 add('X01', 'adult-training', 'an allowlisted parent records a goal and reads it back',
   { setup: adultAllow(MEMBER_C), ...asScanParent, sql: adultGoal(MEMBER_C) + adultGoalCount, expect: 'ok', expectOut: '1' });
@@ -1502,8 +1502,8 @@ add('X10', 'adult-training', 'a workout dated days ahead is refused',
     expect: 'error', expectError: /row-level security/ });
 add('X11', 'adult-training', 'a weight in centimetres is refused',
   { setup: adultAllow(MEMBER_C), ...asScanParent,
-    sql: `insert into public.adult_body_entries(guardian_id, metric_key, value, unit, measured_on) values ('${MEMBER_C}', 'weight', 80, 'cm', current_date);`,
-    expect: 'error', expectError: /adult_body_entries_metric_unit_check/ });
+    sql: `insert into public.adult_health_records(guardian_id, metric_key, value, unit, measured_on, source_kind, method) values ('${MEMBER_C}', 'weight', 80, 'cm', current_date, 'manual', 'entered');`,
+    expect: 'error', expectError: /adult_health_records_metric_check/ });
 add('X12', 'adult-training', "an exercise cannot be attached to another guardian's workout",
   { setup: adultAllow(MEMBER_C) + adultAllow(ADMIN_B) + adultItem(ADULT_ITEM_B, ADMIN_B), ...asScanParent,
     sql: `insert into public.adult_schedule_exercises(item_id, guardian_id, name, sets, reps) values ('${ADULT_ITEM_B}', '${MEMBER_C}', 'Synthetic squat', 3, 8);`,
@@ -1519,7 +1519,7 @@ add('X14', 'adult-training', 'deleting the account removes every part of the rec
       + adultItem('a7000000-0000-4000-8000-00000000000d', ADULT_D)
       + `insert into public.adult_schedule_exercises(item_id, guardian_id, name) values ('a7000000-0000-4000-8000-00000000000d', '${ADULT_D}', 'Synthetic press');
          insert into public.adult_workout_logs(guardian_id, schedule_item_id, done_on) values ('${ADULT_D}', 'a7000000-0000-4000-8000-00000000000d', current_date);
-         insert into public.adult_body_entries(guardian_id, metric_key, value, unit, measured_on) values ('${ADULT_D}', 'weight', 180, 'lb', current_date);`,
+         insert into public.adult_health_records(guardian_id, metric_key, value, unit, measured_on, source_kind, method) values ('${ADULT_D}', 'weight', 180, 'lb', current_date, 'manual', 'entered');`,
     sql: `delete from auth.users where id = '${ADULT_D}';
       select (${ADULT_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_D}')`).join(' + ')})::text;`,
     expect: 'ok', expectOut: '0' });
@@ -1584,6 +1584,83 @@ add('Y12', 'adult-nutrition', 'deleting the account removes every part of the ea
       + `insert into public.adult_nutrition_days(guardian_id, logged_on, protein_meals) values ('${ADULT_E}', current_date, 2);`,
     sql: `delete from auth.users where id = '${ADULT_E}';
       select (${NUTRITION_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_E}')`).join(' + ')})::text;`,
+    expect: 'ok', expectOut: '0' });
+
+// =========================================================== Z. adult health record (one source-tracked record)
+//
+// Every reading a parent types in or imports is one row that says where it came from. The database refuses what a
+// source cannot claim, refuses duplicates, lets an import be undone, and keeps it all the parent's own.
+const ADULT_G = '13131313-0000-4000-8000-000000000013';
+const HR_BATCH_B = 'a9000000-0000-4000-8000-00000000000b';
+const HR_BATCH_C = 'a9000000-0000-4000-8000-00000000000c';
+const HR_BATCH_C2 = 'a9000000-0000-4000-8000-0000000000c2';
+const HR_BATCH_G = 'a9000000-0000-4000-8000-000000000013';
+const hrReading = (metric, value, unit, method) =>
+  `jsonb_build_object('metric_key', '${metric}', 'value', ${value}, 'unit', '${unit}', 'measured_on', current_date, 'method', '${method}')`;
+const HR_TWO = `jsonb_build_array(${hrReading('weight', 180, 'lb', 'device_measured')}, ${hrReading('steps', 8000, 'steps', 'device_estimated')})`;
+const hrImport = (batch, records = HR_TWO) =>
+  `select public.save_adult_health_import(jsonb_build_object('id', '${batch}', 'source_name', 'Synthetic scale export', 'origin', 'device'), ${records});`;
+const hrCount = guardian => `select count(*)::text from public.adult_health_records where guardian_id = '${guardian}';`;
+const hrManual = (guardian, metric, value, unit, on = 'current_date') =>
+  `insert into public.adult_health_records(guardian_id, metric_key, value, unit, measured_on, source_kind, method) values ('${guardian}', '${metric}', ${value}, '${unit}', ${on}, 'manual', 'entered');`;
+const hrBatch = (id, guardian) =>
+  `insert into public.adult_health_import_batches(id, guardian_id, source_kind, source_name, origin, rows_received) values ('${id}', '${guardian}', 'file_import', 'Synthetic scale export', 'device', 2);`;
+const hrFileReading = (guardian, batch, metric, value, unit, method) =>
+  `insert into public.adult_health_records(guardian_id, metric_key, value, unit, measured_on, source_kind, source_name, method, batch_id) values ('${guardian}', '${metric}', ${value}, '${unit}', current_date, 'file_import', 'Synthetic scale export', '${method}', '${batch}');`;
+const hrBatchCounts = batch => `(select rows_saved || '+' || rows_duplicate from public.adult_health_import_batches where id = '${batch}')`;
+const HEALTH_TABLE_LIST = ['adult_health_import_batches', 'adult_health_records'];
+
+add('Z01', 'adult-health-record', 'an allowlisted parent imports two readings and reads them back',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: hrImport(HR_BATCH_C) + hrCount(MEMBER_C), expect: 'ok', expectOut: '2' });
+add('Z02', 'adult-health-record', 'importing the same readings again adds nothing, and the import says so',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: hrImport(HR_BATCH_C) + hrImport(HR_BATCH_C2)
+      + `select (select count(*) from public.adult_health_records where guardian_id = '${MEMBER_C}')::text || '/' || ${hrBatchCounts(HR_BATCH_C2)};`,
+    expect: 'ok', expectOut: '2/0+2' });
+add('Z03', 'adult-health-record', 'retrying the same import changes nothing and keeps its counts true',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: hrImport(HR_BATCH_C) + hrImport(HR_BATCH_C)
+      + `select (select count(*) from public.adult_health_records where guardian_id = '${MEMBER_C}')::text || '/' || ${hrBatchCounts(HR_BATCH_C)};`,
+    expect: 'ok', expectOut: '2/2+0' });
+add('Z04', 'adult-health-record', 'a parent who is not allowlisted cannot import',
+  { ...asScanParent, sql: hrImport(HR_BATCH_C), expect: 'error', expectError: /row-level security/ });
+add('Z05', 'adult-health-record', "a co-parent in the same family cannot read the other parent's readings",
+  { setup: hrManual(MEMBER_C, 'weight', 180, 'lb') + coParentB, role: 'authenticated', claims: ADMIN_B, sql: hrCount(MEMBER_C), expect: 'ok', expectOut: '0' });
+add('Z06', 'adult-health-record', 'a resting heart rate in pounds is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: hrManual(MEMBER_C, 'resting_heart_rate', 60, 'lb'),
+    expect: 'error', expectError: /adult_health_records_metric_check/ });
+add('Z07', 'adult-health-record', 'an import cannot claim a device measured a tape measurement',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: hrImport(HR_BATCH_C, `jsonb_build_array(${hrReading('waist', 34, 'in', 'device_measured')})`),
+    expect: 'error', expectError: /adult_health_records_metric_check/ });
+add('Z08', 'adult-health-record', 'a body-composition value is not a reading this record accepts',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: hrManual(MEMBER_C, 'body_fat_percent', 20, 'percent'),
+    expect: 'error', expectError: /adult_health_records_metric_check/ });
+add('Z09', 'adult-health-record', 'a reading dated days ahead is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: hrManual(MEMBER_C, 'weight', 180, 'lb', 'current_date + 3'),
+    expect: 'error', expectError: /row-level security/ });
+add('Z10', 'adult-health-record', 'undoing an import removes exactly the readings it added',
+  { setup: hrBatch(HR_BATCH_C, MEMBER_C) + hrFileReading(MEMBER_C, HR_BATCH_C, 'weight', 180, 'lb', 'device_measured')
+      + hrFileReading(MEMBER_C, HR_BATCH_C, 'steps', 8000, 'steps', 'device_estimated') + hrManual(MEMBER_C, 'weight', 181, 'lb'),
+    ...asScanParent, sql: `delete from public.adult_health_import_batches where id = '${HR_BATCH_C}';` + hrCount(MEMBER_C), expect: 'ok', expectOut: '1' });
+add('Z11', 'adult-health-record', "a reading cannot be attached to another guardian's import",
+  { setup: adultAllow(MEMBER_C) + hrBatch(HR_BATCH_B, ADMIN_B), ...asScanParent,
+    sql: hrFileReading(MEMBER_C, HR_BATCH_B, 'weight', 180, 'lb', 'device_measured'), expect: 'error', expectError: /adult_health_records_batch_fkey/ });
+add('Z12', 'adult-health-record', 'an import of more than 2000 readings is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: hrImport(HR_BATCH_C, `(select jsonb_agg(jsonb_build_object('metric_key', 'steps', 'value', g, 'unit', 'steps', 'measured_on', current_date, 'method', 'device_estimated')) from generate_series(1, 2001) g)`),
+    expect: 'error', expectError: /between 1 and 2000 readings/ });
+add('Z13', 'adult-health-record', 'a reading cannot be edited, only deleted',
+  { sql: `select (not has_table_privilege('authenticated', 'public.adult_health_records', 'UPDATE')
+      and has_table_privilege('authenticated', 'public.adult_health_records', 'DELETE'))::text;`, expect: 'ok', expectOut: 'true' });
+add('Z14', 'adult-health-record', 'anon reaches nothing and both tables have row-level security',
+  { sql: `select (${HEALTH_TABLE_LIST.map(t => `not has_table_privilege('anon', 'public.${t}', 'SELECT')
+        and (select relrowsecurity from pg_class where oid = 'public.${t}'::regclass)`).join('\n        and ')})::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('Z15', 'adult-health-record', 'deleting the account removes every reading and import',
+  { setup: `insert into auth.users(id, email) values ('${ADULT_G}', 'synthetic-adult-g@example.invalid');` + hrBatch(HR_BATCH_G, ADULT_G)
+      + hrFileReading(ADULT_G, HR_BATCH_G, 'steps', 9000, 'steps', 'device_estimated') + hrManual(ADULT_G, 'weight', 170, 'lb'),
+    sql: `delete from auth.users where id = '${ADULT_G}';
+      select (${HEALTH_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_G}')`).join(' + ')})::text;`,
     expect: 'ok', expectOut: '0' });
 
 // =========================================================== execute
