@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 
 const base = path.resolve(__dirname, '..');
@@ -16,10 +17,21 @@ test('the harness loads every app script the site loads, in the same order, and 
   const harness = read('tools/adult-harness/index.html');
   const harnessScripts = [...harness.matchAll(/<script src="(\/js\/[a-z0-9-]+\.js)"><\/script>/g)].map(m => m[1]);
   assert.deepEqual(harnessScripts, siteScripts, 'rebuild with node tools/adult-harness/build.cjs after changing index.html');
-  // Building again produces the committed file byte for byte.
-  const before = harness;
-  execFileSync(process.execPath, [path.join(base, 'tools/adult-harness/build.cjs')], { cwd: base });
-  assert.equal(read('tools/adult-harness/index.html'), before);
+  // Building again produces the committed page, line endings aside. The build goes to a temporary file, never over
+  // the committed page: rewriting it left a Windows checkout (CRLF) showing it as modified after every run.
+  const committed = path.join(base, 'tools/adult-harness/index.html');
+  const committedBytes = fs.readFileSync(committed);
+  const out = path.join(os.tmpdir(), 'pp-adult-harness-' + process.pid + '-' + Date.now() + '.html');
+  try {
+    execFileSync(process.execPath, [path.join(base, 'tools/adult-harness/build.cjs'), out], { cwd: base });
+    assert.equal(fs.readFileSync(out, 'utf8').replace(/\r\n/g, '\n'), harness, 'rebuild with node tools/adult-harness/build.cjs');
+  } finally {
+    fs.rmSync(out, { force: true });
+  }
+  assert.ok(fs.readFileSync(committed).equals(committedBytes), 'the check does not write into the repository');
+  assert.ok(!fs.existsSync(out), 'the temporary page is removed');
+  // Run without an argument, the build still regenerates the committed page.
+  assert.match(read('tools/adult-harness/build.cjs'), /const out = process\.argv\[2\] \? path\.resolve\(process\.argv\[2\]\) : path\.join\(__dirname, 'index\.html'\);/);
 });
 
 test('the fake client is loaded before core.js creates the client, and nothing real is reachable', () => {
