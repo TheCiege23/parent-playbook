@@ -16,6 +16,9 @@ async function afterLogin(){
       obReset({ ...pending, mode: familyId?'addChild':'create', familyId: familyId||null });
       return finishOnboarding();
     }
+    // A parent keeping only their own training has no child to open the app on. A link to #adult, or a return there
+    // after signing in, opens Your training instead of child setup. Without Adult Training nothing here changes.
+    if((location.hash||'')==='#adult' && adultTrainingOn()) return renderApp('adult');
     // No athletes doesn't mean no household. renderOnboarding() runs the `create` flow,
     // which mints a SECOND family and orphans the first along with its members and any
     // pending invites. If they already belong to one, add the child into it instead.
@@ -76,11 +79,27 @@ function renderNoAccess(){
       for a fresh link — or start your own household if you'd like to track your own athlete.</p>
     <div style="max-width:300px;margin:26px auto 0;display:grid;gap:10px">
       <button class="btn" id="naNew">Start my own household</button>
+      ${adultTrainingOn()?'<button class="btn ghost" id="naAdult">Go to your training</button>':''}
       <button class="btn ghost" id="naOut">Log out</button>
     </div>
   </div>`;
   $("#naNew").onclick=renderOnboarding;
-  $("#naOut").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
+  { const b=$("#naAdult"); if(b) b.onclick=()=>renderApp('adult'); }
+  $("#naOut").onclick=logOutOfApp;
+}
+
+// From Your training with no child profile yet: set one up, inside the household the parent already belongs to if
+// there is one. The #adult address is cleared first, so finishing setup lands on the child's week, not back here.
+async function startChildSetup(){
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  const familyId = await myFamilyId();
+  if(familyId){ document.body.classList.remove('auth'); setAppBg(); obReset({ mode:'addChild', familyId }); return obStep(); }
+  return renderOnboarding();
+}
+// Sign out from a screen that has no top bar of its own.
+async function logOutOfApp(){
+  await releasePushOnThisDevice(); await sb.auth.signOut();
+  state.user=null; state.athletes=[]; state.active=null; renderAuth('login');
 }
 
 async function loadAthletes(){

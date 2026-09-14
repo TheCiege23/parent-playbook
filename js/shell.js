@@ -42,11 +42,16 @@ async function loadRole(){
 // First name of whoever owns this athlete, for read-only copy. Falls back to a neutral
 // noun rather than an empty string.
 function ownerFirstName(){ return (state && state.ownerName) || 'Their parent'; }
+// Whether a child profile is open. Your training asks only this, to choose its header; it never reads the child.
+function hasActiveAthlete(){ return !!(state && state.active); }
 
 async function renderApp(tab, fromPop){
   // Adult Training is the parent's own record, not an athlete's: gated by its own flag and allowlist, and exempt from
   // the coach view, the family-view redirect and the family-view banner below, which are all about a child.
   if(tab==='adult' && adultTrainingOff()) return;
+  // With no child profile there is nothing for the child-facing screens to show. Your training still opens; any other
+  // route goes back through afterLogin(), which sends the parent to add a child.
+  if(!state.active && tab!=='adult') return afterLogin();
   document.body.classList.remove('auth'); setAppBg();
   await loadRole();
   // A coach sees a narrower slice of ONE athlete's data than even family_view — no
@@ -84,6 +89,8 @@ async function renderApp(tab, fromPop){
         <span>A Brown Pig company</span>
       </div>
     </nav>`;
+  // No child profile: Your training is the only screen, so the child-facing navigation comes off.
+  if(!state.active){ const n=$("#nav"); if(n) n.remove(); }
   bindNav(tab);
   try{
     if(tab==='week') await screenWeek();

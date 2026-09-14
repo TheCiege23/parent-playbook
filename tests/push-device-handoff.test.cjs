@@ -261,7 +261,7 @@ test('every sign-out path releases this device first', () => {
   const sites = [
     ['js/shell.js', '#logout'],
     ['js/account.js', '#acctLogout'],
-    ['js/auth.js', '#naOut'],
+    ['js/auth.js', '#naOut and Your training, both through logOutOfApp()'],
     ['js/init.js', '#owOut'],
     ['js/onboarding.js', '#obLogout'],
     ['js/sheets.js', 'account deletion'],

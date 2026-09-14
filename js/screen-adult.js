@@ -34,7 +34,7 @@ async function screenAdult(){
   if (results.some(r => r.error)) {
     results.filter(r => r.error).forEach(r => console.error(r.error));
     $("#screen").innerHTML = H`${top}<div class="app-pad"><p class="empty">Your training record isn't available on this account yet.</p></div>`;
-    $("#adultBack").onclick = () => renderApp('account');
+    bindAdultChrome();
     return;
   }
   const [prof, goalRows, itemRows, exerciseRows, logRows, readingRows, batchRows] = results;
@@ -152,6 +152,12 @@ async function screenAdult(){
 
 // The header both halves of Your training share, and the switch between them.
 function adultTopBar(){
+  // With no child profile there is no Account screen behind this one, so the header offers setting one up and logging out.
+  if (!hasActiveAthlete()) return H`<div class="top">
+      <button class="pill" id="adultAddChild">Add your child</button>
+      <h3 style="font-size:17px">Your training</h3>
+      <button class="pill" id="adultLogout">Log out</button>
+    </div>`;
   return H`<div class="top">
       <button class="pill" id="adultBack" aria-label="Back to account">← Back</button>
       <h3 style="font-size:17px">Your training</h3>
@@ -163,7 +169,9 @@ function adultSectionSwitch(active){
     H`<button type="button" class="chip${k === active ? ' on' : ''}" role="tab" aria-selected="${k === active ? 'true' : 'false'}" data-adult-section="${k}">${l}</button>`).join('')}</div>`;
 }
 function bindAdultChrome(){
-  $("#adultBack").onclick = () => renderApp('account');
+  { const b = $("#adultBack"); if (b) b.onclick = () => renderApp('account'); }
+  { const b = $("#adultAddChild"); if (b) b.onclick = () => startChildSetup(); }
+  { const b = $("#adultLogout"); if (b) b.onclick = () => logOutOfApp(); }
   $("#screen").querySelectorAll('[data-adult-section]').forEach(b => b.onclick = () => {
     state.adultSection = b.dataset.adultSection;
     renderApp('adult');
