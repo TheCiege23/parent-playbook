@@ -1,6 +1,7 @@
 // `account` is a route, not a tab — it has no nav button and lives one level under
 // Profile. It's in this list so the hash router and the Back button still handle it.
-const APP_TABS=['week','growth','scan','insights','journey','profile','account','activity'];
+// `adult` is the signed-in parent's own training record, reached from Account and gated by adultTrainingOn().
+const APP_TABS=['week','growth','scan','insights','journey','profile','account','activity','adult'];
 // Whether this guardian can WRITE for the active athlete. RLS is the real gate —
 // private.can_edit_athlete() only passes owner and co_parent — but the UI has to agree,
 // or family view is a screen full of controls that silently fail.
@@ -43,6 +44,9 @@ async function loadRole(){
 function ownerFirstName(){ return (state && state.ownerName) || 'Their parent'; }
 
 async function renderApp(tab, fromPop){
+  // Adult Training is the parent's own record, not an athlete's: gated by its own flag and allowlist, and exempt from
+  // the coach view, the family-view redirect and the family-view banner below, which are all about a child.
+  if(tab==='adult' && adultTrainingOff()) return;
   document.body.classList.remove('auth'); setAppBg();
   await loadRole();
   // A coach sees a narrower slice of ONE athlete's data than even family_view — no
@@ -50,7 +54,7 @@ async function renderApp(tab, fromPop){
   // Reusing the normal 7-tab shell for that role would render tabs that quietly come
   // back empty rather than explain why, so this bypasses renderApp()'s shell entirely
   // rather than trying to retrofit every screen to hide itself from a coach.
-  if(state.role==='coach') return renderCoachView();
+  if(state.role==='coach' && tab!=='adult') return renderCoachView();
   // Family view has no Growth or Scan tab: goals, measurements and starting a scan are
   // things a parent DOES, and an empty read-only version of them is just a locked door.
   if(!state.canEdit && (tab==='growth' || tab==='scan' || tab==='insights')) tab='week';
@@ -66,7 +70,7 @@ async function renderApp(tab, fromPop){
     }
   }
   root.innerHTML = H`
-    ${state.canEdit?'':'<div class="roview" role="status"><i>👁</i> Family view · you can look, not change</div>'}
+    ${state.canEdit||tab==='adult'?'':'<div class="roview" role="status"><i>👁</i> Family view · you can look, not change</div>'}
     <div id="screen"></div>
     <nav class="nav" id="nav">
       <div class="sb-brand" aria-hidden="true"><span class="mk">P</span><b>Parent Playbook</b></div>
@@ -88,6 +92,7 @@ async function renderApp(tab, fromPop){
     else if(tab==='insights') await screenBodyInsights();
     else if(tab==='journey') await screenJourney();
     else if(tab==='account') await screenAccount();
+    else if(tab==='adult') await screenAdult();
     else if(tab==='activity') await screenActivity();
     else await screenProfile();
   }catch(err){ console.error(err); screenError(tab); }
@@ -104,7 +109,7 @@ function navBtn(id,label,path){ return H`<button data-t="${id}" aria-label="${es
 function bindNav(active){
   if(active==='insights') active='scan';
   // Account & settings sits under Profile, so Profile stays lit while you're in it.
-  if(active==='account') active='profile';
+  if(active==='account'||active==='adult') active='profile';
   // The activity screen owns the whole viewport and has its own sticky action, so the
   // bottom nav comes off — two competing action bars is one too many.
   if(active==='activity'){ const n=$("#nav"); if(n) n.remove(); return; }

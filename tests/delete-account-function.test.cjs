@@ -189,3 +189,16 @@ test('the entry point uses the publishable key for the caller and adds no logic'
   assert.match(entry, /createClient\(URL, PUBLISHABLE, \{ global: \{ headers: \{ Authorization: auth \} \} \}\)/);
   assert.doesNotMatch(entry, /\.from\(/);
 });
+
+test("a parent's own training record is deleted, scoped to them, before the login", async () => {
+  const { createDeleteAccountHandler, ADULT_TABLES } = await load();
+  const s = fakeSupabase({ tables: { adult_goals: [{ guardian_id: 'u', label: 'mine' }, { guardian_id: 'someone-else', label: 'theirs' }] } });
+  await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
+  const deletedAt = indexOf(s.events, e => e[0] === 'deleteUser');
+  assert.ok(deletedAt !== -1);
+  for (const table of ADULT_TABLES) {
+    const at = indexOf(s.events, e => e[0] === 'delete' && e[1] === table && e[2] === 'guardian_id=u');
+    assert.ok(at !== -1 && at < deletedAt, table + ' must be deleted for the caller before the login is');
+  }
+  assert.deepEqual(s.tables.adult_goals, [{ guardian_id: 'someone-else', label: 'theirs' }], "another guardian's record is untouched");
+});
