@@ -780,6 +780,40 @@ const GROWTH_FAST_IN_PER_YEAR = 3.0;   // typical pre-spurt growth runs ~2–2.4
 const GROWTH_MIN_DAYS   = 60;          // shorter windows are mostly measurement error
 const GROWTH_STALE_DAYS = 180;         // an old reading says nothing about today
 
+// One calendar week's roster, season and generated plan, from the Monday weekStart to the Sunday weekEnd. The Week
+// screen builds this week with it and Google Calendar sync (js/calendar-sync.js) builds the weeks ahead with it, so a
+// synced week is the week the app shows. cancelledIdx are the days (Mon=0) called off that week.
+function planForWeek({ age, goals, sports, cancelledIdx, weekStart, weekEnd, heightRows, weekIndex, nameOf }){
+  const list=sports||[];
+  const primary=list.find(s=>s.is_primary)||list[0];
+  const label=nameOf||(k=>k);
+  // Every sport the athlete plays, each with its own schedule and season window.
+  // buildProgram merges them into ONE weekly load budget.
+  const roster=list.map(s=>{
+    const ss=s.season_start||null, se=s.season_end||null;
+    const pre=!!(ss && weekEnd<ss), off=!!(se && weekStart>se);
+    // `gamesOn` gates the GAME DAY only. A sport in preseason camp is still very much
+    // active — practices are happening — so it must keep contributing skill work.
+    return { sportKey:s.sport_key, sportName:label(s.sport_key), positions:s.positions||[],
+             level:s.level||null, practiceDays:s.practice_days||[], gameDay:s.game_day,
+             gamesOn:!(pre||off), isPrimary:!!s.is_primary };
+  });
+  // Games don't exist before the season opens — a weekly game day would otherwise put
+  // "Game day" on every Saturday of the preseason.
+  const seasonStart=primary?.season_start||null;
+  const seasonEnd=primary?.season_end||null;
+  const preseason=!!(seasonStart && weekEnd<seasonStart);
+  const offseason=!!(seasonEnd && weekStart>seasonEnd);
+  const inSeason=!(preseason||offseason);
+  const growth=growthSignal(heightRows||[]);
+  const sched={ sports:roster, cancelled:cancelledIdx||[],
+      practiceDays:primary?.practice_days||[], gameDay:primary?.game_day,
+      inSeason, seasonStart, seasonEnd, seasonState:primary?.season_state||null,
+      level:primary?.level||null, growth };
+  const prog=buildProgram(age, goals||[], primary?.sport_key||'general', primary?.positions||[], weekIndex, sched);
+  return { primary, roster, sched, prog, seasonStart, seasonEnd, preseason, offseason, inSeason, growth };
+}
+
 function growthSignal(rows){
   const dayGap=(a,b)=>Math.round((new Date(a+'T12:00:00')-new Date(b+'T12:00:00'))/86400000);
   const hs=(rows||[])

@@ -54,39 +54,19 @@ async function screenWeek(){
   const nameOf = k => state.ref?.sports.find(s=>s.key===k)?.name || k;
   const sportName = primary ? nameOf(primary.sport_key) : 'Athlete';
 
-  // Every sport the athlete plays, each with its own schedule and season window.
-  // buildProgram merges them into ONE weekly load budget.
-  const roster=(sports||[]).map(s=>{
-    const ss=s.season_start||null, se=s.season_end||null;
-    const pre=!!(ss && weekEnd<ss), off=!!(se && weekStart>se);
-    // `gamesOn` gates the GAME DAY only. A sport in preseason camp is still very much
-    // active — practices are happening — so it must keep contributing skill work.
-    return { sportKey:s.sport_key, sportName:nameOf(s.sport_key), positions:s.positions||[],
-             level:s.level||null, practiceDays:s.practice_days||[], gameDay:s.game_day,
-             gamesOn:!(pre||off), isPrimary:!!s.is_primary };
-  });
-  // Games don't exist before the season opens — a weekly game day would otherwise put
-  // "Game day" on every Saturday of the preseason.
-  const seasonStart = primary?.season_start || null;
-  const seasonEnd   = primary?.season_end   || null;
-  const preseason = !!(seasonStart && weekEnd < seasonStart);
-  const offseason = !!(seasonEnd && weekStart > seasonEnd);
-  const inSeason = !(preseason || offseason);
+  // This week's roster, season and generated plan. planForWeek() in program.js is shared with Google Calendar sync,
+  // so a synced week is the week this screen shows.
+  const weeksIn = weeksSince(a.created_at);
+  const plan = planForWeek({ age, goals:goals||[], sports:sports||[], cancelledIdx, weekStart, weekEnd, heightRows:heightRows||[], weekIndex:weeksIn, nameOf });
+  const { roster, sched, prog, seasonStart, seasonEnd, preseason, offseason, inSeason, growth } = plan;
   const multiSport = roster.length>1;
   // "Active" = games running OR practices on the calendar. Camp counts.
   const activeNames = roster.filter(s=>s.gamesOn||s.practiceDays.length).map(s=>s.sportName);
   // Week counter: weeks into the SEASON once one is set, otherwise weeks since the
   // profile was created. "Week 8" on opening day read as nonsense.
   const seasonRef = primary?.season_start || null;
-  const weeksIn = weeksSince(a.created_at);
   const seasonWeek = (seasonRef && weekStart>=seasonRef) ? weeksSince(seasonRef)+1 : null;
 
-  const growth = growthSignal(heightRows||[]);
-  const sched = { sports: roster, cancelled: cancelledIdx,
-      practiceDays: primary?.practice_days||[], gameDay: primary?.game_day,
-      inSeason, seasonStart, seasonEnd, seasonState: primary?.season_state||null,
-      level: primary?.level||null, growth };
-  const prog = buildProgram(age, goals||[], primary?.sport_key||'general', primary?.positions||[], weeksIn, sched);
   // A parent's change to this week, applied to the generated plan before anything else reads it.
   const changed=applyWeekChange(prog.days, prog, weekChange);
   const planned=changed.days;

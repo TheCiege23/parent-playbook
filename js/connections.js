@@ -22,8 +22,8 @@ const CONNECTIONS = Object.freeze([
     brings:'One game day at a time, as a calendar file your phone opens. No account link and no permission to give.',
     lands:'Your phone’s own calendar', action:Object.freeze({ label:'Open Week', route:'week' }) }),
   Object.freeze({ key:'google_calendar', who:'family', status:'planned', name:'Google Calendar sync',
-    brings:'A “Parent Playbook” calendar kept in step with practices, games, gym sessions and rest days, reaching only the calendar it creates.',
-    lands:'Week' }),
+    brings:'Your children’s next four weeks of practices, games, home sessions and rest days, in a “Parent Playbook” calendar that updates when you press Sync and is the only calendar it can reach.',
+    lands:'Your Google Calendar' }),
   Object.freeze({ key:'apple_health', who:'adult', status:'needs_app', name:'Apple Health and Apple Watch',
     brings:'Workouts, steps, heart rate, distance and weight you choose to share.', lands:'Your training → Progress' }),
   Object.freeze({ key:'health_connect', who:'adult', status:'needs_app', name:'Health Connect on Android',
@@ -43,7 +43,8 @@ const CONNECTION_GROUPS = Object.freeze([['web', 'Works now'], ['planned', 'Plan
 // The connections this account should see. env: { adultTraining, hasChild }.
 function visibleConnections(env){
   const e = env || {};
-  return CONNECTIONS.filter(c => (c.who !== 'adult' || e.adultTraining) && (c.who === 'adult' || !c.action || e.hasChild));
+  // Google Calendar sync works in the web app once js/calendar-sync.js has a client id; until then it is planned.
+  return CONNECTIONS.map(c => (c.key === 'google_calendar' && e.calendarSync ? { ...c, status:'web', action:{ label:'Set up', open:'calendar' } } : c)).filter(c => (c.who !== 'adult' || e.adultTraining) && (c.who === 'adult' || !c.action || e.hasChild));
 }
 
 function connectionsMarkup(env){
@@ -63,12 +64,13 @@ function connectionsMarkup(env){
 }
 
 function openConnections(){
-  const env = { adultTraining:adultTrainingOn(), hasChild:hasActiveAthlete() };
+  const env = { adultTraining:adultTrainingOn(), hasChild:hasActiveAthlete(), calendarSync:typeof calendarSyncAvailable === 'function' && calendarSyncAvailable() };
   const bg = sheet(connectionsMarkup(env));
   bg.querySelectorAll('[data-connection]').forEach(b => b.onclick = () => {
-    const c = CONNECTIONS.find(x => x.key === b.dataset.connection);
+    const c = visibleConnections(env).find(x => x.key === b.dataset.connection);
     if (!c || !c.action) return;
     bg.remove();
+    if (c.action.open === 'calendar') return openCalendarSync();
     renderApp(c.action.route);
   });
 }
