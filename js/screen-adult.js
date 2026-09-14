@@ -115,6 +115,7 @@ async function screenAdult(){
             ? ' · ' + a.otherUnitReadings + ' in another unit not counted' : ''}</small></span>
             <b>${esc(a.value.toLocaleString())} ${esc(a.unit)}</b></div>`).join('')}` : ''}
         <div id="adultComposition"></div>
+        <button class="btn sm ghost" id="adultConnections" style="margin-top:10px">Connections</button>
         ${batches.length ? H`<button class="btn sm ghost" id="adultImports" style="margin-top:10px">Your imports (${batches.length})</button>` : ''}
       </div>
 
@@ -130,6 +131,7 @@ async function screenAdult(){
   { const b = $("#adultImports"); if (b) b.onclick = () => openAdultImports(batches); }
   // Results measured elsewhere (DXA, clinic, smart scale, health app), painted once they load. See js/adult-composition.js.
   if (typeof adultCompositionSection === 'function') adultCompositionSection($("#adultComposition"));
+  { const b = $("#adultConnections"); if (b) b.onclick = () => openConnections(); }
   $("#screen").querySelectorAll('[data-adult-goal-remove]').forEach(b => b.onclick = async () => {
     b.disabled = true;
     const { error } = await sb.from('adult_goals').delete().eq('id', b.dataset.adultGoalRemove).eq('guardian_id', uid);

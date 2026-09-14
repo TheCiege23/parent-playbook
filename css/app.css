@@ -463,6 +463,8 @@
   .grow .gt{flex:1}.grow .gt b{font-size:14px;display:block}.grow .gt span{font-size:12px;color:var(--muted)}
   .mrow{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px}
   .mrow:last-child{border-bottom:none}.mrow b{font-family:'Archivo'}
+  .mrow:not(.scan-history-row)>span{min-width:0}
+  .mrow:not(.scan-history-row)>span>b+small{display:block;color:var(--muted);font-size:12px;font-weight:400;line-height:1.4;margin-top:2px}
 
   /* A row that goes somewhere. Same anatomy as .grow, but the whole row is the target
      — a 14px chevron is not a tap target. */

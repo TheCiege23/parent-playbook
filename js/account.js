@@ -78,6 +78,8 @@ async function screenAccount(){
 
       <div class="sec-title">Your data</div>
       <div class="card app-pad">
+        <div class="navrow" id="toConnections" role="button" tabindex="0"><div class="gi">🔗</div>
+          <div class="gt"><b>Connections</b><span>Where outside data can come from, and what works today</span></div><i>›</i></div>
         <div class="navrow" id="exportAll" role="button" tabindex="0"><div class="gi">📦</div>
           <div class="gt"><b>Export everything</b><span>Every profile, game, milestone and measurement as a file</span></div><i>›</i></div>
         <div class="navrow" id="toLegal" role="button" tabindex="0"><div class="gi">📄</div>
@@ -145,6 +147,7 @@ async function screenAccount(){
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
   if(state.canEdit) fillScanConsents();
   go('exportAll', openExportEverything);
+  go('toConnections', openConnections);
   go('toAdult', ()=>renderApp('adult'));
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@playbookbp.com'; });
