@@ -143,5 +143,5 @@ test('it is the parent\'s own: never tied to the active child, reachable from Ac
   const privacy = read('privacy.html');
   assert.match(privacy, /<b>Your own training record<\/b>/);
   assert.match(privacy, /It is private to you: co-parents, family members, coaches and organizations cannot see it\./);
-  assert.match(read('datadeletion.html'), /<li>Your own training record, if you keep one: goals, schedule, workouts, readings and imports, food preferences, recipes and meal plans\.<\/li>/);
+  assert.match(read('datadeletion.html'), /<li>Your own training record, if you keep one: goals, schedule, workouts, readings and imports, imported body composition results, food preferences, recipes and meal plans\.<\/li>/);
 });

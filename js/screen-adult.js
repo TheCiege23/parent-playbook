@@ -114,6 +114,7 @@ async function screenAdult(){
           ${Object.values(activity).map(a => H`<div class="mrow"><span><b>${esc(a.label)}</b><small>${a.summary === 'average' ? 'Average over ' : ''}${a.days} day${a.days === 1 ? '' : 's'}${a.otherUnitReadings
             ? ' · ' + a.otherUnitReadings + ' in another unit not counted' : ''}</small></span>
             <b>${esc(a.value.toLocaleString())} ${esc(a.unit)}</b></div>`).join('')}` : ''}
+        <div id="adultComposition"></div>
         ${batches.length ? H`<button class="btn sm ghost" id="adultImports" style="margin-top:10px">Your imports (${batches.length})</button>` : ''}
       </div>
 
@@ -127,6 +128,8 @@ async function screenAdult(){
   { const b = $("#adultAddBody"); if (b) b.onclick = () => openAdultBodyEntry(units); }
   { const b = $("#adultImport"); if (b) b.onclick = () => openAdultImport(); }
   { const b = $("#adultImports"); if (b) b.onclick = () => openAdultImports(batches); }
+  // Results measured elsewhere (DXA, clinic, smart scale, health app), painted once they load. See js/adult-composition.js.
+  if (typeof adultCompositionSection === 'function') adultCompositionSection($("#adultComposition"));
   $("#screen").querySelectorAll('[data-adult-goal-remove]').forEach(b => b.onclick = async () => {
     b.disabled = true;
     const { error } = await sb.from('adult_goals').delete().eq('id', b.dataset.adultGoalRemove).eq('guardian_id', uid);
@@ -431,5 +434,8 @@ async function adultTrainingExport(){
     data[t.replace(/^adult_/, '')] = rows;
     if (rows.length) hasData = true;
   });
+  const composition = typeof adultCompositionExport === 'function' ? await adultCompositionExport(state.user.id) : [];
+  data.composition_imports = composition;
+  if (composition.length) hasData = true;
   return { hasData, data };
 }
