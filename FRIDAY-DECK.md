@@ -16,7 +16,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v120`; local production-shaped smoke 29/29; live verification pending deployment |
 | JavaScript suite | `node --test "tests/*.test.cjs"` | 916/916 |
 | Database suite | `node tests/db/run.cjs` | 397/397 on a disposable cluster built from the real migrations: 376 security cases plus a 21-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 216/216, exclusions clean, contracts 330/330, database 385/385, signature verified, host serving |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 217/217, exclusions clean, contracts 330/330, database 397/397, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
 
@@ -101,8 +101,8 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 216 files, checksummed, one command to verify it, and its own
-  bundled migrations rebuild the schema and pass all 385 cases on a clean database.
+- **The buyer archive stands alone**: 217 files, checksummed, one command to verify it, and its own
+  bundled migrations rebuild the schema and pass all 397 cases on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
 than judgment. Three defects worth admitting if pressed, because finding them is the point: the
