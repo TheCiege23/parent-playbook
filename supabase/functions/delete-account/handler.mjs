@@ -81,6 +81,23 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
 
       const svc = serviceClient;
 
+      // Reports attached to imported body composition results (a DXA printout, a clinic PDF) live in storage. When
+      // the records cascade away, the migration's attachment trigger deletes each report's storage.objects row; they
+      // are also removed here through the Storage API, the way this function removes photos, so the files go without
+      // relying on that trigger alone. Collect the keys while the rows still exist: the caller's own imports, child
+      // or adult, and (below) any import for a child whose household goes with them. A database without these
+      // tables has nothing to collect.
+      const reportKeys = new Set();
+      const collectReports = async (column, values) => {
+        if (!values.length) return;
+        const records = svc.from('external_composition_records').select('id');
+        const { data: recs, error } = await (column === 'guardian_id' ? records.eq(column, values[0]) : records.in(column, values));
+        if (error || !recs || !recs.length) return;
+        const { data: attachments } = await svc.from('external_composition_attachments').select('storage_key').in('record_uuid', recs.map(r => r.id));
+        for (const a of attachments || []) if (a.storage_key) reportKeys.add(a.storage_key);
+      };
+      await collectReports('guardian_id', [uid]);
+
       // ---- 1. which households does this person belong to, and are they alone in them? ----
       const { data: myFams } = await svc.from('family_members').select('family_id').eq('guardian_id', uid);
       const familyIds = [...new Set((myFams || []).map(r => r.family_id))];
@@ -100,6 +117,7 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
           // Sole guardian: the household goes with them. Collect photo paths BEFORE the rows
           // disappear; afterwards there is nothing left to tell us what to delete.
           for (const kid of kidIds) athleteIdsToPurge.push(kid);
+          await collectReports('athlete_id', kidIds);
           const { error } = await svc.from('families').delete().eq('id', fid);
           if (error) return json({ error: `could not delete household: ${error.message}` }, 500);
           familiesDeleted++;
@@ -140,6 +158,10 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
       if (trainerDocs.length) {
         const { error } = await svc.storage.from('trainer-verification-docs').remove(trainerDocs);
         if (!error) filesRemoved += trainerDocs.length;
+      }
+      if (reportKeys.size) {
+        const { error } = await svc.storage.from('composition-reports').remove([...reportKeys]);
+        if (!error) filesRemoved += reportKeys.size;
       }
 
       // ---- 3b. the parent's own training record ----
