@@ -2,6 +2,8 @@
 // site loads, in the same order, with three differences: the Supabase CDN script is replaced by fake-supabase.js, the
 // Sentry loader and the marketing landing script are left out, and the service worker is not registered. Run from the
 // repository root: node tools/adult-harness/build.cjs
+// Give an output path to build somewhere else without touching the committed page, as the tests do:
+// node tools/adult-harness/build.cjs <output.html>
 //
 // To use it: serve the repository root over HTTP (python -m http.server 8792) and open
 // http://localhost:8792/tools/adult-harness/index.html. It opens Your training for a synthetic parent with Adult
@@ -61,5 +63,9 @@ ${tags.join('\n')}
 </body>
 </html>
 `;
-fs.writeFileSync(path.join(__dirname, 'index.html'), html);
-console.log('wrote tools/adult-harness/index.html with ' + scripts.length + ' app scripts');
+// The committed page unless another path is given. A check that rebuilt over the committed page left a Windows checkout
+// (CRLF) showing it as modified after every test run, even though only the line endings differed.
+const out = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, 'index.html');
+fs.writeFileSync(out, html);
+const shown = out.startsWith(root + path.sep) ? path.relative(root, out).split(path.sep).join('/') : out;
+console.log('wrote ' + shown + ' with ' + scripts.length + ' app scripts');
