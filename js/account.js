@@ -73,7 +73,7 @@ async function screenAccount(){
       ${adultTrainingOn()?H`<div class="sec-title">Your training</div>
       <div class="card app-pad">
         <div class="navrow" id="toAdult" role="button" tabindex="0"><div class="gi">🏋️</div>
-          <div class="gt"><b>Your own training</b><span>Goals, a gym schedule and progress. Private to you.</span></div><i>›</i></div>
+          <div class="gt"><b>Your own training</b><span>Goals, a gym schedule, progress and meal planning. Private to you.</span></div><i>›</i></div>
       </div>`:''}
 
       <div class="sec-title">Your data</div>

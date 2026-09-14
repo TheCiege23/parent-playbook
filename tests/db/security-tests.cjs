@@ -1524,6 +1524,68 @@ add('X14', 'adult-training', 'deleting the account removes every part of the rec
       select (${ADULT_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_D}')`).join(' + ')})::text;`,
     expect: 'ok', expectOut: '0' });
 
+// =========================================================== Y. adult nutrition (a parent's own eating plan)
+//
+// Preferences, recipes, planned meals and habit days follow the same rules as the rest of the parent's own record:
+// theirs alone, writes need the allowlist, and the account's deletion takes all of it.
+const ADULT_E = 'eeeeeeee-0000-4000-8000-00000000000e';
+const AN_RECIPE_B = 'a8000000-0000-4000-8000-00000000000b';
+const AN_RECIPE_C = 'a8000000-0000-4000-8000-00000000000c';
+const AN_RECIPE_E = 'a8000000-0000-4000-8000-00000000000e';
+const anRecipe = (id, guardian, cols = '', vals = '') =>
+  `insert into public.adult_recipes(id, guardian_id, title, ingredients${cols}) values ('${id}', '${guardian}', 'Synthetic recipe', array['Synthetic ingredient']${vals});`;
+const anPlan = (guardian, recipe, on = 'current_date') =>
+  `insert into public.adult_meal_plan_items(guardian_id, planned_on, slot, recipe_id, title) values ('${guardian}', ${on}, 'dinner', ${recipe ? `'${recipe}'` : 'null'}, 'Synthetic meal');`;
+const anRecipeCount = `select count(*)::text from public.adult_recipes where guardian_id = '${MEMBER_C}';`;
+const NUTRITION_TABLE_LIST = ['adult_nutrition_preferences', 'adult_recipes', 'adult_meal_plan_items', 'adult_nutrition_days'];
+
+add('Y01', 'adult-nutrition', 'an allowlisted parent adds a recipe, plans a meal with it and reads both back',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: anRecipe(AN_RECIPE_C, MEMBER_C) + anPlan(MEMBER_C, AN_RECIPE_C)
+      + `select ((select count(*) from public.adult_recipes where guardian_id = '${MEMBER_C}') + (select count(*) from public.adult_meal_plan_items where guardian_id = '${MEMBER_C}'))::text;`,
+    expect: 'ok', expectOut: '2' });
+add('Y02', 'adult-nutrition', 'a parent who is not allowlisted cannot save food preferences',
+  { ...asScanParent, sql: `insert into public.adult_nutrition_preferences(guardian_id) values ('${MEMBER_C}');`, expect: 'error', expectError: /row-level security/ });
+add('Y03', 'adult-nutrition', "a co-parent in the same family cannot read the other parent's recipes",
+  { setup: anRecipe(AN_RECIPE_C, MEMBER_C) + coParentB, role: 'authenticated', claims: ADMIN_B, sql: anRecipeCount, expect: 'ok', expectOut: '0' });
+add('Y04', 'adult-nutrition', "a planned meal cannot use another guardian's recipe",
+  { setup: adultAllow(MEMBER_C) + anRecipe(AN_RECIPE_B, ADMIN_B), ...asScanParent, sql: anPlan(MEMBER_C, AN_RECIPE_B),
+    expect: 'error', expectError: /adult_meal_plan_items_recipe_fkey/ });
+add('Y05', 'adult-nutrition', 'an allergen tag outside the nine named in labeling law is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: anRecipe(AN_RECIPE_C, MEMBER_C, ', allergens', ", array['gluten']"),
+    expect: 'error', expectError: /adult_recipes_allergens_check/ });
+add('Y06', 'adult-nutrition', 'a recipe with more than 40 ingredient lines is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: `insert into public.adult_recipes(guardian_id, title, ingredients) values ('${MEMBER_C}', 'Synthetic recipe', array_fill('Synthetic ingredient'::text, array[41]));`,
+    expect: 'error', expectError: /adult_recipes_ingredients_check/ });
+add('Y07', 'adult-nutrition', 'deleting a recipe keeps the meals planned with it, unlinked',
+  { setup: anRecipe(AN_RECIPE_C, MEMBER_C) + anPlan(MEMBER_C, AN_RECIPE_C),
+    sql: `delete from public.adult_recipes where id = '${AN_RECIPE_C}';
+      select (count(*) = 1 and bool_and(recipe_id is null))::text from public.adult_meal_plan_items where guardian_id = '${MEMBER_C}';`,
+    expect: 'ok', expectOut: 'true' });
+add('Y08', 'adult-nutrition', 'a habit day logged days ahead is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: `insert into public.adult_nutrition_days(guardian_id, logged_on, protein_meals) values ('${MEMBER_C}', current_date + 3, 2);`,
+    expect: 'error', expectError: /row-level security/ });
+add('Y09', 'adult-nutrition', 'a meal planned more than 60 days ahead is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: anPlan(MEMBER_C, null, 'current_date + 61'), expect: 'error', expectError: /row-level security/ });
+add('Y10', 'adult-nutrition', 'one habit row a day',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: `insert into public.adult_nutrition_days(guardian_id, logged_on, plate_meals) values ('${MEMBER_C}', current_date, 1), ('${MEMBER_C}', current_date, 2);`,
+    expect: 'error', expectError: /adult_nutrition_days_once_a_day_key/ });
+add('Y11', 'adult-nutrition', 'anon reaches nothing and every table has row-level security',
+  { sql: `select (${NUTRITION_TABLE_LIST.map(t => `not has_table_privilege('anon', 'public.${t}', 'SELECT')
+        and (select relrowsecurity from pg_class where oid = 'public.${t}'::regclass)`).join('\n        and ')})::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('Y12', 'adult-nutrition', 'deleting the account removes every part of the eating plan',
+  { setup: `insert into auth.users(id, email) values ('${ADULT_E}', 'synthetic-adult-e@example.invalid');`
+      + `insert into public.adult_nutrition_preferences(guardian_id, avoid_allergens) values ('${ADULT_E}', array['peanuts']);`
+      + anRecipe(AN_RECIPE_E, ADULT_E) + anPlan(ADULT_E, AN_RECIPE_E)
+      + `insert into public.adult_nutrition_days(guardian_id, logged_on, protein_meals) values ('${ADULT_E}', current_date, 2);`,
+    sql: `delete from auth.users where id = '${ADULT_E}';
+      select (${NUTRITION_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_E}')`).join(' + ')})::text;`,
+    expect: 'ok', expectOut: '0' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

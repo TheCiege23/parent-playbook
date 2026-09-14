@@ -39,7 +39,9 @@ export const NULLABLE_BACK_REFERENCES = Object.freeze([
 // auth.users cascade, so "your data was removed" stays true even when the login delete below fails.
 export const ADULT_TABLES = Object.freeze([
   'adult_workout_logs', 'adult_schedule_exercises', 'adult_schedule_items',
-  'adult_goals', 'adult_body_entries', 'adult_profiles', 'adult_training_access',
+  'adult_goals', 'adult_body_entries', 'adult_profiles',
+  'adult_meal_plan_items', 'adult_recipes', 'adult_nutrition_days', 'adult_nutrition_preferences',
+  'adult_training_access',
 ]);
 
 // Every file under a bucket folder, paged.

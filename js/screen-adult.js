@@ -17,6 +17,7 @@ function adultFail(error, where, message){
 
 async function screenAdult(){
   if (adultTrainingOff()) return;
+  if (state.adultSection === 'eating' && typeof screenAdultEating === 'function') return screenAdultEating();
   const uid = state.user.id;
   const weekStart = isoDay(mondayOfThisWeek()), weekEnd = dateForDayIndex(6), today = todayISO();
   const results = await Promise.all([
@@ -28,11 +29,7 @@ async function screenAdult(){
     sb.from('adult_body_entries').select('*').eq('guardian_id', uid)
       .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).limit(120),
   ]);
-  const top = H`<div class="top">
-      <button class="pill" id="adultBack" aria-label="Back to account">← Back</button>
-      <h3 style="font-size:17px">Your training</h3>
-      <span style="width:62px"></span>
-    </div>`;
+  const top = adultTopBar();
   if (results.some(r => r.error)) {
     results.filter(r => r.error).forEach(r => console.error(r.error));
     $("#screen").innerHTML = H`${top}<div class="app-pad"><p class="empty">Your training record isn't available on this account yet.</p></div>`;
@@ -51,6 +48,7 @@ async function screenAdult(){
 
   $("#screen").innerHTML = H`${top}
     <div class="app-pad" style="padding-top:6px">
+      ${adultSectionSwitch('training')}
       <p class="muted-note" style="margin-top:0">Private to you. Co-parents, family members, coaches and teams can't see it, and none of it appears on a child's profile.</p>
 
       ${!profile ? H`<div class="card app-pad">
@@ -111,7 +109,7 @@ async function screenAdult(){
       <div class="act-stop" style="margin-top:16px"><b>Stop if</b> you feel sharp pain, chest pain, dizziness or unusual shortness of breath. If you have a health condition, check with a doctor before starting something new.</div>
     </div>`;
 
-  $("#adultBack").onclick = () => renderApp('account');
+  bindAdultChrome();
   { const b = $("#adultSetup"); if (b) b.onclick = () => openAdultProfile(profile); }
   { const b = $("#adultAddGoal"); if (b) b.onclick = () => openAdultGoal(); }
   { const b = $("#adultAddItem"); if (b) b.onclick = () => openAdultItem(null, []); }
@@ -136,6 +134,26 @@ async function screenAdult(){
   $("#screen").querySelectorAll('[data-adult-edit]').forEach(b => b.onclick = () => {
     const item = items.find(i => i.id === b.dataset.adultEdit);
     if (item) openAdultItem(item, exercises.filter(e => e.item_id === item.id));
+  });
+}
+
+// The header both halves of Your training share, and the switch between them.
+function adultTopBar(){
+  return H`<div class="top">
+      <button class="pill" id="adultBack" aria-label="Back to account">← Back</button>
+      <h3 style="font-size:17px">Your training</h3>
+      <span style="width:62px"></span>
+    </div>`;
+}
+function adultSectionSwitch(active){
+  return H`<div class="chipgrid two" role="tablist" aria-label="Your training" style="margin:0 0 12px">${[['training', 'Training'], ['eating', 'Eating']].map(([k, l]) =>
+    H`<button type="button" class="chip${k === active ? ' on' : ''}" role="tab" aria-selected="${k === active ? 'true' : 'false'}" data-adult-section="${k}">${l}</button>`).join('')}</div>`;
+}
+function bindAdultChrome(){
+  $("#adultBack").onclick = () => renderApp('account');
+  $("#screen").querySelectorAll('[data-adult-section]').forEach(b => b.onclick = () => {
+    state.adultSection = b.dataset.adultSection;
+    renderApp('adult');
   });
 }
 
@@ -296,7 +314,8 @@ function openAdultBodyEntry(units){
 // tables yields nothing rather than failing the export.
 async function adultTrainingExport(){
   if (!state.user) return { hasData:false, data:null };
-  const tables = ['adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_body_entries'];
+  const tables = ['adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_body_entries',
+    'adult_nutrition_preferences', 'adult_recipes', 'adult_meal_plan_items', 'adult_nutrition_days'];
   const results = await Promise.all(tables.map(t => sb.from(t).select('*').eq('guardian_id', state.user.id)));
   const data = {}; let hasData = false;
   tables.forEach((t, i) => {
