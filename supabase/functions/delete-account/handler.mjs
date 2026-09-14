@@ -34,6 +34,14 @@ export const NULLABLE_BACK_REFERENCES = Object.freeze([
   ['athlete_invites', 'accepted_by'],
 ]);
 
+// A parent's own training record (Adult Training). It is theirs alone, so nobody inherits it: every row is deleted,
+// scoped to the caller, children before the rows they reference. Deleted explicitly rather than left to the
+// auth.users cascade, so "your data was removed" stays true even when the login delete below fails.
+export const ADULT_TABLES = Object.freeze([
+  'adult_workout_logs', 'adult_schedule_exercises', 'adult_schedule_items',
+  'adult_goals', 'adult_body_entries', 'adult_profiles', 'adult_training_access',
+]);
+
 // Every file under a bucket folder, paged.
 async function listFolder(svc, bucket, folder) {
   const out = [];
@@ -130,6 +138,15 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
       if (trainerDocs.length) {
         const { error } = await svc.storage.from('trainer-verification-docs').remove(trainerDocs);
         if (!error) filesRemoved += trainerDocs.length;
+      }
+
+      // ---- 3b. the parent's own training record ----
+      // A database the Adult Training migration has not reached has none of these tables; that is not a failure.
+      for (const table of ADULT_TABLES) {
+        const { error } = await svc.from(table).delete().eq('guardian_id', uid);
+        if (error && error.code !== 'PGRST205' && error.code !== '42P01') {
+          return json({ error: 'could not delete your training record' }, 500);
+        }
       }
 
       // ---- 4. the account itself, last ----

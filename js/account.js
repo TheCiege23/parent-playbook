@@ -70,6 +70,12 @@ async function screenAccount(){
         already saved — delete those from Growth, one reading at a time, or a whole body scan from Scans.</p>
       `:''}
 
+      ${adultTrainingOn()?H`<div class="sec-title">Your training</div>
+      <div class="card app-pad">
+        <div class="navrow" id="toAdult" role="button" tabindex="0"><div class="gi">🏋️</div>
+          <div class="gt"><b>Your own training</b><span>Goals, a gym schedule and progress. Private to you.</span></div><i>›</i></div>
+      </div>`:''}
+
       <div class="sec-title">Your data</div>
       <div class="card app-pad">
         <div class="navrow" id="exportAll" role="button" tabindex="0"><div class="gi">📦</div>
@@ -139,6 +145,7 @@ async function screenAccount(){
   { const n=$("#editName"); if(n) n.onclick=()=>openEditMyName(myName); }
   if(state.canEdit) fillScanConsents();
   go('exportAll', openExportEverything);
+  go('toAdult', ()=>renderApp('adult'));
   go('toLegal', ()=>window.open('/privacy','_blank','noopener'));
   go('helpRow', ()=>{ location.href='mailto:support@playbookbp.com'; });
   go('adminQueue', openAdminQueue);
@@ -302,17 +309,20 @@ function openChangePassword(){
 // base64 video is not a useful thing to hand anyone.
 async function openExportEverything(){
   const bg=sheet(H`<h3>Export everything</h3>
-    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">One file with every athlete, game, milestone, measurement, logged session, Team Connect message and consent record you have access to — plus who has access, and links to your photos and videos.</p>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">One file with every athlete, game, milestone, measurement, logged session, Team Connect message and consent record you have access to — plus who has access, links to your photos and videos, and your own training record if you keep one.</p>
     <div id="exStatus"><div class="center-screen" style="min-height:90px"><span class="spinner" role="status" aria-label="Loading"></span></div></div>`);
   const out=bg.querySelector('#exStatus');
   try{
     const ids=state.athletes.map(x=>x.id);
-    if(!ids.length){ out.innerHTML='<p class="empty">No athletes to export yet.</p>'; return; }
-    const grab=t=>sb.from(t).select('*').in('athlete_id',ids);
+    // A parent's own training record is exported even when the account has no athlete yet.
+    const adult=(typeof adultTrainingExport==='function')?await adultTrainingExport():{hasData:false,data:null};
+    if(!ids.length&&!adult.hasData){ out.innerHTML='<p class="empty">Nothing to export yet.</p>'; return; }
+    const none=Promise.resolve({data:[],error:null});
+    const grab=t=>ids.length?sb.from(t).select('*').in('athlete_id',ids):none;
     // athlete_invites is deliberately left out: it carries a live token/code_hash that
     // could be used to accept a pending invite, which is a secret, not "data about the child".
     const [ath,sp,goals,meas,games,miles,sess,media,updates,consentsBio,consentsGeneral,teams,access]=await Promise.all([
-      sb.from('athletes').select('*').in('id',ids),
+      ids.length?sb.from('athletes').select('*').in('id',ids):none,
       grab('athlete_sports'), grab('goals'), grab('measurements'),
       grab('games'), grab('milestones'), grab('sessions'), grab('media'),
       grab('coach_updates'), grab('biometric_consents'), grab('consent_records'),
@@ -344,11 +354,13 @@ async function openExportEverything(){
       coach_updates:updates.data||[], biometric_consents:consentsBio.data||[],
       consent_records:consentsGeneral.data||[], team_memberships:teams.data||[],
       access_grants:access.data||[],
+      adult_training:adult.data,
     };
     const counts=[['athletes',payload.athletes.length],['games',payload.games.length],
       ['milestones',payload.milestones.length],['measurements',payload.measurements.length],
       ['sessions logged',payload.sessions.length],['photos & videos',payload.media.length],
-      ['coach updates',payload.coach_updates.length],['access grants',payload.access_grants.length]];
+      ['coach updates',payload.coach_updates.length],['access grants',payload.access_grants.length],
+      ...(adult.hasData?[['your training entries',Object.values(adult.data).reduce((n,rows)=>n+rows.length,0)]]:[])];
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const name='parent-playbook-export-'+isoDay(new Date())+'.json';

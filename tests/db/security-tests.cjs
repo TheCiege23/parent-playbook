@@ -1457,6 +1457,73 @@ add('W02', 'measurement-delete', 'a family viewer cannot delete a measurement',
   { setup: reading + scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
     sql: `delete from public.measurements where id = '${READING_ID}';reset role;` + readingCount, expect: 'ok', expectOut: '1' });
 
+// =========================================================== X. adult training (a parent's own record)
+//
+// A parent's goals, schedule, workouts and entries belong to that guardian alone. Writing also needs an allowlist row
+// while the feature is behind a flag; reading and deleting never do, so a tester taken off the list can still export
+// and delete. No co-parent, family viewer, coach or organization reaches it.
+const ADULT_D = 'dddddddd-0000-4000-8000-00000000000d';
+const ADULT_ITEM_B = 'a7000000-0000-4000-8000-00000000000b';
+const ADULT_ITEM_C = 'a7000000-0000-4000-8000-00000000000c';
+const adultAllow = guardian => `insert into public.adult_training_access(guardian_id) values ('${guardian}');`;
+const adultGoal = guardian => `insert into public.adult_goals(guardian_id, kind, label) values ('${guardian}', 'strength', 'Synthetic goal');`;
+const adultItem = (id, guardian) => `insert into public.adult_schedule_items(id, guardian_id, weekday, title, kind, duration_min) values ('${id}', '${guardian}', 1, 'Synthetic workout', 'strength', 40);`;
+const adultGoalCount = `select count(*)::text from public.adult_goals where guardian_id = '${MEMBER_C}';`;
+const coParentB = `insert into public.family_members(family_id, guardian_id, role) values ('${SCAN_FAMILY}', '${ADMIN_B}', 'co_parent');`;
+const ADULT_TABLE_LIST = ['adult_training_access', 'adult_profiles', 'adult_goals', 'adult_schedule_items', 'adult_schedule_exercises', 'adult_workout_logs', 'adult_body_entries'];
+
+add('X01', 'adult-training', 'an allowlisted parent records a goal and reads it back',
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: adultGoal(MEMBER_C) + adultGoalCount, expect: 'ok', expectOut: '1' });
+add('X02', 'adult-training', 'a parent who is not allowlisted cannot write, whatever the app flag says',
+  { ...asScanParent, sql: adultGoal(MEMBER_C), expect: 'error', expectError: /row-level security/ });
+add('X03', 'adult-training', "a parent cannot write into another guardian's record",
+  { setup: adultAllow(MEMBER_C), ...asScanParent, sql: adultGoal(ADMIN_B), expect: 'error', expectError: /row-level security/ });
+add('X04', 'adult-training', "a co-parent in the same family cannot read the other parent's record",
+  { setup: adultAllow(MEMBER_C) + adultGoal(MEMBER_C) + coParentB, role: 'authenticated', claims: ADMIN_B, sql: adultGoalCount, expect: 'ok', expectOut: '0' });
+add('X05', 'adult-training', "a family viewer of the parent's child cannot read it either",
+  { setup: adultGoal(MEMBER_C) + scanFamilyViewer, role: 'authenticated', claims: ADMIN_B, sql: adultGoalCount, expect: 'ok', expectOut: '0' });
+add('X06', 'adult-training', 'a parent taken off the allowlist can still read what they recorded',
+  { setup: adultGoal(MEMBER_C), ...asScanParent, sql: adultGoalCount, expect: 'ok', expectOut: '1' });
+add('X07', 'adult-training', 'and can still delete it',
+  { setup: adultGoal(MEMBER_C), ...asScanParent,
+    sql: `delete from public.adult_goals where guardian_id = '${MEMBER_C}';reset role;` + adultGoalCount, expect: 'ok', expectOut: '0' });
+add('X08', 'adult-training', 'a parent cannot put themselves on the allowlist',
+  { ...asScanParent, sql: adultAllow(MEMBER_C), expect: 'error', expectError: /permission denied/ });
+add('X09', 'adult-training', 'anon reaches nothing, no tenant can write the allowlist, and every table has row-level security',
+  { sql: `select (${ADULT_TABLE_LIST.map(t => `not has_table_privilege('anon', 'public.${t}', 'SELECT')
+        and (select relrowsecurity from pg_class where oid = 'public.${t}'::regclass)`).join('\n        and ')}
+      and not has_table_privilege('authenticated', 'public.adult_training_access', 'INSERT')
+      and not has_table_privilege('authenticated', 'public.adult_training_access', 'UPDATE')
+      and not has_table_privilege('authenticated', 'public.adult_training_access', 'DELETE'))::text;`,
+    expect: 'ok', expectOut: 'true' });
+add('X10', 'adult-training', 'a workout dated days ahead is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: `insert into public.adult_workout_logs(guardian_id, done_on) values ('${MEMBER_C}', current_date + 3);`,
+    expect: 'error', expectError: /row-level security/ });
+add('X11', 'adult-training', 'a weight in centimetres is refused',
+  { setup: adultAllow(MEMBER_C), ...asScanParent,
+    sql: `insert into public.adult_body_entries(guardian_id, metric_key, value, unit, measured_on) values ('${MEMBER_C}', 'weight', 80, 'cm', current_date);`,
+    expect: 'error', expectError: /adult_body_entries_metric_unit_check/ });
+add('X12', 'adult-training', "an exercise cannot be attached to another guardian's workout",
+  { setup: adultAllow(MEMBER_C) + adultAllow(ADMIN_B) + adultItem(ADULT_ITEM_B, ADMIN_B), ...asScanParent,
+    sql: `insert into public.adult_schedule_exercises(item_id, guardian_id, name, sets, reps) values ('${ADULT_ITEM_B}', '${MEMBER_C}', 'Synthetic squat', 3, 8);`,
+    expect: 'error', expectError: /adult_schedule_exercises_item_fkey/ });
+add('X13', 'adult-training', 'deleting a workout from the schedule keeps the days it was done, unlinked',
+  { setup: adultItem(ADULT_ITEM_C, MEMBER_C) + `insert into public.adult_workout_logs(guardian_id, schedule_item_id, done_on) values ('${MEMBER_C}', '${ADULT_ITEM_C}', current_date);`,
+    sql: `delete from public.adult_schedule_items where id = '${ADULT_ITEM_C}';
+      select (count(*) = 1 and bool_and(schedule_item_id is null))::text from public.adult_workout_logs where guardian_id = '${MEMBER_C}';`,
+    expect: 'ok', expectOut: 'true' });
+add('X14', 'adult-training', 'deleting the account removes every part of the record',
+  { setup: `insert into auth.users(id, email) values ('${ADULT_D}', 'synthetic-adult-d@example.invalid');`
+      + adultAllow(ADULT_D) + `insert into public.adult_profiles(guardian_id) values ('${ADULT_D}');` + adultGoal(ADULT_D)
+      + adultItem('a7000000-0000-4000-8000-00000000000d', ADULT_D)
+      + `insert into public.adult_schedule_exercises(item_id, guardian_id, name) values ('a7000000-0000-4000-8000-00000000000d', '${ADULT_D}', 'Synthetic press');
+         insert into public.adult_workout_logs(guardian_id, schedule_item_id, done_on) values ('${ADULT_D}', 'a7000000-0000-4000-8000-00000000000d', current_date);
+         insert into public.adult_body_entries(guardian_id, metric_key, value, unit, measured_on) values ('${ADULT_D}', 'weight', 180, 'lb', current_date);`,
+    sql: `delete from auth.users where id = '${ADULT_D}';
+      select (${ADULT_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_D}')`).join(' + ')})::text;`,
+    expect: 'ok', expectOut: '0' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

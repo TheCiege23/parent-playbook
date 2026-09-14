@@ -44,6 +44,26 @@ async function loadPremium(){
   state.premium = !!(data && data.status==='active' && (!data.current_period_end || new Date(data.current_period_end)>new Date()));
 }
 function isPremium(){ return !!state.premium; }
+
+// Adult Training (a parent's own training record) is built behind two locks and is off for everyone in production.
+// This flag would show it to every account. Until then, public.adult_training_access names the test accounts that
+// see it, and the database refuses a write from anyone not on that list whatever this flag says. A parent's record is
+// theirs alone: no co-parent, family viewer, coach or organization can read it. See js/screen-adult.js.
+const ADULT_TRAINING_ENABLED = false;
+async function loadAdultTrainingAccess(){
+  state.adultTrainingAllowed = false;
+  if(!state.user) return;
+  // A database without the table answers with an error, which simply means "not allowed".
+  const { data, error } = await sb.from('adult_training_access').select('guardian_id').eq('guardian_id',state.user.id).limit(1);
+  state.adultTrainingAllowed = !error && !!(data && data.length);
+}
+function adultTrainingOn(){ return ADULT_TRAINING_ENABLED || !!state.adultTrainingAllowed; }
+function adultTrainingOff(){
+  if(adultTrainingOn()) return false;
+  toast('Adult training isn\'t available yet');
+  renderApp('profile');
+  return true;
+}
 const SCAN_FREE_MONTHLY_CAP = 3;
 // Approximates "scans this month" as distinct capture days in the last 30 days —
 // there's no dedicated attempts log, and a single capture can write several
