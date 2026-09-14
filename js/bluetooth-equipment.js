@@ -146,6 +146,12 @@ async function openBluetoothEquipment(units){
     <p class="muted-note">Works in Chrome on Android and computers, with equipment that follows the Bluetooth standards. If a reading looks wrong, don’t save it.</p>`);
   const $b = sel => bg.querySelector(sel);
   const err = $b('#btErr'), startBtn = $b('#btStart'), summaryEl = $b('#btSummary');
+  // Closing mid-workout, or with a finished workout not yet saved, asks first: those readings exist only on this sheet.
+  const closeSheet = bg.remove;
+  bg.remove = () => {
+    if ((session || finished) && !confirm(session ? 'Stop this workout without saving it?' : 'Close without saving this workout?')) return;
+    closeSheet();
+  };
   const miles = units !== 'kg';
   const one = n => (Math.round(n * 10) / 10).toLocaleString(undefined, { maximumFractionDigits:1 });
   // Distance shows the two decimals it is saved with, so the summary never says 0 mi above a save of 0.01 mi.
@@ -159,7 +165,9 @@ async function openBluetoothEquipment(units){
     try { const p = c.char.stopNotifications(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
     try { if (c.device.gatt && c.device.gatt.connected !== false) c.device.gatt.disconnect(); } catch (e) {}
   };
-  const releaseAll = () => { release(conn.heart); release(conn.machine); conn.heart = conn.machine = null; };
+  // Clear the slot before disconnecting: Chrome fires gattserverdisconnected inside disconnect(), and a slot still holding
+  // the device would report it as an unexpected disconnection.
+  const releaseAll = () => { const h = conn.heart, m = conn.machine; conn.heart = conn.machine = null; release(h); release(m); };
 
   function paint(){
     $b('#btHeartName').textContent = conn.heart ? conn.heart.name : 'Not connected';
@@ -195,8 +203,9 @@ async function openBluetoothEquipment(units){
 
   async function connect(which){
     err.textContent = '';
+    let device = null, entry = null;
     try {
-      const device = await navigator.bluetooth.requestDevice({ filters:[{ services:[which === 'heart' ? BT_SERVICE.heartRate : BT_SERVICE.fitnessMachine] }] });
+      device = await navigator.bluetooth.requestDevice({ filters:[{ services:[which === 'heart' ? BT_SERVICE.heartRate : BT_SERVICE.fitnessMachine] }] });
       const server = await device.gatt.connect();
       let char = null, kind = 'heart';
       if (which === 'heart') char = await (await server.getPrimaryService(BT_SERVICE.heartRate)).getCharacteristic(BT_CHAR.heartRate);
@@ -208,28 +217,35 @@ async function openBluetoothEquipment(units){
         if (!char) { try { device.gatt.disconnect(); } catch (e) {} throw new Error('That machine doesn’t share treadmill, bike or rower readings.'); }
       }
       if (!bg.isConnected) { try { device.gatt.disconnect(); } catch (e) {} return; }
-      const entry = { device, char, kind, name:btDeviceName(device.name, which === 'heart' ? 'Heart-rate strap' : BT_MACHINE_LABEL[kind]), handler:ev => onReading(kind, ev.target.value) };
+      entry = { device, char, kind, name:btDeviceName(device.name, which === 'heart' ? 'Heart-rate strap' : BT_MACHINE_LABEL[kind]), handler:ev => onReading(kind, ev.target.value) };
       char.addEventListener('characteristicvaluechanged', entry.handler);
       await char.startNotifications();
+      // Closed while connecting: let this device go rather than leave it connected with nothing listening.
+      if (!bg.isConnected) { release(entry); return; }
       const old = conn[which];
       conn[which] = entry;
       release(old);
-      if (session) session.names[which] = entry.name;
+      if (session) { session.names[which] = entry.name; if (which === 'machine') session.lastDistance = null; }
       device.addEventListener('gattserverdisconnected', () => {
         if (conn[which] !== entry) return;
         conn[which] = null;
+        // A machine that comes back may have counted on meanwhile, or be another machine: count on from its next total.
+        if (session && which === 'machine') session.lastDistance = null;
         err.textContent = entry.name + ' disconnected.';
         paint();
       });
       paint();
     } catch (e) {
+      // A connection that failed partway is let go, so it does not stay connected in the background.
+      if (entry && conn[which] !== entry) release(entry);
+      else if (!entry && device) { try { device.gatt.disconnect(); } catch (x) {} }
       if (e && e.name === 'NotFoundError' && /cancel/i.test(e.message || '')) return;
       err.textContent = (e && e.message) || 'Could not connect.';
     }
   }
 
-  $b('#btHeart').onclick = () => { if (conn.heart) { release(conn.heart); conn.heart = null; paint(); } else connect('heart'); };
-  $b('#btMachine').onclick = () => { if (conn.machine) { release(conn.machine); conn.machine = null; paint(); } else connect('machine'); };
+  $b('#btHeart').onclick = () => { if (conn.heart) { const c = conn.heart; conn.heart = null; release(c); paint(); } else connect('heart'); };
+  $b('#btMachine').onclick = () => { if (conn.machine) { const c = conn.machine; conn.machine = null; if (session) session.lastDistance = null; release(c); paint(); } else connect('machine'); };
 
   startBtn.onclick = () => {
     err.textContent = '';
@@ -276,7 +292,7 @@ async function openBluetoothEquipment(units){
         p_records:records,
       });
       if (error) { adultFail(error, 'adult:bluetooth', 'Could not save the workout'); save.disabled = false; return; }
-      releaseAll(); bg.remove(); toast('Workout saved'); renderApp('adult');
+      finished = null; releaseAll(); closeSheet(); toast('Workout saved'); renderApp('adult');
     };
   }
 

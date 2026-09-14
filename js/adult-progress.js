@@ -97,8 +97,9 @@ function adultBarsSvg(values, label, unit){
 }
 
 // A line through the weight readings. The vertical scale spans at least five percent of the readings' average, so a
-// change of a pound or two looks like a change of a pound or two.
-function adultWeightSvg(series){
+// change of a pound or two looks like a change of a pound or two. Each reading sits at its date across the eight weeks,
+// so a change over two days does not look as gradual as one over six weeks.
+function adultWeightSvg(series, from, days = ADULT_PROGRESS_WEEKS * 7){
   if (series.points.length < 2) return '';
   const w = 280, h = 64;
   const vals = series.points.map(p => p.value);
@@ -106,8 +107,10 @@ function adultWeightSvg(series){
   const span = Math.max(Math.max(...vals) - Math.min(...vals), mean * 0.05, 1);
   const mid = (Math.max(...vals) + Math.min(...vals)) / 2;
   const lo = mid - span / 2;
-  const step = w / (series.points.length - 1);
-  const pts = series.points.map((p, i) => [Math.round(i * step), Math.round(h - 6 - ((p.value - lo) / span) * (h - 12))]);
+  const [fy, fm, fd] = String(from).split('-').map(Number);
+  const dayOf = on => { const [y, m, d] = String(on).split('-').map(Number); return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(fy, fm - 1, fd)) / 86400000); };
+  const xOf = on => Math.round(Math.min(Math.max(dayOf(on), 0), days - 1) / (days - 1) * w);
+  const pts = series.points.map(p => [xOf(p.date), Math.round(h - 6 - ((p.value - lo) / span) * (h - 12))]);
   const spoken = series.points.map(p => fmtDate(p.date) + ', ' + adultProgressNumber(p.value) + ' ' + series.unit).join('; ');
   return `<svg viewBox="-4 0 ${w + 8} ${h}" width="100%" height="${h}" role="img" aria-label="${esc('Weight readings: ' + spoken)}">`
     + `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--green)" stroke-width="2"></polyline>`
@@ -140,7 +143,7 @@ function adultProgressMarkup(data){
 
   if (weight.points.length) {
     const first = weight.points[0], latest = last(weight.points);
-    out.push(section('Weight readings', adultWeightSvg(weight) + H`
+    out.push(section('Weight readings', adultWeightSvg(weight, weeks[0].start) + H`
       <div class="mrow"><span>First in these weeks</span><b>${esc(adultProgressNumber(first.value))} ${esc(weight.unit)} · ${esc(fmtDate(first.date))}</b></div>
       <div class="mrow"><span>Latest</span><b>${esc(adultProgressNumber(latest.value))} ${esc(weight.unit)} · ${esc(fmtDate(latest.date))}</b></div>
       <p class="muted-note" style="margin:6px 0 0">${new Set(weight.points.map(p => p.source)).size === 1 ? 'Source' : 'Sources'}: ${esc([...new Set(weight.points.map(p => p.source))].join(', '))}.${weight.otherUnitReadings ? ' ' + weight.otherUnitReadings + ' in another unit not shown.' : ''}</p>`));
@@ -160,29 +163,46 @@ function adultProgressMarkup(data){
     <p class="muted-note" style="margin-top:14px">Your record compared with nothing but itself. A quiet week is just a quiet week.</p>`;
 }
 
+// Every reading in the eight weeks, a page at a time. The API returns at most 1000 rows to a request, and a parent with
+// large imports can have more, which would otherwise drop the latest weeks without a word.
+async function adultProgressReadings(uid, from, to){
+  const PAGE = 1000, rows = [];
+  for (let page = 0; page < 20; page++) {
+    const r = await sb.from('adult_health_records').select('*').eq('guardian_id', uid).gte('measured_on', from).lte('measured_on', to).in('metric_key', ['weight', ...ADULT_PROGRESS_ACTIVITY]).order('measured_on').order('id').range(page * PAGE, page * PAGE + PAGE - 1);
+    if (r.error) return { data:null, error:r.error };
+    rows.push(...(r.data || []));
+    if (!r.data || r.data.length < PAGE) break;
+  }
+  return { data:rows, error:null };
+}
+
 async function openAdultProgress(){
+  if (adultTrainingOff()) return;
   const uid = state.user.id;
   const weeks = adultProgressWeeks(isoDay(mondayOfThisWeek()));
   const from = weeks[0].start, to = weeks[weeks.length - 1].end;
   const bg = sheet('<h3>Progress over time</h3><p class="muted-note" role="status">Loading…</p>');
   const card = bg.querySelector('.sheet');
+  // The dialog is named by its heading's id; content written in later keeps that id, so the dialog keeps its name.
+  const titleId = card.getAttribute('aria-labelledby');
+  const named = html => titleId ? html.replace('<h3>', '<h3 id="' + titleId + '">') : html;
   const results = await Promise.all([
     sb.from('adult_workout_logs').select('schedule_item_id,done_on,minutes').eq('guardian_id', uid).gte('done_on', from).lte('done_on', to),
     sb.from('adult_schedule_items').select('id,kind').eq('guardian_id', uid),
-    sb.from('adult_health_records').select('*').eq('guardian_id', uid).gte('measured_on', from).lte('measured_on', to).order('measured_on'),
+    adultProgressReadings(uid, from, to),
     sb.from('adult_nutrition_days').select('*').eq('guardian_id', uid).gte('logged_on', from).lte('logged_on', to),
     sb.from('adult_nutrition_preferences').select('*').eq('guardian_id', uid).maybeSingle(),
   ]);
   if (results.some(r => r.error)) {
     results.filter(r => r.error).forEach(r => console.error(r.error));
-    card.innerHTML = '<div class="grab"></div><h3>Progress over time</h3><p class="empty">Your progress isn’t available on this account yet.</p>';
+    card.innerHTML = '<div class="grab"></div>' + named('<h3>Progress over time</h3><p class="empty">Your progress isn’t available on this account yet.</p>');
     return;
   }
   const [logs, items, readings, days, prefs] = results.map(r => r.data);
   const records = readings || [];
   const activity = Object.fromEntries(ADULT_PROGRESS_ACTIVITY.map(k => [k, adultActivityByWeek(records, weeks, k)]));
-  card.innerHTML = '<div class="grab"></div>' + adultProgressMarkup({
+  card.innerHTML = '<div class="grab"></div>' + named(adultProgressMarkup({
     weeks, workouts:adultWorkoutsByWeek(logs || [], weeks, items || []), activity,
     weight:adultWeightSeries(records, from), habits:adultHabitsByWeek(days || [], prefs || null, weeks), prefs:prefs || null,
-  });
+  }));
 }

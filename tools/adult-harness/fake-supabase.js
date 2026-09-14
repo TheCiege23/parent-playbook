@@ -111,7 +111,7 @@
         let out = rows.filter(matches);
         const count = out.length;
         for (const [column, ascending] of [...st.orders].reverse()) out = [...out].sort((a, b) => compare(a[column], b[column]) * (ascending ? 1 : -1));
-        if (st.limit != null) out = out.slice(0, st.limit);
+        if (st.limit != null) out = out.slice(st.offset || 0, (st.offset || 0) + st.limit);
         return done(st.head ? null : out.map(r => ({ ...r })), st.count ? { count } : {});
       }
       if (st.op === 'insert' || st.op === 'upsert') {
@@ -152,7 +152,7 @@
       like(){ return b; }, ilike(){ return b; }, or(){ return b; }, not(){ return b; }, contains(){ return b; }, filter(){ return b; }, match(o){ Object.entries(o || {}).forEach(([c, v]) => b.eq(c, v)); return b; },
       order(c, opts){ st.orders.push([c, !(opts && opts.ascending === false)]); return b; },
       limit(n){ st.limit = n; return b; },
-      range(from, to){ st.limit = to - from + 1; return b; },
+      range(from, to){ st.offset = from; st.limit = to - from + 1; return b; },
       maybeSingle(){ st.single = 'maybe'; return b; },
       single(){ st.single = 'one'; return b; },
       then(resolve, reject){ try { resolve(run()); } catch (e) { reject(e); } },
@@ -214,9 +214,10 @@
         const events = gcal.events[decodeURIComponent(m[1])];
         if (!events) return missing();
         if (method === 'GET') {
-          const marked = u.searchParams.get('privateExtendedProperty') === 'ppSync=1';
+          // Every privateExtendedProperty=key=value given must match, as Google applies them.
+          const wanted = u.searchParams.getAll('privateExtendedProperty').map(p => [p.slice(0, p.indexOf('=')), p.slice(p.indexOf('=') + 1)]);
           return reply(log(200), { items:Object.values(events).filter(e => e.status !== 'cancelled'
-            && (!marked || (e.extendedProperties && e.extendedProperties.private && e.extendedProperties.private.ppSync === '1'))) });
+            && wanted.every(([k, v]) => e.extendedProperties && e.extendedProperties.private && e.extendedProperties.private[k] === v)) });
         }
         if (method === 'POST') {
           // Google keeps an event's id after it is deleted, so inserting it again is refused.

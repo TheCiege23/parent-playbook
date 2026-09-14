@@ -180,6 +180,8 @@ function adultHealthTrend(records, metricKey){
 // never added together. On each day the reading comes from a single source: a device's over a typed one, and among
 // those the most recently saved. Within that source a total takes the day's largest value (a re-exported daily total
 // only grows) and resting heart rate its lowest. Readings in a second unit are left out and counted, not converted.
+// Workouts saved from Bluetooth equipment (external ids starting bt-) are separate sessions, not re-exports of one
+// total, so on a day they count as one source whatever the equipment, and are added together.
 function adultActivityWeek(records, dates){
   const days = new Set(dates || []), out = {};
   Object.keys(ADULT_HEALTH_METRICS).filter(k => ADULT_HEALTH_METRICS[k].group === 'activity').forEach(key => {
@@ -192,11 +194,13 @@ function adultActivityWeek(records, dates){
     (dates || []).forEach(d => {
       const day = rows.filter(r => r.measured_on === d && r.unit === unit);
       if (!day.length) return;
-      const sourceOf = r => r.source_kind + '|' + String(r.source_name || '').toLowerCase() + '|' + r.method;
+      const session = r => /^bt-/.test(String(r.external_id || ''));
+      const sourceOf = r => session(r) ? 'bluetooth-sessions|' + r.method : r.source_kind + '|' + String(r.source_name || '').toLowerCase() + '|' + r.method;
       const pick = day.slice().sort((a, b) => ((a.method === 'entered') - (b.method === 'entered'))
         || String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
       const values = day.filter(r => sourceOf(r) === sourceOf(pick)).map(r => Number(r.value));
-      daily.push({ date:d, value:meta.summary === 'average' ? Math.min(...values) : Math.max(...values), source:adultHealthSourceLabel(pick) });
+      const value = meta.summary === 'average' ? Math.min(...values) : session(pick) ? values.reduce((a, b) => a + b, 0) : Math.max(...values);
+      daily.push({ date:d, value, source:adultHealthSourceLabel(pick) });
     });
     const sum = daily.reduce((n, x) => n + x.value, 0);
     out[key] = {

@@ -78,9 +78,9 @@ test('weight is one unit, oldest first, with its sources, on a scale that cannot
   assert.deepEqual(series.points.map(p => [p.date, p.value, p.source]), [['2026-09-01', 180, 'Typed in'], ['2026-09-10', 179, 'Scale app']]);
   assert.equal(series.otherUnitReadings, 1);
   // A one-pound change on a 180 lb scale moves the line a little, not from the bottom of the chart to the top.
-  const ys = [...ctx.adultWeightSvg(series).matchAll(/<circle cx="\d+" cy="(\d+)"/g)].map(m => Number(m[1]));
+  const ys = [...ctx.adultWeightSvg(series, '2026-08-01').matchAll(/<circle cx="\d+" cy="(\d+)"/g)].map(m => Number(m[1]));
   assert.ok(Math.abs(ys[0] - ys[1]) < 12, 'moved ' + Math.abs(ys[0] - ys[1]) + ' of 64');
-  assert.equal(ctx.adultWeightSvg({ unit: 'lb', points: [series.points[0]], otherUnitReadings: 0 }), '', 'one reading draws no line');
+  assert.equal(ctx.adultWeightSvg({ unit: 'lb', points: [series.points[0]], otherUnitReadings: 0 }, '2026-08-01'), '', 'one reading draws no line');
   const shown = ctx.adultProgressMarkup({ weeks: ctx.adultProgressWeeks('2026-09-14', 8), workouts: [], activity: {}, weight: series, habits: [], prefs: null });
   assert.match(shown, /Sources: Typed in, Scale app\. 1 in another unit not shown\./);
 });
@@ -130,4 +130,34 @@ test("it reads only the parent's own rows, never a child, and opens from Progres
   const at = name => index.indexOf('<script src="/js/' + name + '"></script>');
   assert.ok(at('adult-health-record.js') < at('adult-progress.js') && at('adult-nutrition.js') < at('adult-progress.js') && at('adult-progress.js') < at('init.js'));
   assert.match(read('sw.js'), /'\/js\/adult-composition\.js','\/js\/adult-progress\.js',/);
+});
+
+test('weight readings sit at their dates, and the sheet keeps its own gate and its dialog name', () => {
+  const ctx = context();
+  const point = date => ({ date, value: 180, source: 'Typed in' });
+  const svg = ctx.adultWeightSvg({ unit: 'lb', points: [point('2026-07-20'), point('2026-07-21'), point('2026-09-13')], otherUnitReadings: 0 }, '2026-07-20');
+  assert.deepEqual([...svg.matchAll(/<circle cx="(\d+)"/g)].map(m => Number(m[1])), [0, 5, 280],
+    'a day apart sits close together; the last day of the eight weeks is the right edge');
+  const src = read('js/adult-progress.js');
+  assert.match(src, /async function openAdultProgress\(\)\{\n  if \(adultTrainingOff\(\)\) return;/);
+  assert.match(src, /const named = html => titleId \? html\.replace\('<h3>', '<h3 id="' \+ titleId \+ '">'\) : html;/);
+  assert.equal((src.match(/card\.innerHTML = '<div class="grab"><\/div>' \+ named\(/g) || []).length, 2, 'both the result and the unavailable message keep the name');
+});
+
+test('more than a page of readings comes back whole and in order', async () => {
+  const ctx = vm.createContext({ console, Number, Math, String, Date, JSON, Set, Map, Array, Object, Intl, Promise, URLSearchParams,
+    crypto: require('node:crypto').webcrypto, location: { search: '' } });
+  ctx.window = ctx;
+  vm.runInContext(read('tools/adult-harness/fake-supabase.js'), ctx);
+  vm.runInContext('const sb = supabase.createClient();', ctx);
+  for (const file of ['js/dates.js', 'js/adult-health-record.js', 'js/adult-nutrition.js', 'js/adult-progress.js']) vm.runInContext(read(file), ctx);
+  const h = vm.runInContext('window.__harness', ctx);
+  h.db.adult_health_records = Array.from({ length: 2345 }, (_, i) => ({ id: 'r' + String(i).padStart(5, '0'), guardian_id: h.USER.id,
+    metric_key: i % 2 ? 'steps' : 'waist', value: i, unit: i % 2 ? 'steps' : 'in', measured_on: '2026-09-' + String(1 + (i % 13)).padStart(2, '0') }));
+  const r = await ctx.adultProgressReadings(h.USER.id, '2026-08-01', '2026-09-20');
+  const steps = h.db.adult_health_records.filter(x => x.metric_key === 'steps').length;
+  assert.equal(r.error, null);
+  assert.equal(r.data.length, steps, 'every steps reading across pages, and no tape measurement');
+  assert.equal(new Set(r.data.map(x => x.id)).size, steps, 'no reading twice');
+  assert.ok(r.data.every((x, i, all) => i === 0 || all[i - 1].measured_on <= x.measured_on));
 });

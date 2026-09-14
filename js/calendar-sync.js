@@ -14,8 +14,13 @@
 // A parent with Your training can tick "Include my workouts" to add their own scheduled workouts the same way, each
 // named "Your training" so it is never read as a child's session. Unticking and syncing again takes them off.
 //
-// Each week is built by planForWeek() in js/program.js, the same function the Week screen uses, so the calendar and
-// the app cannot disagree about a week.
+// Each week is built by planForWeek() and applyWeekChange() in js/program.js, as the Week screen builds it. The Week
+// screen also moves a missed session to a later day of this week (rebalanceWeek); the calendar keeps the plan as set.
+//
+// Only children this account can edit, as an owner or co-parent, are synced: never a child it can only view or coaches.
+// Every event carries a hash of the Parent Playbook account that wrote it, so two accounts syncing into one Google
+// calendar never remove each other's events, and device settings are kept per account. A session's note stays in the
+// app; Google receives the first name, the day and the session's name.
 //
 // Off until GOOGLE_CALENDAR_CLIENT_ID holds a web OAuth client id created in Google Cloud for this site's origin.
 
@@ -37,6 +42,11 @@ function calendarClientId(){
 }
 function calendarSyncAvailable(){ return !!calendarClientId(); }
 
+// Device settings are kept per Parent Playbook account, so the next account on a shared device starts fresh.
+const calendarAccount = () => (typeof state !== 'undefined' && state && state.user && state.user.id) || 'signed-out';
+function calendarKey(base){ return base + ':' + calendarHash('account:' + calendarAccount()); }
+function calendarOwner(){ return calendarHash('account:' + calendarAccount()); }
+
 // FNV-1a, 32-bit, as eight hex digits. An event id only has to be stable and use Google's allowed characters (0-9 and
 // a-v), and hex is a subset. A child is named in an id by this hash, never by their record id.
 function calendarHash(text){
@@ -54,17 +64,19 @@ function calendarNextDay(on){
 
 // The events a child's plan asks for, from today on. days: [{ date, t, title, sub }]. A day the plan moved or dropped
 // has no event of its own.
-function calendarEventsFor(athlete, days, today){
+function calendarEventsFor(athlete, days, today, owner = calendarOwner()){
   return (days || []).filter(d => d && d.date >= today && Object.hasOwn(CALENDAR_KIND, d.t)).map(d => {
     const title = d.t === 'rest' ? 'Rest day' : (d.title || CALENDAR_KIND[d.t]);
     const child = calendarHash(athlete.id);
     return {
-      id:'pp' + d.date.replace(/-/g, '') + child + calendarHash(d.t + '|' + title),
+      id:'pp' + d.date.replace(/-/g, '') + owner + child + calendarHash(d.t + '|' + title),
       summary:athlete.first_name + ' · ' + title,
-      description:[d.sub || '', CALENDAR_KIND[d.t] + ' from ' + athlete.first_name + '’s plan in Parent Playbook. Change the plan in the app; the next sync replaces edits made here.'].filter(Boolean).join('\n\n'),
+      description:CALENDAR_KIND[d.t] + ' from ' + athlete.first_name + '’s plan in Parent Playbook. Change the plan in the app; the next sync replaces edits made here.',
       start:{ date:d.date }, end:{ date:calendarNextDay(d.date) },
       transparency:'transparent',
-      extendedProperties:{ private:{ ppSync:'1', ppDate:d.date, ppChild:child } },
+      // Confirmed, so rewriting an event deleted in Google brings it back rather than leaving it cancelled.
+      status:'confirmed',
+      extendedProperties:{ private:{ ppSync:'1', ppDate:d.date, ppChild:child, ppOwner:owner } },
     };
   });
 }
@@ -73,7 +85,7 @@ function calendarEventsFor(athlete, days, today){
 // adult_schedule_items rows (weekday 0 is Monday); monday is this week's Monday as YYYY-MM-DD. Each is named "Your
 // training", so it is never read as a child's session. An event's id comes from the workout, not its title, so a
 // renamed workout is rewritten in place rather than removed and added.
-function calendarOwnEventsFor(items, monday, today){
+function calendarOwnEventsFor(items, monday, today, owner = calendarOwner()){
   const [y, m, d] = String(monday).split('-').map(Number);
   const self = calendarHash('self');
   const out = [];
@@ -82,13 +94,14 @@ function calendarOwnEventsFor(items, monday, today){
     const date = localDay(new Date(y, m - 1, d + 7 * w + it.weekday));
     if (date < today) continue;
     out.push({
-      id:'pp' + date.replace(/-/g, '') + self + calendarHash(it.id),
+      id:'pp' + date.replace(/-/g, '') + owner + self + calendarHash(it.id),
       summary:'Your training · ' + it.title,
       description:[(it.duration_min ? it.duration_min + ' min · ' : '') + (CALENDAR_OWN_KIND[it.kind] || 'Workout'),
         'From your own schedule in Parent Playbook. Change it in Your training; the next sync replaces edits made here.'].join('\n\n'),
       start:{ date }, end:{ date:calendarNextDay(date) },
       transparency:'transparent',
-      extendedProperties:{ private:{ ppSync:'1', ppDate:date, ppWho:'self' } },
+      status:'confirmed',
+      extendedProperties:{ private:{ ppSync:'1', ppDate:date, ppWho:'self', ppOwner:owner } },
     });
   }
   return out;
@@ -126,7 +139,9 @@ async function calendarPlanFor(athlete){
     // Missing on a database the week-changes migration has not reached; then there are simply no changes.
     sb.from('week_exceptions').select('week_start,op,from_day,from_title,to_day,replacement_title').eq('athlete_id', athlete.id).gte('week_start', from).lte('week_start', to),
   ]);
-  if (sportsRes.error) throw sportsRes.error;
+  // A read that fails would sync a wrong plan (a cancelled practice back on the calendar), so any failure stops the sync.
+  // Week changes are the exception: a database without that migration simply has none. The message names no child.
+  if ([sportsRes, goalsRes, cancelRes, heightRes].some(r => r.error)) throw new Error('A child’s plan could not be read, so the calendar was left as it was. Try again.');
   const nameOf = k => ((state.ref && state.ref.sports || []).find(s => s.key === k) || {}).name || k;
   const days = [];
   for (let w = 0; w < CALENDAR_SYNC_WEEKS; w++) {
@@ -139,6 +154,23 @@ async function calendarPlanFor(athlete){
     applyWeekChange(prog.days, prog, change).days.forEach((d, i) => days.push({ ...d, date:dates[i] }));
   }
   return days;
+}
+
+// The children this account can edit: in a household where it is an owner or co-parent, or granted to it as one. A
+// child it can only view (a family-view relative) or coaches is never sent to Google.
+async function calendarEditableAthletes(athletes){
+  const uid = calendarAccount();
+  if (uid === 'signed-out' || !(athletes || []).length) return [];
+  const [households, grants] = await Promise.all([
+    sb.from('family_members').select('family_id,role').eq('guardian_id', uid),
+    sb.from('athlete_access').select('athlete_id,role,revoked_at').eq('guardian_id', uid),
+  ]);
+  if (households.error) throw new Error('Your household could not be read, so nothing was synced. Try again.');
+  const editor = r => r.role === 'owner' || r.role === 'co_parent';
+  const families = new Set((households.data || []).filter(editor).map(r => r.family_id));
+  // A grant that cannot be read leaves only the household's children, the safe side to err on.
+  const granted = new Set(((!grants.error && grants.data) || []).filter(r => editor(r) && !r.revoked_at).map(r => r.athlete_id));
+  return athletes.filter(a => families.has(a.family_id) || granted.has(a.id));
 }
 
 function calendarLoadGoogle(){
@@ -169,14 +201,21 @@ function calendarToken(){
   });
 }
 
+// Google answers a burst of writes (a first sync of several children is dozens) with 429, or 403 and a rate-limit
+// reason. Those are retried after 1, 2 and 4 seconds; anything else is returned as it came.
 async function calendarApi(token, method, path, body){
-  const res = await fetch(GOOGLE_CALENDAR_API + path, {
-    method, headers:{ Authorization:'Bearer ' + token, ...(body ? { 'Content-Type':'application/json' } : {}) },
-    body:body ? JSON.stringify(body) : undefined,
-  });
-  const data = res.status === 204 ? null : await res.json().catch(() => null);
-  return { status:res.status, data };
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(GOOGLE_CALENDAR_API + path, {
+      method, headers:{ Authorization:'Bearer ' + token, ...(body ? { 'Content-Type':'application/json' } : {}) },
+      body:body ? JSON.stringify(body) : undefined,
+    });
+    const data = res.status === 204 ? null : await res.json().catch(() => null);
+    const limited = res.status === 429 || (res.status === 403 && /rate ?limit/i.test(JSON.stringify((data && data.error) || '')));
+    if (!limited || attempt >= 3) return { status:res.status, data };
+    await new Promise(resolve => setTimeout(resolve, 1000 * 2 ** attempt));
+  }
 }
+// The message names no child or workout: a failed sync may be reported to error monitoring.
 function calendarFailure(r, doing){
   const why = r && r.data && r.data.error && r.data.error.message;
   return new Error('Google Calendar would not ' + doing + (why ? ': ' + why : ' (status ' + (r && r.status) + ').'));
@@ -185,10 +224,13 @@ function calendarFailure(r, doing){
 // The calendar this device made before, or one Google lists as made by this app, or a new one.
 async function calendarEnsure(token){
   let remembered = null;
-  try { remembered = localStorage.getItem(CALENDAR_SYNC_STORE); } catch (e) {}
+  try { remembered = localStorage.getItem(calendarKey(CALENDAR_SYNC_STORE)); } catch (e) {}
   if (remembered) {
     const r = await calendarApi(token, 'GET', '/calendars/' + encodeURIComponent(remembered));
     if (r.status === 200) return remembered;
+    // Only a calendar that is gone is replaced. Any other answer (a rate limit, an outage) stops here, or the family would
+    // end up with a second "Parent Playbook" calendar.
+    if (r.status !== 404 && r.status !== 410) throw calendarFailure(r, 'open the Parent Playbook calendar');
   }
   const list = await calendarApi(token, 'GET', '/users/me/calendarList?minAccessRole=owner');
   const found = list.status === 200 && ((list.data && list.data.items) || []).find(c => c.summary === CALENDAR_SYNC_NAME);
@@ -200,23 +242,23 @@ async function calendarEnsure(token){
     if (created.status !== 200 || !created.data || !created.data.id) throw calendarFailure(created, 'make the Parent Playbook calendar');
     id = created.data.id;
   }
-  try { localStorage.setItem(CALENDAR_SYNC_STORE, id); } catch (e) {}
+  try { localStorage.setItem(calendarKey(CALENDAR_SYNC_STORE), id); } catch (e) {}
   return id;
 }
 
 // The events this app wrote to the calendar, for the days a sync covers.
-async function calendarExisting(token, calendarId, from, to){
+async function calendarExisting(token, calendarId, from, to, owner = calendarOwner()){
   const out = [];
   let page = '';
   do {
-    const q = '?privateExtendedProperty=' + encodeURIComponent('ppSync=1') + '&singleEvents=true&showDeleted=false&maxResults=2500'
+    const q = '?privateExtendedProperty=' + encodeURIComponent('ppSync=1') + '&privateExtendedProperty=' + encodeURIComponent('ppOwner=' + owner) + '&singleEvents=true&showDeleted=false&maxResults=2500'
       + '&timeMin=' + encodeURIComponent(from + 'T00:00:00Z') + '&timeMax=' + encodeURIComponent(calendarNextDay(calendarNextDay(to)) + 'T00:00:00Z')
       + (page ? '&pageToken=' + encodeURIComponent(page) : '');
     const r = await calendarApi(token, 'GET', '/calendars/' + encodeURIComponent(calendarId) + '/events' + q);
     if (r.status !== 200) throw calendarFailure(r, 'list its events');
     ((r.data && r.data.items) || []).forEach(e => {
-      const on = e.extendedProperties && e.extendedProperties.private && e.extendedProperties.private.ppDate;
-      if (on && on >= from && on <= to) out.push(e);
+      const p = (e.extendedProperties && e.extendedProperties.private) || {};
+      if (p.ppDate && p.ppDate >= from && p.ppDate <= to && p.ppOwner === owner) out.push(e);
     });
     page = r.data && r.data.nextPageToken;
   } while (page);
@@ -230,40 +272,47 @@ async function syncGoogleCalendar(athletes, today, ownSource){
   const token = await calendarToken();
   // Read before the calendar is touched, so a schedule that cannot be read changes nothing there.
   const own = typeof ownSource === 'function' ? await ownSource() : (ownSource || null);
-  const calendarId = await calendarEnsure(token);
   const monday = mondayOfThisWeek();
   const last = new Date(monday); last.setDate(monday.getDate() + 7 * CALENDAR_SYNC_WEEKS - 1);
   let desired = own ? calendarOwnEventsFor(own, isoDay(monday), today) : [];
   for (const a of athletes || []) desired = desired.concat(calendarEventsFor(a, await calendarPlanFor(a), today));
+  // Every plan is read before the calendar is opened or made, so a read that fails changes nothing in Google.
+  const calendarId = await calendarEnsure(token);
   const plan = calendarSyncPlan(desired, await calendarExisting(token, calendarId, today, isoDay(last)));
   const events = '/calendars/' + encodeURIComponent(calendarId) + '/events';
   for (const e of plan.insert) {
     let r = await calendarApi(token, 'POST', events, e);
     // An id Google has seen before (an event deleted in Google, say) cannot be inserted again, only rewritten.
     if (r.status === 409) r = await calendarApi(token, 'PUT', events + '/' + e.id, e);
-    if (r.status !== 200) throw calendarFailure(r, 'add ' + e.summary);
+    if (r.status !== 200) throw calendarFailure(r, 'add an event');
   }
   for (const e of plan.update) {
     const r = await calendarApi(token, 'PUT', events + '/' + e.id, e);
-    if (r.status !== 200) throw calendarFailure(r, 'update ' + e.summary);
+    if (r.status !== 200) throw calendarFailure(r, 'update an event');
   }
   for (const id of plan.remove) {
     const r = await calendarApi(token, 'DELETE', events + '/' + id);
     if (r.status !== 204 && r.status !== 200 && r.status !== 404 && r.status !== 410) throw calendarFailure(r, 'remove an event the plan no longer holds');
   }
-  try { localStorage.setItem(CALENDAR_SYNC_LAST, new Date().toISOString()); } catch (e) {}
+  try { localStorage.setItem(calendarKey(CALENDAR_SYNC_LAST), new Date().toISOString()); } catch (e) {}
   return { calendarId, added:plan.insert.length, updated:plan.update.length, removed:plan.remove.length, unchanged:plan.unchanged };
 }
 
-function openCalendarSync(){
-  const kids = (state.athletes || []).map(a => a.first_name).filter(Boolean);
+async function openCalendarSync(){
+  let athletes;
+  try { athletes = await calendarEditableAthletes(state.athletes || []); }
+  catch (e) { console.error(e); toast(e.message || 'Google Calendar isn’t available right now'); return; }
+  // Start loading Google's sign-in now, so pressing Sync opens Google's window at once instead of after a download,
+  // which some browsers block as a popup.
+  calendarLoadGoogle().catch(() => {});
+  const kids = athletes.map(a => a.first_name).filter(Boolean);
   const names = kids.length > 1 ? kids.slice(0, -1).join(', ') + ' and ' + kids[kids.length - 1] : (kids[0] || '');
   // A parent's own workouts are offered only to someone with Your training, and added only when they tick the box.
   const canOwn = typeof adultTrainingOn === 'function' && adultTrainingOn();
   let last = null, ownOn = false;
-  try { last = localStorage.getItem(CALENDAR_SYNC_LAST); ownOn = canOwn && localStorage.getItem(CALENDAR_SYNC_OWN) === '1'; } catch (e) {}
+  try { last = localStorage.getItem(calendarKey(CALENDAR_SYNC_LAST)); ownOn = canOwn && localStorage.getItem(calendarKey(CALENDAR_SYNC_OWN)) === '1'; } catch (e) {}
   const sends = kids.length
-    ? 'Your children’s first names and each day’s plan' + (canOwn ? ', and, if you tick Include my workouts, your workouts’ names, days and lengths' : '')
+    ? 'Your children’s first names and each day’s session name' + (canOwn ? ', and, if you tick Include my workouts, your workouts’ names, days and lengths' : '')
     : 'Your workouts’ names, days and lengths, once you tick Include my workouts';
   const bg = sheet(H`<h3>Google Calendar</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">${kids.length
@@ -281,7 +330,7 @@ function openCalendarSync(){
     <div class="err" id="gcalErr"></div>
     <button class="btn" id="gcalSync">Sync now</button>`);
   const btn = bg.querySelector('#gcalSync'), err = bg.querySelector('#gcalErr'), status = bg.querySelector('#gcalStatus'), own = bg.querySelector('#gcalOwn');
-  if (own) own.onchange = () => { try { localStorage.setItem(CALENDAR_SYNC_OWN, own.checked ? '1' : '0'); } catch (e) {} };
+  if (own) own.onchange = () => { try { localStorage.setItem(calendarKey(CALENDAR_SYNC_OWN), own.checked ? '1' : '0'); } catch (e) {} };
   btn.onclick = async () => {
     err.textContent = '';
     const withOwn = !!(own && own.checked);
@@ -290,7 +339,7 @@ function openCalendarSync(){
     btn.disabled = true; status.textContent = 'Syncing…';
     try {
       const ownSource = withOwn ? calendarOwnSchedule : null;
-      const r = await syncGoogleCalendar(state.athletes || [], todayISO(), ownSource);
+      const r = await syncGoogleCalendar(athletes, todayISO(), ownSource);
       last = new Date().toISOString();
       status.textContent = 'Synced: ' + r.added + ' added, ' + r.updated + ' updated, ' + r.removed + ' removed, ' + r.unchanged + ' already up to date.';
       toast('Google Calendar is up to date');
