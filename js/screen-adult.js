@@ -117,6 +117,7 @@ async function screenAdult(){
         <div id="adultComposition"></div>
         <button class="btn sm ghost" id="adultProgressOverTime" style="margin-top:10px">Progress over time</button>
         <button class="btn sm ghost" id="adultConnections" style="margin-top:10px">Connections</button>
+        ${typeof bluetoothEquipmentAvailable === 'function' && bluetoothEquipmentAvailable() ? H`<button class="btn sm ghost" id="adultBluetooth" style="margin-top:10px">Bluetooth equipment</button>` : ''}
         ${batches.length ? H`<button class="btn sm ghost" id="adultImports" style="margin-top:10px">Your imports (${batches.length})</button>` : ''}
       </div>
 
@@ -133,6 +134,8 @@ async function screenAdult(){
   // Results measured elsewhere (DXA, clinic, smart scale, health app), painted once they load. See js/adult-composition.js.
   if (typeof adultCompositionSection === 'function') adultCompositionSection($("#adultComposition"));
   { const b = $("#adultConnections"); if (b) b.onclick = () => openConnections(); }
+  // Only where the browser has Web Bluetooth (Chrome on Android or a computer). See js/bluetooth-equipment.js.
+  { const b = $("#adultBluetooth"); if (b) b.onclick = () => openBluetoothEquipment(units); }
   { const b = $("#adultProgressOverTime"); if (b) b.onclick = () => openAdultProgress(); }
   $("#screen").querySelectorAll('[data-adult-goal-remove]').forEach(b => b.onclick = async () => {
     b.disabled = true;

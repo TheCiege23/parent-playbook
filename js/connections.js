@@ -47,6 +47,8 @@ function visibleConnections(env){
   // With Your training it can also carry the parent's own workouts, so it is offered to a parent with no child.
   return CONNECTIONS.map(c => (c.key === 'google_calendar' && e.calendarSync ? { ...c, status:'web', action:{ label:'Set up', open:'calendar' } } : c))
     .map(c => (c.key === 'google_calendar' && e.adultTraining ? { ...c, brings:c.brings + ' With Your training, you can add your own workouts too.' } : c))
+    // Where this browser has Web Bluetooth, an early web version works now (js/bluetooth-equipment.js); elsewhere it waits for the app.
+    .map(c => (c.key === 'bluetooth_equipment' && e.bluetooth ? { ...c, status:'web', brings:c.brings + ' In Chrome on Android or a computer it works in this app now, showing readings while you train and saving the minutes and distance you choose. iPhone needs the mobile app.', action:{ label:'Open', open:'bluetooth' } } : c))
     .filter(c => (c.who !== 'adult' || e.adultTraining) && (c.who === 'adult' || !c.action || e.hasChild || (c.key === 'google_calendar' && e.adultTraining)));
 }
 
@@ -67,13 +69,15 @@ function connectionsMarkup(env){
 }
 
 function openConnections(){
-  const env = { adultTraining:adultTrainingOn(), hasChild:hasActiveAthlete(), calendarSync:typeof calendarSyncAvailable === 'function' && calendarSyncAvailable() };
+  const env = { adultTraining:adultTrainingOn(), hasChild:hasActiveAthlete(), calendarSync:typeof calendarSyncAvailable === 'function' && calendarSyncAvailable(),
+    bluetooth:typeof bluetoothEquipmentAvailable === 'function' && bluetoothEquipmentAvailable() };
   const bg = sheet(connectionsMarkup(env));
   bg.querySelectorAll('[data-connection]').forEach(b => b.onclick = () => {
     const c = visibleConnections(env).find(x => x.key === b.dataset.connection);
     if (!c || !c.action) return;
     bg.remove();
     if (c.action.open === 'calendar') return openCalendarSync();
+    if (c.action.open === 'bluetooth') return openBluetoothEquipment();
     renderApp(c.action.route);
   });
 }

@@ -13,8 +13,8 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v127`; local production-shaped smoke 29/29; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 969/969 |
+| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v128`; local production-shaped smoke 29/29; live verification pending deployment |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 977/977 |
 | Database suite | `node tests/db/run.cjs` | 412/412 on a disposable cluster built from the real migrations: 391 security cases plus a 21-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 218/218, exclusions clean, contracts 330/330, database 412/412, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
@@ -31,7 +31,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
   predicted adult height.
 - An organization side: rostered athletes, consent, an organization-scoped record with audit and
   retention, and an SDK a company can host itself.
-- Build `pp-v127` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
+- Build `pp-v128` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
 
 *Speaker notes.* Lead with the journey, not the measurement — the measurement is a feature of a
 product parents already use for training, rest and schedule. Do not open on parity percentages.

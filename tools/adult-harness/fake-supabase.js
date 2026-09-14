@@ -239,6 +239,67 @@
     };
   }
 
+  // Bluetooth, with ?bluetooth=1 in any scenario: a synthetic heart-rate strap and a synthetic treadmill that notify
+  // readings built from the published characteristic formats, so the equipment sheet can be driven without a real device
+  // or Chrome's device picker. requestDevice picks by the service asked for; nothing leaves the page.
+  const bluetooth = { notifications:0, connected:[] };
+  if (typeof navigator !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('bluetooth') === '1') {
+    const notFound = message => Object.assign(new Error(message), { name:'NotFoundError' });
+    const fakeDevice = (name, service, characteristic, frame) => {
+      const listeners = { device:[], char:[] };
+      let timer = null, n = 0;
+      const char = {
+        uuid:characteristic, value:null,
+        addEventListener(type, fn){ if (type === 'characteristicvaluechanged') listeners.char.push(fn); },
+        removeEventListener(type, fn){ listeners.char = listeners.char.filter(f => f !== fn); },
+        async startNotifications(){
+          clearInterval(timer);
+          timer = setInterval(() => { n++; bluetooth.notifications++; char.value = frame(n); listeners.char.slice().forEach(fn => fn({ target:char })); }, 250);
+          return char;
+        },
+        async stopNotifications(){ clearInterval(timer); timer = null; return char; },
+      };
+      const device = {
+        name, id:'synthetic-' + name.toLowerCase().replace(/\s+/g, '-'),
+        addEventListener(type, fn){ if (type === 'gattserverdisconnected') listeners.device.push(fn); },
+        gatt:{
+          connected:false,
+          async connect(){ this.connected = true; bluetooth.connected.push(name); return server; },
+          disconnect(){
+            if (!this.connected) return;
+            this.connected = false; clearInterval(timer); timer = null;
+            bluetooth.connected = bluetooth.connected.filter(x => x !== name);
+            listeners.device.forEach(fn => fn({ target:device }));
+          },
+        },
+      };
+      const server = {
+        device,
+        async getPrimaryService(uuid){
+          if (uuid !== service) throw notFound('No such service on ' + name);
+          return { async getCharacteristic(u){ if (u !== characteristic) throw notFound('No such characteristic on ' + name); return char; } };
+        },
+      };
+      return device;
+    };
+    const view = bytes => new DataView(Uint8Array.from(bytes).buffer);
+    // Heart Rate Measurement: flags 0x06 (one-byte rate, skin contact detected), 120 to 140 bpm.
+    const strap = () => fakeDevice('Synthetic HR strap', 0x180d, 0x2a37, n => view([0x06, 120 + (n % 21)]));
+    // Treadmill Data: flags 0x0004 (speed, and total distance), 10.00 km/h, 0.7 m further each quarter second.
+    const treadmill = () => fakeDevice('Synthetic treadmill', 0x1826, 0x2acd, n => {
+      const d = Math.round(n * 0.7);
+      return view([0x04, 0x00, 0xe8, 0x03, d & 255, (d >> 8) & 255, (d >> 16) & 255]);
+    });
+    Object.defineProperty(navigator, 'bluetooth', { configurable:true, value:{
+      async requestDevice(options){
+        const services = ((options && options.filters) || []).flatMap(f => f.services || []);
+        if (services.includes(0x180d)) return strap();
+        if (services.includes(0x1826)) return treadmill();
+        throw notFound('User cancelled the requestDevice() chooser.');
+      },
+    } });
+  }
+
   const client = {
     from:query,
     rpc:async (name, args) => {
@@ -265,6 +326,6 @@
   };
 
   window.supabase = { createClient:() => client };
-  window.__harness = { db, calls, USER, SCENARIO, WITH_ADULT, MISSING_TABLES, MISSING_FUNCTIONS, gcal,
+  window.__harness = { db, calls, USER, SCENARIO, WITH_ADULT, MISSING_TABLES, MISSING_FUNCTIONS, gcal, bluetooth,
     calendarClientId:SCENARIO === 'family' ? 'synthetic-harness-client.apps.googleusercontent.com' : '' };
 })();
