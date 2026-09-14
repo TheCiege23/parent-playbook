@@ -165,8 +165,9 @@ test('it is the parent\'s own: never tied to the active child, reachable from Ac
   const sw = read('sw.js');
   assert.match(sw, /'\/js\/adult-training\.js','\/js\/screen-adult\.js'/);
 
-  // Every table the migration creates is deleted by delete-account, children before parents.
-  const migration = flat(read('supabase/migrations/20260914120000_adult_training_foundation.sql'));
+  // Every table an Adult Training migration creates is deleted by delete-account, children before parents.
+  const migration = fs.readdirSync(path.join(base, 'supabase/migrations')).filter(f => /_adult_[a-z_]+\.sql$/.test(f)).sort()
+    .map(f => flat(read('supabase/migrations/' + f))).join('\n');
   const tables = [...migration.matchAll(/create table if not exists public\.(adult_[a-z_]+) \(/g)].map(m => m[1]);
   const { ADULT_TABLES } = await import(pathToFileURL(path.join(base, 'supabase/functions/delete-account/handler.mjs')).href);
   assert.deepEqual([...ADULT_TABLES].sort(), [...tables].sort());
@@ -176,5 +177,5 @@ test('it is the parent\'s own: never tied to the active child, reachable from Ac
   const privacy = read('privacy.html');
   assert.match(privacy, /<b>Your own training record<\/b>/);
   assert.match(privacy, /It is private to you: co-parents, family members, coaches and organizations cannot see it\./);
-  assert.match(read('datadeletion.html'), /<li>Your own training record, if you keep one: goals, schedule, workouts and measurements\.<\/li>/);
+  assert.match(read('datadeletion.html'), /<li>Your own training record, if you keep one: goals, schedule, workouts, measurements, food preferences, recipes and meal plans\.<\/li>/);
 });
