@@ -1,6 +1,6 @@
 # Parent Playbook continuation handoff
 
-Updated September 13, 2026. Verify this checkpoint against the repository before editing.
+Updated September 14, 2026. Verify this checkpoint against the repository before editing.
 
 ## Primary objective
 
@@ -43,13 +43,13 @@ For an adversarial pass, the user runs `/code-review ultra`. It is user-triggere
 - Company SDK: https://playbookbp.com/company-sdk-demo
 - Adult persistence: https://playbookbp.com/company-persistence-demo
 - Composition gate: https://playbookbp.com/company-composition-demo
-- Git: `main` is at `c499bef` (PR #70, the parent-experience audit), 2026-09-13. Every change lands through a pull request, `.github/workflows/ci.yml` runs both suites on each, and merged branches are deleted. The repository is private.
-- Service-worker release: **`pp-v114` live in production**, built from `main` at `c499bef` (PR #70, the parent-experience audit), Railway deployment `381a7201-da85-456c-8c29-714ce290d40e` (SUCCESS, 2026-09-13 21:50 UTC). Production smoke **29/29**, `ok: true`, at 21:52:47 UTC. Verified against the deployed files: `sw.js` declares `pp-v114` (last modified 21:50:15 UTC), and `sw.js`, `css/app.css`, `js/account.js`, `js/body-scan.js`, `js/journey.js`, `js/screen-coach.js`, `js/screen-growth.js`, `js/screen-profile.js`, `js/screen-scan.js`, `js/screen-week.js` and `js/shell.js` — every file the release changed — are byte-identical to the repository once line endings are normalised. The release carries no migration and no edge function. Its scan release version is `2026-09-13.ondevice.v5`, which makes every earlier scan consent stale, so each parent is asked again before their next scan. Before that, `pp-v113` was live, verified 2026-09-13 01:27 UTC against `main` at `ddf3ec5`. The deployment id was not recorded when it shipped and is not recorded here. Production smoke **29/29**, `ok: true`. Verified against the deployed files: `sw.js` declares `pp-v113` (last modified 2026-09-13 00:20:06 UTC), and `sw.js`, `js/invites.js`, `js/sheets.js`, `js/screen-week.js`, `js/screen-profile.js` and `emails/invite.html` are byte-identical to the repository once line endings are normalised. The release’s backend is live too: migration `20260912123000_family_wide_parent_invites` is applied to the ParentPlaybook project with a version matching its filename, and the `send-invite` (v8, 00:22:51 UTC) and `send-invite-sms` (v7, 00:23:05 UTC) edge functions were redeployed after `2178f8f`, the last commit to touch them, and carry its household-wide invite logic. No invite was sent to verify delivery, because that would email or text a real person. Before that, `pp-v112` live in production, built from `main` at `5e8b500` (deployment `e758c005-0c80-4ef4-a079-233de0a47aec`, 2026-09-12 08:16 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files: `js/org-composition.js`, `js/composition-sharing-ui.js`, `js/composition-import-supabase.mjs`, `js/org-insights.js`, `js/body-insights.js` and `sw.js` are byte-identical to the repository once line endings are normalised; all seven app scripts load in dependency order; the service worker precaches both new scripts; the shared-measurements section is guarded so it cannot take the roster screen down; and the deployed org source still orders by athlete name, carries no sort control, and names the uses these readings are not for. Before that, `pp-v111` live in production, built from `main` at `6b8a011` (deployment `a60831e8-eb89-4df9-9283-59a9e6972d8f`, 2026-09-12 08:02 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files rather than the cache assertion: `js/composition-import.mjs`, `js/composition-import-ui.js`, `js/composition-import-supabase.mjs`, `js/body-composition-reference.mjs`, `js/body-insights.js` and `css/body-insights.css` are all byte-identical to the repository once line endings are normalised; `index.html` loads the import screen after `dates.js` and `core.js` (it needs `localDay` and `esc` from them); the service worker precaches the three import modules; and `body-insights.js` carries the Import button and opens the sheet. Before that, `pp-v110` ran from `ecab430` (deployment `c93bac6d-f44e-48eb-8dfa-bc121c23e0f8`, 2026-09-11 19:51 UTC), smoke 29/29. Verified against the deployed file: `/js/device-evidence.js` is byte-identical to the repository once line endings are normalised, and carries the viewport guard, the `unknown` device class and the `served-sw.js` build fallback. Before that, `pp-v109` ran from `dfec45d` (deployment `2ab8fcb6`, 19:25 UTC). Before that, `pp-v108` ran from `fe495d3` (deployment `9e4515d8`, 18:59 UTC). Before that, `pp-v107` ran from `cdff443` (deployment `750e7051`, 16:52 UTC). Before that, `pp-v106` ran from `7bb5290` (deployment `d8f4498c`, 16:14 UTC). Before that, `pp-v105` ran from `e43df43` (deployment `793577ce`, 15:40 UTC). Before that, `pp-v104` ran from `720a545` (deployment `2b16a88a-0583-4df8-89e6-2a54cc1ab987`, SUCCESS 14:05 UTC). Earlier, `pp-v97` (deployment `5b3e8959-4af3-45eb-83a8-79a350fcfd78`) was verified against the deployed files rather than the cache version: `js/dates.js` byte-identical to the repository and returning the local day for a 23:30 local timestamp, the biometric consent gate in the deployed `js/body-scan.js` filtering on `todayISO()`, and no UTC-day expression left in it.
-- Railway deployment: `381a7201-da85-456c-8c29-714ce290d40e` (SUCCESS, 2026-09-13 21:50 UTC), built from `c499bef` on `main`; before it, `2b16a88a-0583-4df8-89e6-2a54cc1ab987` (SUCCESS, 2026-09-11). Project `a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2`, service `caf9bbfb-1084-422b-913a-2b90d004410f`, environment production. The service source is branch `main` with `checkSuites: false`. Pushing a feature branch still does not deploy, but **merging to `main` now does**: the PR #2 and PR #3 merges each produced a build carrying `commitHash` and `branch: main` in its metadata, where every earlier deployment carried only `reason: deploy` from a `railway up` upload.
+- Git: `main` is at `93fa384` (PR #78, the v41 package record), 2026-09-14. PR #79 (Adult Training milestone 2, the eating plan) is open, and the refresh of this file is stacked on it. Every change lands through a pull request, `.github/workflows/ci.yml` runs both suites on each, and merged branches are deleted. The repository is private.
+- Service-worker release: **`pp-v119` live in production**, built from `main` at `93fa384` (PR #78), Railway deployment `6ce8aebe-8cb1-4c1d-ab82-f840219f8841` (SUCCESS, 2026-09-14 00:27 UTC). Production smoke **29/29**, `ok: true`, re-run at 02:08 UTC. Verified against the deployed files: `sw.js` declares `pp-v119` (last modified 2026-09-14 00:13:21 UTC), and `sw.js` and all fourteen app scripts changed since `c499bef` (`js/account.js`, `js/adult-training.js`, `js/auth.js`, `js/body-scan.js`, `js/core.js`, `js/program.js`, `js/scan-record.js`, `js/screen-activity.js`, `js/screen-adult.js`, `js/screen-growth.js`, `js/screen-scan.js`, `js/screen-week.js`, `js/sheets.js`, `js/shell.js`) are byte-identical to the repository once line endings are normalised. `index.html`, `/privacy` and `/datadeletion` differ only where Cloudflare’s email obfuscation rewrites addresses and adds its decode script; with that normalised they match too. The release’s code is ahead of its database: none of the seven migrations listed first under “Next implementation targets” is applied, and each part of the app that needs one falls back or stays hidden until it is (see that list). `pp-v120` belongs to PR #79 and is not deployed. Before that, `pp-v114` was live, built from `main` at `c499bef` (PR #70, the parent-experience audit), Railway deployment `381a7201-da85-456c-8c29-714ce290d40e` (SUCCESS, 2026-09-13 21:50 UTC). Production smoke **29/29**, `ok: true`, at 21:52:47 UTC. Verified against the deployed files: `sw.js` declares `pp-v114` (last modified 21:50:15 UTC), and `sw.js`, `css/app.css`, `js/account.js`, `js/body-scan.js`, `js/journey.js`, `js/screen-coach.js`, `js/screen-growth.js`, `js/screen-profile.js`, `js/screen-scan.js`, `js/screen-week.js` and `js/shell.js` — every file the release changed — are byte-identical to the repository once line endings are normalised. The release carries no migration and no edge function. Its scan release version is `2026-09-13.ondevice.v5`, which makes every earlier scan consent stale, so each parent is asked again before their next scan. Before that, `pp-v113` was live, verified 2026-09-13 01:27 UTC against `main` at `ddf3ec5`. The deployment id was not recorded when it shipped and is not recorded here. Production smoke **29/29**, `ok: true`. Verified against the deployed files: `sw.js` declares `pp-v113` (last modified 2026-09-13 00:20:06 UTC), and `sw.js`, `js/invites.js`, `js/sheets.js`, `js/screen-week.js`, `js/screen-profile.js` and `emails/invite.html` are byte-identical to the repository once line endings are normalised. The release’s backend is live too: migration `20260912123000_family_wide_parent_invites` is applied to the ParentPlaybook project with a version matching its filename, and the `send-invite` (v8, 00:22:51 UTC) and `send-invite-sms` (v7, 00:23:05 UTC) edge functions were redeployed after `2178f8f`, the last commit to touch them, and carry its household-wide invite logic. No invite was sent to verify delivery, because that would email or text a real person. Before that, `pp-v112` live in production, built from `main` at `5e8b500` (deployment `e758c005-0c80-4ef4-a079-233de0a47aec`, 2026-09-12 08:16 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files: `js/org-composition.js`, `js/composition-sharing-ui.js`, `js/composition-import-supabase.mjs`, `js/org-insights.js`, `js/body-insights.js` and `sw.js` are byte-identical to the repository once line endings are normalised; all seven app scripts load in dependency order; the service worker precaches both new scripts; the shared-measurements section is guarded so it cannot take the roster screen down; and the deployed org source still orders by athlete name, carries no sort control, and names the uses these readings are not for. Before that, `pp-v111` live in production, built from `main` at `6b8a011` (deployment `a60831e8-eb89-4df9-9283-59a9e6972d8f`, 2026-09-12 08:02 UTC). Production smoke **29/29**, `ok: true`. Verified against the deployed files rather than the cache assertion: `js/composition-import.mjs`, `js/composition-import-ui.js`, `js/composition-import-supabase.mjs`, `js/body-composition-reference.mjs`, `js/body-insights.js` and `css/body-insights.css` are all byte-identical to the repository once line endings are normalised; `index.html` loads the import screen after `dates.js` and `core.js` (it needs `localDay` and `esc` from them); the service worker precaches the three import modules; and `body-insights.js` carries the Import button and opens the sheet. Before that, `pp-v110` ran from `ecab430` (deployment `c93bac6d-f44e-48eb-8dfa-bc121c23e0f8`, 2026-09-11 19:51 UTC), smoke 29/29. Verified against the deployed file: `/js/device-evidence.js` is byte-identical to the repository once line endings are normalised, and carries the viewport guard, the `unknown` device class and the `served-sw.js` build fallback. Before that, `pp-v109` ran from `dfec45d` (deployment `2ab8fcb6`, 19:25 UTC). Before that, `pp-v108` ran from `fe495d3` (deployment `9e4515d8`, 18:59 UTC). Before that, `pp-v107` ran from `cdff443` (deployment `750e7051`, 16:52 UTC). Before that, `pp-v106` ran from `7bb5290` (deployment `d8f4498c`, 16:14 UTC). Before that, `pp-v105` ran from `e43df43` (deployment `793577ce`, 15:40 UTC). Before that, `pp-v104` ran from `720a545` (deployment `2b16a88a-0583-4df8-89e6-2a54cc1ab987`, SUCCESS 14:05 UTC). Earlier, `pp-v97` (deployment `5b3e8959-4af3-45eb-83a8-79a350fcfd78`) was verified against the deployed files rather than the cache version: `js/dates.js` byte-identical to the repository and returning the local day for a 23:30 local timestamp, the biometric consent gate in the deployed `js/body-scan.js` filtering on `todayISO()`, and no UTC-day expression left in it.
+- Railway deployment: `6ce8aebe-8cb1-4c1d-ab82-f840219f8841` (SUCCESS, 2026-09-14 00:27 UTC), built from `93fa384` on `main`; before it, `381a7201-da85-456c-8c29-714ce290d40e` (SUCCESS, 2026-09-13 21:50 UTC) from `c499bef`, and before that `2b16a88a-0583-4df8-89e6-2a54cc1ab987` (SUCCESS, 2026-09-11). Project `a6dca082-fbe5-4bc9-b2a6-3f6eaf92e7e2`, service `caf9bbfb-1084-422b-913a-2b90d004410f`, environment production. The service source is branch `main` with `checkSuites: false`. Pushing a feature branch still does not deploy, but **merging to `main` now does**: the PR #2 and PR #3 merges each produced a build carrying `commitHash` and `branch: main` in its metadata, where every earlier deployment carried only `reason: deploy` from a `railway up` upload.
 - Full JavaScript suite: **916/916 passing** — `node --test "tests/*.test.cjs"`. `.github/workflows/ci.yml` also runs it, and the database suite, on every pull request and every push to `main`
 - Executable database tests: **397/397 passing** (376 security cases plus a 21-case restore and deletion rehearsal) — `node tests/db/run.cjs`. It creates a throwaway PostgreSQL cluster, replays the real migration history into it, runs the suite as the restricted `authenticated` and `anon` roles, then destroys the cluster. It cannot be pointed at an existing server.
 - Migration replay into a disposable cluster: **90 of 91 applied**; only `20260812174514_enable_cron_and_net.sql` fails, because pg_cron and pg_net binaries are unavailable outside Supabase
-- Production smoke: **29/29**, `ok: true`, re-run 2026-09-13 — `node tools/deployment-smoke.cjs https://playbookbp.com/` (24 paths that must serve, 5 that must stay private). `.github/workflows/production-monitor.yml` runs it every six hours; its first scheduled run, at 18:28 UTC on 2026-09-13, succeeded.
+- Production smoke: **29/29**, `ok: true`, re-run 2026-09-14 at 02:08 UTC against `pp-v119` — `node tools/deployment-smoke.cjs https://playbookbp.com/` (24 paths that must serve, 5 that must stay private). `.github/workflows/production-monitor.yml` runs it every six hours; its first scheduled run, at 18:28 UTC on 2026-09-13, succeeded.
 - Supabase migration **committed to the live project on 2026-09-10** (`xqvqjkdxykowwpcmyudz`, Postgres 17.6), after three rollback-only rehearsals. Applied in one transaction that also recorded `supabase_migrations.schema_migrations` at version `20260910190000`, matching the repository filename, so a later `supabase db push` sees it as applied. All seven function body md5s match the local cluster byte for byte. `company_composition_providers` and `company_composition_results` both exist, both have RLS enabled, both hold **zero rows**, `anon` has no privilege on either and is denied through the public API, and `authenticated` holds exactly `SELECT` on the registry and CRUD on results. Supabase security advisors report **no new findings** attributable to this migration.
 - Weighted parity: 40.75/100, reported as 40.75% or 41% rounded, under rubric version 2 (adopted 2026-09-13 at 39, when three FITMATCH-claimed categories were added; the same stages scored 42.75 under version 1). FM15 has since moved 0.25 -> 0.5 on the locally tested results API, and FM16 0 -> 0.25 on the Node-tested WebView message bridge. An internal engineering estimate, not independently verified parity.
 - SDK ZIP: **current handoff build** `tools/sdk-releases/parent-playbook-sdk-0.13.0-friday-final-v41.zip`, SHA-256 `FB7552B49CF97598C41978849E68459062F5DA55842E92B0B42D752F75E5FD35`, 640,419 bytes, 216 payload files plus `manifest.json` and `signature.json` (219 archive entries (218 files and one empty directory entry)), payload digest `3736240cfd815a6fdc0652af49421ff07bb21ca0126ae252becba7a7d60e4487`. Cut 2026-09-14 from `main` at `88e8bdf` (after PRs #75, #76 and #77), in a clean worktree. Signed with key `0cc2d189c342212d23d250264f8ab71d`; public half committed as `SIGNING-KEY.pub.pem` and deliberately not bundled. The private key lives outside the repository at `~/.parent-playbook-signing/`; back it up. Its payload digest differs from v40’s (`b591208ec549dff9e9fa44dc11a6829c72e98823c77704b51a1d3dc9839acf46`) because the package gained one migration and changed four files: `20260914120000_adult_training_foundation.sql` (a parent’s own training record, private to that guardian, writable only by allowlisted accounts while the feature is behind a flag); `tests/db/security-tests.cjs` gains 16 cases (two for deleting a single measurement, fourteen for that record), `tools/sdk-files.cjs` lists the migration, and `HANDOVER.md` and `tests/db/README.md` carry the new database counts. The contract count is unchanged at 330; the database cases rise from 369 to 385. v40 and earlier are stale. Verified from the extracted copy: `node tools/acceptance.cjs` with `PP_SDK_PUBLIC_KEY` set -> **7/7** (manifest 216/216, exclusions clean, contracts 330/330, database 385/385, on a disposable cluster built from the package’s own 90 migrations — 364 security cases plus a 21-case restore and deletion rehearsal — signature verified against the repository copy of the public key, host serving modules that match the manifest).
@@ -69,21 +69,37 @@ There is no licensed body-composition model, real composition output or independ
 ## Next implementation targets, in order
 
 1. **Deploy what is merged but not live.** This needs the user's authorization in the session that does it.
-   As of 2026-09-13, checked read-only:
+   As of 2026-09-14, checked read-only (`list_migrations` and `list_edge_functions` on the live project): the
+   newest applied migration is `20260912123000_family_wide_parent_invites`, and nothing has been deployed since
+   the 2026-09-13 check.
+   - **Seven migrations are not applied**, in filename order:
+     - `20260913120000_company_results_api.sql`: organization API keys and the service-role list, get and delete
+       functions behind `company-results-api`. Apply it with that function's first deploy. A deployed function
+       and one real call with an issued key are what FM15 needs to move from 0.5 to 0.75.
+     - `20260913140000_stripe_webhook_ordering.sql`. Apply it and redeploy `stripe-webhook` in the same window:
+       the new webhook calls `apply_stripe_subscription_event`, which the live schema does not have. `payments`
+       and `subscriptions` both held zero rows when checked.
+     - `20260913140500_notification_schedules.sql`. The live `measure-nudge` still runs `14 14 1-7 * 0`, so it
+       fires on days 1 to 7 and every Sunday. Deploy `notify-measure` and apply the migration back to back.
+       Either order leaves a short window of extra sends: the new function on the old schedule sends on days 1 to
+       7, and the old function on the new schedule sends every Sunday.
+     - `20260913170000_body_scan_assessments.sql` (scan records). Safe before or after the site: until it exists,
+       `js/scan-record.js` saves a scan's outputs exactly as before, and the migration then links existing scans
+       to records and extends the nightly biometric sweep to them.
+     - `20260913180000_week_exceptions.sql`. Until it exists, the Week screen does not offer "Change this day"
+       (PR #75).
+     - `20260914120000_adult_training_foundation.sql` and `20260914130000_adult_nutrition.sql` (the second is in
+       PR #79). Adult Training stays hidden until both are applied **and** an account is added to
+       `adult_training_access`; see "Adult Training" below.
    - **Edge functions.** The 14 deployed functions all predate their `handler.mjs` refactors (the newest
-     deploy is `send-invite-sms` v7 at 00:23 UTC on 2026-09-13). Production therefore still runs bugs that
+     deploy is still `send-invite-sms` v7 at 00:23 UTC on 2026-09-13). Production therefore still runs bugs that
      are fixed on `main`: `notify-weekly` ignores the week-ahead opt-out, `notify-booking` lets either side
      of a booking send any update, and several functions return runtime error text to the caller.
+     `delete-account` on `main` also deletes a parent's own Adult Training record before the login, and treats
+     a database without those tables as nothing to delete, so it can be redeployed before those migrations.
      `company-results-api` is not deployed at all. Each function now imports its own `handler.mjs`, and
      several import `supabase/functions/_shared/`, so deploy the function with those files, not a lone
      `index.ts`.
-   - **`20260913140000_stripe_webhook_ordering.sql` is not applied.** Apply it and redeploy `stripe-webhook`
-     in the same window: the new webhook calls `apply_stripe_subscription_event`, which the live schema does
-     not have. `payments` and `subscriptions` both held zero rows when checked.
-   - **`20260913140500_notification_schedules.sql` is not applied.** The live `measure-nudge` still runs
-     `14 14 1-7 * 0`, so it fires on days 1 to 7 and every Sunday. Deploy `notify-measure` and apply the
-     migration back to back. Either order leaves a short window of extra sends: the new function on the old
-     schedule sends on days 1 to 7, and the old function on the new schedule sends every Sunday.
    - Supabase `apply_migration` stamps its own version. Afterwards, set
      `supabase_migrations.schema_migrations.version` to the filename's timestamp, or `supabase db push` will
      try to run the migration again.
@@ -110,6 +126,63 @@ Resolved, and removed from this list: observing the retention sweeps fire. As of
 `cron.job` has run and succeeded, including `company-composition-result-retention` (three runs, the latest at
 03:50 UTC) and `external-composition-retention` (one run, 03:55 UTC). A succeeded run shows the sweep
 statement executed; it does not show that anything was due for deletion.
+
+## Adult Training (outside the rubric)
+
+A parent's own training record, separate from every child's athlete profile. It is **not** FITMATCH parity work:
+keep it out of `tools/parity-progress.json`, which stays at 40.75.
+
+- **Milestone 1, merged (PR #77):** profile, up to three goals, a weekly gym or activity schedule with exercises
+  and ticks, and weight or tape measurements typed in by the parent. The federal activity baseline (150–300
+  minutes a week, strength work on two days) is shown as a reference, never filled in.
+- **Milestone 2, open (PR #79):** a Training | Eating switch with a plate guide after USDA MyPlate (proportions,
+  never amounts), food preferences and the nine labeling-law allergens to avoid, the parent's own recipes, a week
+  of planned meals with a warning when a recipe carries an avoided tag, a grocery list built from those recipes,
+  and two eating habits logged against aims the parent sets. No nutrient values: those would need a sourced
+  dataset such as USDA FoodData Central, and the user chose parent-entered recipes for now.
+- **Two locks.** `ADULT_TRAINING_ENABLED = false` in `js/core.js`, and `public.adult_training_access`, an
+  allowlist only the operator writes: the database refuses every write from an account not on it, whatever the
+  flag says. Reading and deleting never need it, so a tester taken off the list can still export and delete.
+  Turning it on for a tester is: apply both migrations, then insert that account's id into
+  `adult_training_access`. **No account is allowlisted**, and doing so needs the user's authorization.
+- **Privacy.** Every table is keyed by `guardian_id` with no co-parent, family-viewer, coach or organization
+  policy. `delete-account` deletes all of it before the login, "Export everything" includes it, and the privacy
+  and data-deletion pages describe it.
+- **Rules that do not bend.** No weight-loss or body-fat goal, target or adult nutrition plan ever reaches a
+  child's profile. Nothing claims body-fat percentage, muscle gain, lean mass, pounds lost or medical health.
+  Weight comes only from a scale or the parent's own entry.
+- **Deferred by the user's choice (2026-09-14).** Adult scanner history waits for the normalized health-record
+  system below, so scans, scales and watches share one source-tracked record. A parent scanning themselves would
+  also need a new self-scan release version, which is a legal document. Later: smart-scale and DXA imports,
+  Train Together family activities, and company wellness with explicit participant consent.
+- **Not yet tried in a browser**: the screens need the migrations and an allowlisted signed-in account. A parent
+  with no athlete still cannot reach the app shell, so cannot reach this either.
+
+## Device connections roadmap
+
+Added to the build list by the user on 2026-09-14. Nothing is built yet, and it does not move the FITMATCH rubric.
+
+- **Apple:** Apple Watch data through HealthKit (workouts, steps, heart rate, distance, energy, weight). A watch
+  app only for live tracking or sending workouts to the watch (WorkoutKit).
+- **Android:** Health Connect as the one connection point for watches, phones, scales and fitness apps, with
+  per-category permissions.
+- **Gym equipment:** Bluetooth Fitness Machine Service for treadmills, bikes and rowers, plus heart-rate monitors
+  and compatible scales. Web Bluetooth is only an early Android or desktop demonstration; a native layer is the
+  dependable path on both phone platforms.
+- **Google Calendar:** a dedicated "Parent Playbook" calendar using the scope limited to calendars the app created,
+  syncing practices, games, gym sessions, rest days and appointments. Today there is only a single-event download
+  (`js/week-rail.js`).
+- **Where imports land:** Weekly (schedule and changes), Journey (completed workouts, personal records,
+  consistency), Adult Progress (weight, frequency, strength, distance, steps, scanner measurements), Growth (age-
+  appropriate child metrics only), and Settings → Connections for permissions. Device-estimated body composition
+  may be shown to an adult only when it is clearly labelled a device estimate.
+- **Children's device data:** off by default, guardian approval and assent where appropriate, no calorie or
+  weight-loss targets, never automatically visible to trainers, camps or companies. Company dashboards receive
+  only explicitly shared or aggregated information.
+- **The user's order:** adult profiles and goals → Settings → Connections → Google Calendar sync → a normalized
+  health-record system with source tracking and duplicate prevention → native iPhone with HealthKit → native
+  Android with Health Connect → Adult Progress dashboards → direct Bluetooth equipment → optional Apple Watch and
+  Wear OS companions → organization wellness with separate opt-in sharing.
 
 ## Deploy and migration ordering
 
