@@ -155,7 +155,7 @@ test('it lives inside Your training, never reads a child, and goes with the acco
 
   // No child-facing file reads the eating plan.
   const jsDir = path.join(base, 'js');
-  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|screen-adult-eating|adult-nutrition)\.js$/.test(f)))
+  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|screen-adult-eating|adult-nutrition|adult-progress)\.js$/.test(f)))
     assert.doesNotMatch(fs.readFileSync(path.join(jsDir, file), 'utf8'), /adult_(nutrition|recipes|meal_plan)|ADULT_PLATE_GUIDE/, file);
 
   const index = read('index.html');

@@ -94,7 +94,7 @@
       with full audit and bounded retention.</li>
     <li><strong>For a buyer:</strong> a portable SDK, its migrations and its verification tooling,
       hostable on your own origin.</li>
-    <li><strong>Release candidate:</strong> build <code>pp-v125</code>; production verification follows deployment.</li>
+    <li><strong>Release candidate:</strong> build <code>pp-v126</code>; production verification follows deployment.</li>
   </ul>
   <div class="notes"><b>Notes.</b> Lead with the journey, not the measurement. Do not open on parity
     percentages. If asked what is live right now: capture, outputs, insights, organization records
@@ -246,8 +246,8 @@
   </ul>
   <table>
     <tr><th>Claim</th><th>Command</th><th>Result</th></tr>
-    <tr><td>Release candidate</td><td>Local Docker smoke, then <code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v125</code>; local 29/29; live pending</td></tr>
-    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>954/954</td></tr>
+    <tr><td>Release candidate</td><td>Local Docker smoke, then <code>node tools/deployment-smoke.cjs https://playbookbp.com/</code></td><td><code>pp-v126</code>; local 29/29; live pending</td></tr>
+    <tr><td>JavaScript suite</td><td><code>node --test "tests/*.test.cjs"</code></td><td>960/960</td></tr>
     <tr><td>Database suite</td><td><code>node tests/db/run.cjs</code></td><td>412/412</td></tr>
     <tr><td>Buyer package</td><td><code>node tools/acceptance.cjs</code></td><td>7/7 checks</td></tr>
     <tr><td>Archive exclusions</td><td><code>node tools/package-scan.cjs &lt;pkg&gt;</code></td><td>clean</td></tr>
