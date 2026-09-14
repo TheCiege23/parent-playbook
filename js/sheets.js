@@ -514,6 +514,65 @@ function openAddMeasure(presetKey){
   };
 }
 
+// Every reading of one measurement, newest first, with Delete where a single reading can be deleted. See
+// measurementDeleteRule() for why a body scan's outputs are deleted from the scan hub instead. On a database the
+// scan-records migration has not reached yet there is no scan link column, so the read and the delete leave it out.
+async function openMeasureHistory(key){
+  const a=state.active; if(!a||!key) return;
+  const read=cols=>sb.from('measurements').select(cols).eq('athlete_id',a.id).eq('metric_key',key)
+    .order('measured_on',{ascending:false}).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(200);
+  const base='id,metric_key,value,unit,source,measured_on,created_at,note';
+  let hasScanColumn=true;
+  let { data:rows, error }=await read(base+',scan_assessment_id');
+  if(error){ hasScanColumn=false; ({ data:rows, error }=await read(base)); }
+  const canEdit=state.canEdit!==false;
+  const methodLabel=r=>({manual:'Entered by hand',guided:'Timed with the stopwatch',video:'Measured from video',photo:'Body scan',import:'Imported'})[r.source]||'Recorded';
+  const bg=sheet(H`<h3>${esc(metricName(key))}</h3>
+    <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Every reading, newest first.${canEdit?' A deleted reading is gone from Growth, Body Insights and anyone you have shared stats with.':''}</p>
+    ${error?H`<p class="err">Could not load the readings. Check your connection and try again.</p>`
+      :!(rows||[]).length?H`<p class="empty">No readings.</p>`
+      :H`<div class="card app-pad">${rows.map(r=>{ const rule=measurementDeleteRule(r);
+        return H`<div class="mrow measure-history-row">
+          <span><b>${esc(fmtMeasure(key,r.value,r.unit))}</b><small>${esc(fmtDate(r.measured_on))} · ${esc(methodLabel(r))}</small></span>
+          ${!canEdit?''
+            :rule.kind==='scan'?H`<button class="btn sm ghost" data-measure-scan="1">Part of a body scan · Scans ›</button>`
+            :rule.kind==='single'?H`<button class="btn sm ghost" data-measure-delete="${esc(r.id)}">Delete</button>`:''}
+        </div>`; }).join('')}</div>`}
+    <button class="btn ghost" id="measureHistoryClose" style="margin-top:14px">Close</button>`);
+  bg.querySelector('#measureHistoryClose').onclick=()=>bg.remove();
+  bg.querySelectorAll('[data-measure-scan]').forEach(b=>b.onclick=()=>{ bg.remove(); renderApp('scan'); });
+  bg.querySelectorAll('[data-measure-delete]').forEach(b=>b.onclick=()=>{
+    const row=(rows||[]).find(r=>r.id===b.dataset.measureDelete);
+    if(row) confirmDeleteMeasurement(row, hasScanColumn, ()=>{ bg.remove(); renderApp('growth'); });
+  });
+}
+function confirmDeleteMeasurement(row, hasScanColumn, onDeleted){
+  const rule=measurementDeleteRule(row); if(rule.kind!=='single') return;
+  const bg=sheet(H`<h3>Delete this ${esc(metricName(row.metric_key).toLowerCase())} reading?</h3>
+    <p style="font-size:14px;line-height:1.55;margin:8px 0 0">${esc(fmtMeasure(row.metric_key,row.value,row.unit))} on ${esc(fmtDate(row.measured_on))}. It is removed from Growth, Body Insights and anyone you have shared stats with. This cannot be undone.</p>
+    ${rule.maturityInput?H`<div class="teach" style="margin-top:12px"><div class="ic">📏</div><div>
+      <h4>Part of the growth-spurt estimate</h4>
+      <p>This reading is one of the three used for that estimate. Deleting it removes the estimate, or uses an earlier complete set if there is one.</p></div></div>`:''}
+    <div class="row2" style="margin-top:16px">
+      <button class="btn ghost" id="deleteMeasureNo">Keep it</button>
+      <button class="btn danger" id="deleteMeasureYes">Delete</button>
+    </div>`);
+  bg.querySelector('#deleteMeasureNo').onclick=()=>bg.remove();
+  bg.querySelector('#deleteMeasureYes').onclick=async e=>{
+    const btn=e.currentTarget; btn.disabled=true;
+    let q=sb.from('measurements').delete().eq('id',row.id).eq('athlete_id',state.active.id);
+    // A reading that belongs to a scan is never deleted on its own, even from a sheet opened before it was linked.
+    if(hasScanColumn) q=q.is('scan_assessment_id',null);
+    const { data, error }=await q.select('id');
+    // Row-level security refuses a delete silently, as zero rows, so an empty result is a failure too.
+    if(error||!data||!data.length){
+      if(error){ console.error(error); if(typeof reportError==='function') reportError(error,'growth:deleteMeasurement'); }
+      toast('Could not delete that reading'); btn.disabled=false; return;
+    }
+    bg.remove(); toast('Reading deleted'); if(onDeleted) onDeleted();
+  };
+}
+
 // ---- add / edit a sport ----
 // Everything about one sport in one place: positions, level, practice days, season.
 // `row` null = adding. Load is shared across every sport, so adding a second one never

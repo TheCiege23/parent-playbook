@@ -1306,7 +1306,7 @@ function confirmWithdrawScan(athleteId, engineId, name, label){
     <div class="teach" style="margin-top:14px"><div class="ic">📊</div><div>
       <h4>Measurements already saved stay</h4>
       <p>They are in ${esc(name)}'s Growth with everything else, and are deleted the same way — from Growth,
-      one at a time, or by deleting the profile. Withdrawing permission stops new ones; it does not quietly
+      one reading at a time (a whole body scan from Scans), or by deleting the profile. Withdrawing permission stops new ones; it does not quietly
       erase the record you have been keeping.</p></div></div>
     <div class="row2" style="margin-top:16px">
       <button class="btn ghost" id="wdNo">Keep it</button>

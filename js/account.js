@@ -67,7 +67,7 @@ async function screenAccount(){
         <div class="rail-empty" style="padding:4px 0">Checking…</div>
       </div>
       <p class="muted-note">Withdrawing stops any future scan immediately. It does not delete measurements
-        already saved — those are removed from Growth, alongside every other measurement.</p>
+        already saved — delete those from Growth, one reading at a time, or a whole body scan from Scans.</p>
       `:''}
 
       <div class="sec-title">Your data</div>
