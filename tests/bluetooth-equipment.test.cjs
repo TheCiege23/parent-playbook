@@ -119,6 +119,8 @@ test('offered only where the browser has Web Bluetooth, saved only as one import
   assert.doesNotMatch(code, /state\.active|athlete/i);
   assert.doesNotMatch(code, /localStorage|sessionStorage|indexedDB/);
   assert.match(code, /releaseAll\(\); bg\.remove\(\); toast\('Workout saved'\);/);
+  // The distance shown uses the precision it is saved with (btSessionRecords rounds to hundredths).
+  assert.match(code, /const two = n => \(Math\.round\(n \* 100\) \/ 100\)\.toLocaleString\(undefined, \{ minimumFractionDigits:2, maximumFractionDigits:2 \}\);\n  const distanceText = m => miles \? two\(m \/ 1609\.344\) \+ ' mi' : two\(m \/ 1000\) \+ ' km';/);
   assert.match(code, /if \(!bg\.isConnected\) \{ clearInterval\(timer\); releaseAll\(\); return; \}/, 'closing the sheet disconnects the equipment');
 });
 

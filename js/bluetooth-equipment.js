@@ -148,7 +148,9 @@ async function openBluetoothEquipment(units){
   const err = $b('#btErr'), startBtn = $b('#btStart'), summaryEl = $b('#btSummary');
   const miles = units !== 'kg';
   const one = n => (Math.round(n * 10) / 10).toLocaleString(undefined, { maximumFractionDigits:1 });
-  const distanceText = m => miles ? one(m / 1609.344) + ' mi' : one(m / 1000) + ' km';
+  // Distance shows the two decimals it is saved with, so the summary never says 0 mi above a save of 0.01 mi.
+  const two = n => (Math.round(n * 100) / 100).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const distanceText = m => miles ? two(m / 1609.344) + ' mi' : two(m / 1000) + ' km';
   const clock = sec => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 
   const release = c => {
