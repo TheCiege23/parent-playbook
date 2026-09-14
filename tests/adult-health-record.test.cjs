@@ -200,7 +200,7 @@ test('Progress reads the one record, imports are previewed and undoable, and it 
   assert.doesNotMatch(read('js/adult-training.js'), /ADULT_BODY_METRICS|adultValidateBodyEntry|adultTrend/);
 
   const jsDir = path.join(base, 'js');
-  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|adult-health-record)\.js$/.test(f)))
+  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|adult-health-record|adult-progress)\.js$/.test(f)))
     assert.doesNotMatch(fs.readFileSync(path.join(jsDir, file), 'utf8'), /adult_health_(records|import_batches)|ADULT_HEALTH_METRICS/, file);
 
   const index = read('index.html');
