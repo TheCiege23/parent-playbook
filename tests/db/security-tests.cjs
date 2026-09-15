@@ -1020,18 +1020,101 @@ add('R25', 'external-integrity', 'the guardian can see their own source document
   { setup: seedPrivate + attach('synthetic-child-ref-001'), claims: GUARDIAN, role: 'authenticated',
     sql: 'select count(*)::text from public.external_composition_attachments;', expect: 'ok', expectOut: '1' });
 
-// An expired record must not leave a clinical PDF in the bucket with nothing left to say whose it
-// was. The foreign key cascade reaches the attachment row; only the trigger reaches the object.
+// A report's file goes through the Storage API, never by a DELETE on storage.objects. Supabase refuses that DELETE
+// (storage.protect_delete, which 00-preamble.sql reproduces), because the row would go and the file's bytes would
+// stay. Until 20260915200000 a trigger issued it whenever an attachment row went, so in production deleting a record
+// with a report, its athlete or its account failed, and so would the retention sweep. Now the database refuses to
+// delete an attachment whose file is still stored, every path removes the file first, and the sweep leaves such a
+// record for composition-report-retention. storageApiRemove stands in for the Storage API, which sets
+// storage.allow_delete_query for its own delete.
 const putObject = "insert into storage.objects(bucket_id,name) select 'composition-reports', storage_key from public.external_composition_attachments;";
 const objectCount = "(select count(*) from storage.objects where bucket_id='composition-reports')::text";
-add('R30', 'external-integrity', 'deleting the record deletes the attachment and the stored object',
+const storageApiRemove = "select set_config('storage.allow_delete_query','true',true); delete from storage.objects where bucket_id='composition-reports';"
+  + " select set_config('storage.allow_delete_query','false',true);";
+const attachmentsAndObjects = "select (select count(*) from public.external_composition_attachments)::text || '|' || " + objectCount + ';';
+const STILL_STORED = /report file is still stored/;
+const removeAsCaller = "select set_config('storage.allow_delete_query','true',true);"
+  + " with d as (delete from storage.objects where bucket_id='composition-reports' returning 1) select count(*)::text from d;";
+add('R29', 'external-integrity', 'SQL cannot delete a stored object, as on Supabase',
   { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject,
-    sql: 'delete from public.external_composition_records;'
-      + " select (select count(*) from public.external_composition_attachments)::text || '|' || " + objectCount + ';',
-    expect: 'ok', expectOut: '0|0' });
-add('R31', 'external-integrity', 'the retention sweep takes the stored object with it',
+    sql: "delete from storage.objects where bucket_id='composition-reports';", expect: 'error', expectError: /Direct deletion from storage tables is not allowed/ });
+add('R30', 'external-integrity', 'a record whose report file is still stored cannot be deleted, and nothing is lost',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject,
+    sql: 'delete from public.external_composition_records;', expect: 'error', expectError: STILL_STORED });
+add('R30b', 'external-integrity', 'once the file is removed through the Storage API, the record and its attachment go',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject + storageApiRemove,
+    sql: 'delete from public.external_composition_records;' + attachmentsAndObjects, expect: 'ok', expectOut: '0|0' });
+add('R30c', 'external-integrity', 'the importing guardian may remove the file through Storage while the record exists',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject, claims: GUARDIAN, role: 'authenticated',
+    sql: removeAsCaller, expect: 'ok', expectOut: '1' });
+add('R30d', 'external-integrity', 'and then delete the record, as the app does',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject + storageApiRemove, claims: GUARDIAN, role: 'authenticated',
+    sql: 'with d as (delete from public.external_composition_records returning 1) select count(*)::text from d;', expect: 'ok', expectOut: '1' });
+add('R30e', 'external-integrity', 'an organization the record was shared with cannot remove the file',
+  { setup: seedShared + attach('synthetic-child-ref-001') + putObject, claims: ADMIN_A, role: 'authenticated',
+    sql: removeAsCaller, expect: 'ok', expectOut: '0' });
+
+const seedOldBare = "select public.test_seed_external('synthetic-adult-old-2','" + GUARDIAN
+  + "','adult_reference','synthetic-subject-001',null,null,null,"
+  + "'2020-02-01T00:00:00Z','2021-02-01T00:00:00Z','2020-02-01T00:05:00Z');";
+const withdrawnChild = seedChild(C_LIVE) + "update public.biometric_consents set revoked_at = now() where id='" + C_LIVE + "';";
+add('R31', 'external-integrity', 'the retention sweep leaves a due record whose file is still stored, instead of failing',
   { setup: seedOld + attach('synthetic-adult-old') + putObject,
-    sql: sweepThen('select ' + objectCount + ';'), expect: 'ok', expectOut: '0' });
+    sql: sweepThen(countRecords), expect: 'ok', expectOut: '1' });
+add('R31b', 'external-integrity', 'and still removes every other due record, so one report cannot stop retention for everyone',
+  { setup: seedOld + attach('synthetic-adult-old') + putObject + seedOldBare,
+    sql: 'select private.sweep_external_composition_retention()::text;', expect: 'ok', expectOut: '1' });
+add('R31c', 'external-integrity', 'the service role is shown the stored files holding back a due record, expired or withdrawn',
+  { setup: seedOld + attach('synthetic-adult-old') + putObject,
+    sql: "set local role service_role; select count(*)::text from public.composition_reports_due_for_removal();", expect: 'ok', expectOut: '1' });
+add('R31d', 'external-integrity', 'a withdrawn release holds its record back the same way',
+  { setup: withdrawnChild + attach('synthetic-child-ref-001') + putObject,
+    sql: "set local role service_role; select count(*)::text from public.composition_reports_due_for_removal();", expect: 'ok', expectOut: '1' });
+add('R31e', 'external-integrity', 'a record that is not due, or whose file is gone, is not listed',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject + seedOldBare,
+    sql: "set local role service_role; select count(*)::text from public.composition_reports_due_for_removal();", expect: 'ok', expectOut: '0' });
+add('R31f', 'external-integrity', 'once composition-report-retention removes the file, its sweep removes the record',
+  { setup: seedOld + attach('synthetic-adult-old') + putObject + storageApiRemove,
+    sql: "set local role service_role; select public.run_external_composition_retention()::text;", expect: 'ok', expectOut: '1' });
+add('R31g', 'external-integrity', 'only the service role can list due files or run the sweep',
+  { sql: "select string_agg(has_function_privilege(r, f, 'EXECUTE')::text, ',' order by r, f) from unnest(array['anon','authenticated','service_role']) r,"
+      + " unnest(array['public.composition_reports_due_for_removal(integer)','public.run_external_composition_retention()']) f;",
+    expect: 'ok', expectOut: 'false,false,false,false,true,true' });
+add('R31h', 'external-integrity', 'the report retention job is registered with the scheduler',
+  { sql: "select count(*)::text from cron.job where jobname='external-composition-report-retention';", expect: 'ok', expectOut: '1' });
+
+add('R32', 'external-integrity', 'an athlete whose imported result has a stored report cannot be deleted until the file is removed',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject,
+    sql: "delete from public.athletes where id='" + ATH_A + "';", expect: 'error', expectError: STILL_STORED });
+add('R32b', 'external-integrity', 'after the file is removed through the Storage API, deleting the athlete takes the record and attachment',
+  { setup: seedPrivate + attach('synthetic-child-ref-001') + putObject + storageApiRemove,
+    sql: "delete from public.athletes where id='" + ATH_A + "';" + attachmentsAndObjects, expect: 'ok', expectOut: '0|0' });
+add('R32c', 'external-integrity', 'delete-athlete asks can_delete_athlete first: yes for a family owner of the athlete',
+  { claims: GUARDIAN, role: 'authenticated', sql: "select public.can_delete_athlete('" + ATH_A + "')::text;", expect: 'ok', expectOut: 'true' });
+add('R32d', 'external-integrity', 'no for an organization admin who is not in the family',
+  { claims: ADMIN_A, role: 'authenticated', sql: "select public.can_delete_athlete('" + ATH_A + "')::text;", expect: 'ok', expectOut: 'false' });
+add('R32e', 'external-integrity', 'no for a caller with no claim',
+  { role: 'authenticated', sql: "select public.can_delete_athlete('" + ATH_A + "')::text;", expect: 'ok', expectOut: 'false' });
+add('R32f', 'external-integrity', 'anon holds no execute on can_delete_athlete',
+  { role: 'anon', sql: "select public.can_delete_athlete('" + ATH_A + "')::text;", expect: 'error', expectError: /permission denied/ });
+// The audit of each cascaded delete runs with the athlete row already gone, so it keeps no link to it rather than
+// failing the athlete's delete, as the body scan audit does.
+add('R32g', 'external-integrity', 'an athlete with an imported result and no report can be deleted, and the audit keeps no link',
+  { setup: seedPrivate,
+    sql: "delete from public.athletes where id='" + ATH_A + "';"
+      + " select count(*)::text || '|' || count(*) filter (where athlete_id is null)::text || '|' || count(*) filter (where detail->>'athlete_id' = '" + ATH_A + "')::text"
+      + " from public.access_log where action='external_composition_record_delete';",
+    expect: 'ok', expectOut: '1|1|1' });
+
+const REPORT_OWNER = 'f0000000-0000-4000-8000-00000000000f';
+const seedOwnReport = "insert into auth.users(id, email) values ('" + REPORT_OWNER + "','synthetic-report-owner@example.invalid');"
+  + " select public.test_seed_external('synthetic-adult-own','" + REPORT_OWNER + "','adult_reference','me');"
+  + attach('synthetic-adult-own') + putObject;
+add('R33', 'external-integrity', 'an account whose own imported result has a stored report cannot be deleted until the file is removed',
+  { setup: seedOwnReport, sql: "delete from auth.users where id='" + REPORT_OWNER + "';", expect: 'error', expectError: STILL_STORED });
+add('R33b', 'external-integrity', 'after the file is removed through the Storage API, deleting the account takes the record and attachment',
+  { setup: seedOwnReport + storageApiRemove,
+    sql: "delete from auth.users where id='" + REPORT_OWNER + "';" + attachmentsAndObjects, expect: 'ok', expectOut: '0|0' });
 
 // The audit trail records that a health record moved, without becoming one itself.
 add('R40', 'external-integrity', 'an insert is audited',

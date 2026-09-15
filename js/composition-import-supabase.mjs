@@ -195,8 +195,26 @@ export function createExternalCompositionStore(client, { scope, athleteId = null
       return Array.isArray(response?.data) && response.data.length === 1;
     },
 
+    /* Delete a reading, and the report document behind it first.
+     *
+     * The document goes through the Storage API before the row does. Removing the row from SQL would leave the file's
+     * bytes behind, which Supabase refuses, and the database now refuses to delete an attachment whose file is still
+     * stored (20260915200000). The record is found in this store's scope before anything is removed, so a record that
+     * is not this store's to delete never loses its document. Deleting again after a failure part-way finishes the job.
+     */
     async remove(id) {
-      const response = await scoped(client.from(TABLE).delete()).eq('id', uuid(id, 'id')).select('id');
+      const recordId = uuid(id, 'id');
+      const found = await scoped(client.from(TABLE).select('id')).eq('id', recordId).limit(1);
+      if (found?.error) fail('DELETE_FAILED', found.error.message || 'Could not delete that measurement.');
+      if (!Array.isArray(found?.data) || !found.data.length) return false;
+      const attached = await client.from(ATTACHMENTS).select('storage_key').eq('record_uuid', recordId);
+      if (attached?.error) fail('DELETE_FAILED', attached.error.message || 'Could not read the report attached to that measurement.');
+      const keys = (Array.isArray(attached?.data) ? attached.data : []).map(a => a?.storage_key).filter(k => typeof k === 'string' && k);
+      if (keys.length) {
+        const removed = await client.storage.from(BUCKET).remove(keys);
+        if (removed?.error) fail('DELETE_FAILED', 'The report attached to that measurement could not be removed, so the measurement was kept: ' + (removed.error.message || 'the Storage API refused.'));
+      }
+      const response = await scoped(client.from(TABLE).delete()).eq('id', recordId).select('id');
       if (response?.error) fail('DELETE_FAILED', response.error.message || 'Could not delete that measurement.');
       return Array.isArray(response?.data) && response.data.length === 1;
     },
