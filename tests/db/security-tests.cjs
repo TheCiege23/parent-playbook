@@ -1795,6 +1795,129 @@ add('AA13', 'camp-listings', 'the rules bind the table owner too: a listing cann
     sql: `update public.camps set status = 'approved', external_signup_url = 'javascript:alert(1)' where created_by = '${MEMBER_C}';`,
     ...campUrlRefused });
 
+// =========================================================== AB. a child needs consent
+//
+// Until 20260915180000_child_creation_requires_consent.sql the browser was the only place a child's consent was
+// required: create_athlete_onboarding() recorded whatever consents it was handed, none included, and ath_insert let a
+// family editor insert into public.athletes past the function. Now the function refuses without both required consents,
+// the policy is gone, and a deferred constraint trigger refuses any writer's new child that reaches COMMIT without them.
+//
+// Every case here is rolled back, so none reaches COMMIT, which is when a deferred check runs. `set constraints all
+// immediate` runs the pending checks at that point instead, exactly as COMMIT would. A case that inserts a child and
+// leaves it out would pass whatever the trigger said.
+const AT_COMMIT = 'set constraints all immediate;';
+const CONSENT_MISSING = 'Both required consents, child_data and account, are needed to add a child.';
+const CONSENT_MALFORMED = 'Each consent must be {"consent_type": <a known type>}, given once, in a list.';
+const CONSENT_AT_COMMIT = 'has no granted child_data and account consent from one guardian in its household';
+const BOTH_CONSENTS = `'[{"consent_type":"child_data"},{"consent_type":"account"}]'`;
+const NEW_CHILD = 'a0000000-0000-4000-8000-00000000c0de';
+const onboard = ({ newFamily = true, family = null, consents = BOTH_CONSENTS } = {}) =>
+  `public.create_athlete_onboarding(${newFamily}, ${family ? `'${family}'` : 'null'}, 'Synthetic consent household', 'SyntheticConsentChild',
+    date '2016-04-01', null, 'football', array['RB'], 'Junior', '[{"type":"skill","key":"hands","label":"Synthetic goal"}]'::jsonb, ${consents}::jsonb)`;
+// Passes only if the statement is refused with exactly this SQLSTATE and message. Acceptance, or a refusal for any other
+// reason, fails the case and shows what really happened.
+const refusedWith = (statements, sqlstate, message) => `do $refusal$
+begin
+  ${statements}
+  raise exception 'the database accepted it';
+exception when others then
+  if sqlstate is distinct from '${sqlstate}' or strpos(sqlerrm, '${message}') = 0 then
+    raise;
+  end if;
+end $refusal$;
+select 'refused';`;
+const directChild = (id = NEW_CHILD) =>
+  `insert into public.athletes(id, family_id, first_name, birthdate) values ('${id}', '${SCAN_FAMILY}', 'SyntheticDirectChild', date '2016-04-01');`;
+const consentRow = (guardian, type, granted = true) =>
+  `insert into public.consent_records(guardian_id, athlete_id, consent_type, granted, method) values ('${guardian}', '${NEW_CHILD}', '${type}', ${granted}, 'synthetic_case');`;
+const refusedAtCommit = statements => ({ sql: refusedWith(statements + '\n  ' + AT_COMMIT, '23514', CONSENT_AT_COMMIT), expect: 'ok', expectOut: 'refused' });
+const newChildCount = `${AT_COMMIT}\nreset role;\nselect count(*)::text from public.athletes where id = '${NEW_CHILD}';`;
+
+add('AB01', 'child-consent', 'THE CASE: create_athlete_onboarding refuses a child with no consent (22023)',
+  { ...asScanParent, sql: refusedWith(`perform ${onboard({ consents: `'[]'` })};`, '22023', CONSENT_MISSING), expect: 'ok', expectOut: 'refused' });
+add('AB02', 'child-consent', 'a missing consent list counts as no consent',
+  { ...asScanParent, sql: refusedWith(`perform ${onboard({ consents: 'null' })};`, '22023', CONSENT_MISSING), expect: 'ok', expectOut: 'refused' });
+add('AB03', 'child-consent', 'child_data alone is refused: account consent is required too',
+  { ...asScanParent, sql: refusedWith(`perform ${onboard({ consents: `'[{"consent_type":"child_data"}]'` })};`, '22023', CONSENT_MISSING), expect: 'ok', expectOut: 'refused' });
+add('AB04', 'child-consent', 'account and the optional media consent are refused without child_data',
+  { ...asScanParent, sql: refusedWith(`perform ${onboard({ consents: `'[{"consent_type":"account"},{"consent_type":"media"}]'` })};`, '22023', CONSENT_MISSING), expect: 'ok', expectOut: 'refused' });
+const malformedConsents = [
+  ['AB05', 'a single object instead of a list', `'{"consent_type":"child_data"}'`],
+  ['AB06', 'bare strings instead of entries', `'["child_data","account"]'`],
+  ['AB07', 'an entry with no consent_type', `'[{},{"consent_type":"child_data"},{"consent_type":"account"}]'`],
+  ['AB08', 'a type that does not exist', `'[{"consent_type":"child_data"},{"consent_type":"account"},{"consent_type":"everything"}]'`],
+  ['AB09', 'an entry trying to record a consent as not granted', `'[{"consent_type":"child_data","granted":false},{"consent_type":"account"}]'`],
+  ['AB10', 'a consent_type that is not a string', `'[{"consent_type":["child_data"]},{"consent_type":"account"}]'`],
+  ['AB11', 'the same type given twice', `'[{"consent_type":"child_data"},{"consent_type":"child_data"},{"consent_type":"account"}]'`],
+  ['AB12', 'a JSON null', `'null'`],
+];
+for (const [id, desc, consents] of malformedConsents)
+  add(id, 'child-consent', 'malformed consents are refused, not cast (22023): ' + desc,
+    { ...asScanParent, sql: refusedWith(`perform ${onboard({ consents })};`, '22023', CONSENT_MALFORMED), expect: 'ok', expectOut: 'refused' });
+add('AB13', 'child-consent', 'with both consents a parent adds a child in a new household: sport, goal and both consent records, and the check at commit passes',
+  { ...asScanParent,
+    sql: `select ${onboard()} is not null;
+      ${AT_COMMIT}
+      reset role;
+      select (select count(*) from public.family_members m where m.family_id = a.family_id and m.guardian_id = '${MEMBER_C}' and m.role = 'owner')
+        || '|' || (a.family_id <> '${SCAN_FAMILY}')
+        || '|' || (select count(*) from public.athlete_sports s where s.athlete_id = a.id and s.sport_key = 'football' and s.is_primary)
+        || '|' || (select count(*) from public.goals g where g.athlete_id = a.id and g.status = 'active')
+        || '|' || (select string_agg(c.consent_type || ':' || c.granted || ':' || c.method, ',' order by c.consent_type::text)
+                     from public.consent_records c where c.athlete_id = a.id and c.guardian_id = '${MEMBER_C}')
+        from public.athletes a where a.first_name = 'SyntheticConsentChild';`,
+    expect: 'ok', expectOut: '1|true|1|1|account:true:onboarding_checkbox,child_data:true:onboarding_checkbox' });
+add('AB14', 'child-consent', 'with both consents a parent adds a sibling to the household they belong to, optional media consent recorded too',
+  { ...asScanParent,
+    sql: `select ${onboard({ newFamily: false, family: SCAN_FAMILY, consents: `'[{"consent_type":"child_data"},{"consent_type":"account"},{"consent_type":"media"}]'` })} is not null;
+      ${AT_COMMIT}
+      reset role;
+      select a.family_id || '|' || (select string_agg(c.consent_type::text, ',' order by c.consent_type::text) from public.consent_records c where c.athlete_id = a.id and c.guardian_id = '${MEMBER_C}')
+        from public.athletes a where a.first_name = 'SyntheticConsentChild';`,
+    expect: 'ok', expectOut: `${SCAN_FAMILY}|account,child_data,media` });
+add('AB15', 'child-consent', 'consent does not open a household the caller does not belong to',
+  { role: 'authenticated', claims: ADMIN_B,
+    sql: refusedWith(`perform ${onboard({ newFamily: false, family: SCAN_FAMILY })};`, 'P0001', 'not authorized for this family'), expect: 'ok', expectOut: 'refused' });
+add('AB16', 'child-consent', 'THE CASE: an owner of the household can no longer insert a child directly, past the function',
+  { ...asScanParent, sql: refusedWith(directChild(), '42501', 'new row violates row-level security policy for table "athletes"'), expect: 'ok', expectOut: 'refused' });
+add('AB17', 'child-consent', 'no INSERT or ALL policy on public.athletes is left for any role',
+  { sql: `select count(*)::text from pg_policies where schemaname = 'public' and tablename = 'athletes' and cmd in ('INSERT', 'ALL');`,
+    expect: 'ok', expectOut: '0' });
+add('AB18', 'child-consent', 'THE CASE: the table owner, which bypasses row-level security, cannot commit a child with no consent (23514)',
+  refusedAtCommit(directChild()));
+add('AB19', 'child-consent', 'nor can the service role',
+  { role: 'service_role', ...refusedAtCommit(directChild()) });
+add('AB20', 'child-consent', 'the table owner commits a child whose household guardian gave both consents, written after the child',
+  { sql: directChild() + consentRow(MEMBER_C, 'child_data') + consentRow(MEMBER_C, 'account') + newChildCount, expect: 'ok', expectOut: '1' });
+add('AB21', 'child-consent', 'and so does the service role',
+  { role: 'service_role', sql: directChild() + consentRow(MEMBER_C, 'child_data') + consentRow(MEMBER_C, 'account') + newChildCount, expect: 'ok', expectOut: '1' });
+add('AB22', 'child-consent', 'consent from a guardian outside the household does not count',
+  refusedAtCommit(directChild() + consentRow(ADMIN_A, 'child_data') + consentRow(ADMIN_A, 'account')));
+add('AB23', 'child-consent', 'both consents must come from one guardian, not one from each parent',
+  { setup: coParentB, ...refusedAtCommit(directChild() + consentRow(MEMBER_C, 'child_data') + consentRow(ADMIN_B, 'account')) });
+add('AB24', 'child-consent', 'a consent record that was not granted does not count',
+  refusedAtCommit(directChild() + consentRow(MEMBER_C, 'child_data') + consentRow(MEMBER_C, 'account', false)));
+add('AB25', 'child-consent', 'a child deleted again in the same transaction leaves nothing to refuse',
+  { sql: directChild() + `delete from public.athletes where id = '${NEW_CHILD}';` + newChildCount, expect: 'ok', expectOut: '0' });
+add('AB26', 'child-consent', 'giving the new child another id in the same transaction does not escape the check',
+  refusedAtCommit(directChild('a0000000-0000-4000-8000-00000000c0df') + `update public.athletes set id = '${NEW_CHILD}' where id = 'a0000000-0000-4000-8000-00000000c0df';`));
+add('AB27', 'child-consent', "delete-account's hand-over still works: consent passes to the co-parent who stays and the departing parent leaves",
+  { setup: coParentB, role: 'service_role',
+    sql: `update public.consent_records set guardian_id = '${ADMIN_B}'
+        where guardian_id = '${MEMBER_C}' and athlete_id in (select id from public.athletes where family_id = '${SCAN_FAMILY}');
+      delete from public.family_members where family_id = '${SCAN_FAMILY}' and guardian_id = '${MEMBER_C}';
+      ${AT_COMMIT}
+      select (select count(*) from public.consent_records where guardian_id = '${ADMIN_B}') || '|'
+        || (select string_agg(guardian_id::text, ',') from public.family_members where family_id = '${SCAN_FAMILY}');`,
+    expect: 'ok', expectOut: `6|${ADMIN_B}` });
+add('AB28', 'child-consent', 'the check is a deferred constraint trigger whose SECURITY DEFINER function pins an empty search_path and no tenant role can run; the function pins one too',
+  { sql: `select (select c.condeferrable and c.condeferred from pg_constraint c where c.conname = 'athletes_require_consent' and c.conrelid = 'public.athletes'::regclass)
+        || '|' || (select p.prosecdef || ':' || array_to_string(p.proconfig, ',') from pg_proc p where p.oid = 'private.require_athlete_consent()'::regprocedure)
+        || '|' || (has_function_privilege('anon', 'private.require_athlete_consent()', 'EXECUTE') or has_function_privilege('authenticated', 'private.require_athlete_consent()', 'EXECUTE'))
+        || '|' || (select array_to_string(p.proconfig, ',') from pg_proc p
+                    where p.oid = 'public.create_athlete_onboarding(boolean,uuid,text,text,date,text,text,text[],text,jsonb,jsonb)'::regprocedure);`,
+    expect: 'ok', expectOut: 'true|true:search_path=""|false|search_path=""' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
