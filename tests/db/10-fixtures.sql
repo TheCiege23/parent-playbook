@@ -39,6 +39,18 @@ insert into public.athletes(id, family_id, first_name, birthdate) values
   ('c1111111-1111-4111-8111-11111111111c', 'ffffffff-0000-4000-8000-00000000000f', 'SyntheticOffRoster', date '2012-01-01')
 on conflict (id) do nothing;
 
+-- ---- their consent records
+-- A child cannot be committed without granted child_data and account consent from a guardian of its household
+-- (20260915180000_child_creation_requires_consent.sql), and this file loads in one transaction, so each synthetic
+-- athlete carries both, given by the synthetic owner of the synthetic family.
+insert into public.consent_records(guardian_id, athlete_id, consent_type, granted, method)
+select 'cccccccc-0000-4000-8000-00000000000c', a.id, t.consent_type, true, 'synthetic_fixture'
+  from (values ('a1111111-1111-4111-8111-11111111111a'::uuid), ('b1111111-1111-4111-8111-11111111111b'::uuid),
+               ('c1111111-1111-4111-8111-11111111111c'::uuid)) as a(id)
+ cross join (values ('child_data'::public.consent_type), ('account'::public.consent_type)) as t(consent_type)
+ where not exists (select 1 from public.consent_records c
+                    where c.athlete_id = a.id and c.consent_type = t.consent_type and c.granted);
+
 -- athleteA1 is on Org A's roster; athleteB1 on Org B's; athleteX is on NO roster.
 insert into public.team_memberships(team_id, athlete_id, season) values
   ('11111111-1111-4111-8111-111111111111', 'a1111111-1111-4111-8111-11111111111a', '2026'),

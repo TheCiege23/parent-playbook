@@ -3,8 +3,9 @@
 // It lets the real app scripts run in a browser against an in-memory database, so a screen can be clicked through and
 // read back without a live project, an account or real data. Every row it holds is synthetic and lives only in this
 // page; a reload starts again. It is not a model of Postgres: it answers the query-builder calls the app makes, applies
-// a few foreign-key cascades the screens rely on, and implements save_adult_health_import and create_athlete_onboarding.
-// Row-level security, check constraints and every other rule are the database's job and are tested in tests/db, not here.
+// a few foreign-key cascades the screens rely on, and implements save_adult_health_import and create_athlete_onboarding,
+// including the latter's consent refusals. Row-level security, check constraints and every other rule are the database's
+// job and are tested in tests/db, not here.
 (function(){
   const USER = Object.freeze({ id:'00000000-0000-4000-8000-0000000000aa', email:'synthetic-parent@example.invalid' });
   // Two scenarios, chosen with ?scenario= in the page address.
@@ -161,9 +162,26 @@
     return b;
   }
 
-  // create_athlete_onboarding, as 20260806143444 defines it: a household when asked for one, the athlete, their sport and
-  // goals, and a consent record for each consent given. Like the database it requires no consent; the browser is the only
-  // place that does, which is how the add-child flow could save without asking (fixed 2026-09-15).
+  // create_athlete_onboarding, as 20260915180000_child_creation_requires_consent.sql defines it: consent first, then a
+  // household when asked for one, the athlete, their sport and goals, and a consent record for each consent given. Like the
+  // database it refuses, with the same code and message and before writing anything, consents that are not a list of
+  // {"consent_type": <known type>} entries each given once, and a list without both child_data and account. Until that
+  // migration the browser was the only place a child's consent was required, which is how the add-child flow could save
+  // without asking (fixed in the browser 2026-09-15). The live project refuses these only once that migration is applied,
+  // so for this one function the family scenario is ahead of production. The database's other refusals (sign-in, name,
+  // sport, membership) and its check at commit are not modelled here; tests/db holds those.
+  const CONSENT_TYPES = ['account', 'child_data', 'sharing', 'third_party', 'media'];
+  function onboardingConsentRefusal(consents){
+    const refuse = message => ({ code:'22023', message, details:null, hint:null });
+    const list = consents == null ? [] : consents;
+    const malformed = 'Each consent must be {"consent_type": <a known type>}, given once, in a list.';
+    if (!Array.isArray(list)) return refuse(malformed);
+    const types = list.map(c => (c && typeof c === 'object' && !Array.isArray(c) && Object.keys(c).length === 1
+      && typeof c.consent_type === 'string' && CONSENT_TYPES.includes(c.consent_type) ? c.consent_type : null));
+    if (types.includes(null) || new Set(types).size !== types.length) return refuse(malformed);
+    if (!types.includes('child_data') || !types.includes('account')) return refuse('Both required consents, child_data and account, are needed to add a child.');
+    return null;
+  }
   function createAthleteOnboarding(a){
     let family = a.p_family_id;
     if (a.p_new_family || !family) {
@@ -330,7 +348,10 @@
       calls.push(['rpc', name]);
       if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
-      if (name === 'create_athlete_onboarding') return { data:createAthleteOnboarding(args), error:null };
+      if (name === 'create_athlete_onboarding') {
+        const refused = onboardingConsentRefusal(args.p_consents);
+        return refused ? { data:null, error:refused } : { data:createAthleteOnboarding(args), error:null };
+      }
       return { data:null, error:null };
     },
     auth:{
