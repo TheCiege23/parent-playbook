@@ -14,9 +14,9 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v130`; local production-shaped smoke 29/29; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 985/985 |
-| Database suite | `node tests/db/run.cjs` | 412/412 on a disposable cluster built from the real migrations: 391 security cases plus a 21-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 218/218, exclusions clean, contracts 330/330, database 412/412, signature verified, host serving |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 988/988 |
+| Database suite | `node tests/db/run.cjs` | 425/425 on a disposable cluster built from the real migrations: 404 security cases plus a 21-case restore and deletion rehearsal |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 219/219, exclusions clean, contracts 330/330, database 425/425, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
 
@@ -57,7 +57,7 @@ on September 13 against FIT:MATCH's current public pages (`FITMATCH-CLAIM-MAP.md
 things FIT:MATCH claims and the first rubric did not score: population benchmarking, an
 authenticated results API and iOS and mobile embedding. That lowered the total from 42.75% to 39% with
 no stage changed. The results API has since been built and tested locally, which moved it to 0.5 and
-the total to 40%; it is not deployed. A tested WebView message bridge then moved iOS and mobile embedding to 0.25 (40.75%); no WebView or phone has run it. Body composition (15), circumferences (10), benchmarking (4) and
+the total to 40%; it is deployed on the live project since 2026-09-15 but has served no call with an issued key. A tested WebView message bridge then moved iOS and mobile embedding to 0.25 (40.75%); no WebView or phone has run it. Body composition (15), circumferences (10), benchmarking (4) and
 iOS embedding (3) are the weakest: 32 of 100 points, with 4.25 earned. Personalized 3D body is the
 heaviest category (16), is only halfway and writes USDZ only in the research lab. Say this before they find it.
 Some of what moves the score is code (a native iOS SDK, avatar files, deploying the results API) and
@@ -101,8 +101,8 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 218 files, checksummed, one command to verify it, and its own
-  bundled migrations rebuild the schema and pass all 412 cases on a clean database.
+- **The buyer archive stands alone**: 219 files, checksummed, one command to verify it, and its own
+  bundled migrations rebuild the schema and pass all 425 cases on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
 than judgment. Three defects worth admitting if pressed, because finding them is the point: the
