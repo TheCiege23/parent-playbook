@@ -1959,6 +1959,104 @@ add('AC09', 'athlete-delete', 'both replaced audit functions still pin an empty 
       + " from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname in ('audit_company_body_assessment_change', 'audit_company_composition_change');",
     expect: 'ok', expectOut: 'audit_company_body_assessment_change=search_path="":true:1 audit_company_composition_change=search_path="":true:1' });
 
+// =========================================================== AD. a signed-in parent writes only inside their own household
+// Three policies let a signed-in account write outside the household it belongs to. ath_update checked that the caller
+// could edit the child as stored, never the household the child was being written into, so an owner or an invited
+// co-parent could move a child into any household. consent_ins checked only that a consent named its author, so anyone
+// could put consent records on another family's child. fm_insert, and fm_update with it, let a household editor make any
+// account a member, as owner if they liked, without an invite. The app does none of these: it never writes a child's
+// household, a consent row or a membership directly, and an invite grants per-child access, not membership.
+const OTHER_FAMILY = 'fb000000-0000-4000-8000-0000000000fb';   // another household, owned by ADMIN_B
+const SECOND_FAMILY = 'fc000000-0000-4000-8000-0000000000fc';  // a second household of the scan parent's own
+// A household is created the way the app creates one: its creator inserts it and private.handle_new_family() makes them
+// its owner, which reads auth.uid(), so the setup supplies the claim.
+const householdOf = (family, owner) => `select set_config('request.jwt.claims','{"sub":"${owner}","role":"authenticated"}',true);
+  insert into public.families(id, name, created_by) values ('${family}', 'Synthetic household', '${owner}');`;
+// What accept_invite() writes for a co-parent invited to one child: per-child access, not membership.
+const invitedCoParentB = `insert into public.athlete_access(athlete_id, guardian_id, role, granted_by) values ('${ATH_A}', '${ADMIN_B}', 'co_parent', '${MEMBER_C}');`;
+const ATHLETES_RLS = 'new row violates row-level security policy for table "athletes"';
+const CONSENT_RLS = 'new row violates row-level security policy for table "consent_records"';
+const MEMBERS_RLS = 'new row violates row-level security policy for table "family_members"';
+const refusedBy = (statement, message) => ({ sql: refusedWith(statement, '42501', message), expect: 'ok', expectOut: 'refused' });
+const moveChild = family => `update public.athletes set family_id = '${family}' where id = '${ATH_A}';`;
+const consentFor = (guardian, athlete, type, granted = true) =>
+  `insert into public.consent_records(guardian_id, athlete_id, consent_type, granted, method) values ('${guardian}', ${athlete ? `'${athlete}'` : 'null'}, '${type}', ${granted}, 'synthetic_case')`;
+const addMember = (guardian, role) => `insert into public.family_members(family_id, guardian_id, role) values ('${SCAN_FAMILY}', '${guardian}', '${role}');`;
+const scanMembers = `reset role; select string_agg(guardian_id::text || ':' || role, ',' order by guardian_id::text) from public.family_members where family_id = '${SCAN_FAMILY}';`;
+const editChild = `with u as (update public.athletes set first_name = 'SyntheticRenamed', nickname = 'Syn', birthdate = date '2012-02-02', dominant_hand = 'left'
+    where id = '${ATH_A}' returning family_id) select count(*) || '|' || min(family_id::text) from u;`;
+
+add('AD01', 'household-writes', "THE CASE: an owner cannot move their child into another family's household",
+  { setup: householdOf(OTHER_FAMILY, ADMIN_B), ...asScanParent, ...refusedBy(moveChild(OTHER_FAMILY), ATHLETES_RLS) });
+add('AD02', 'household-writes', 'nor into a second household of their own: a child stays in the household it was added to',
+  { setup: householdOf(SECOND_FAMILY, MEMBER_C), ...asScanParent, ...refusedBy(moveChild(SECOND_FAMILY), ATHLETES_RLS) });
+add('AD03', 'household-writes', 'THE CASE: a co-parent invited to the child cannot move them into their own household',
+  { setup: householdOf(OTHER_FAMILY, ADMIN_B) + invitedCoParentB, role: 'authenticated', claims: ADMIN_B, ...refusedBy(moveChild(OTHER_FAMILY), ATHLETES_RLS) });
+add('AD04', 'household-writes', "the owner still edits the child's name, nickname, birthdate and hand, as the Edit screen does",
+  { ...asScanParent, sql: editChild, expect: 'ok', expectOut: `1|${SCAN_FAMILY}` });
+add('AD05', 'household-writes', 'and so does the invited co-parent, who is not a member of the household',
+  { setup: invitedCoParentB, role: 'authenticated', claims: ADMIN_B, sql: editChild, expect: 'ok', expectOut: `1|${SCAN_FAMILY}` });
+add('AD06', 'household-writes', 'the growth inputs the Growth screen writes still save',
+  { ...asScanParent, sql: `with u as (update public.athletes set sex_at_birth = 'female', mother_height_in = 64, father_height_in = 70 where id = '${ATH_A}' returning 1) select count(*)::text from u;`,
+    expect: 'ok', expectOut: '1' });
+add('AD07', 'household-writes', 'an update that restates the household the child is already in is accepted',
+  { ...asScanParent, sql: `with u as (update public.athletes set family_id = '${SCAN_FAMILY}', first_name = 'SyntheticRestated' where id = '${ATH_A}' returning 1) select count(*)::text from u;`,
+    expect: 'ok', expectOut: '1' });
+
+add('AD08', 'household-writes', "THE CASE: an account outside the household cannot record a consent for another family's child",
+  { role: 'authenticated', claims: ADMIN_A, ...refusedBy(consentFor(ADMIN_A, ATH_A, 'media') + ';', CONSENT_RLS) });
+add('AD09', 'household-writes', 'nor record one as refused',
+  { role: 'authenticated', claims: ADMIN_A, ...refusedBy(consentFor(ADMIN_A, ATH_A, 'sharing', false) + ';', CONSENT_RLS) });
+add('AD10', 'household-writes', 'a co-parent invited to the child has access to them but is not their household, so cannot record one either',
+  { setup: invitedCoParentB, role: 'authenticated', claims: ADMIN_B, ...refusedBy(consentFor(ADMIN_B, ATH_A, 'media') + ';', CONSENT_RLS) });
+add('AD11', 'household-writes', 'a consent names a child: one with no child is refused',
+  { ...asScanParent, ...refusedBy(consentFor(MEMBER_C, null, 'account') + ';', CONSENT_RLS) });
+add('AD12', 'household-writes', 'the owner still records a consent for their own child',
+  { ...asScanParent, sql: `with i as (${consentFor(MEMBER_C, ATH_A, 'media')} returning 1) select count(*)::text from i;`, expect: 'ok', expectOut: '1' });
+add('AD13', 'household-writes', "a co-parent who is a member of the household records their own consent for the household's child",
+  { setup: coParentB, role: 'authenticated', claims: ADMIN_B,
+    sql: `with i as (${consentFor(ADMIN_B, ATH_A, 'media')} returning 1) select count(*)::text from i;`, expect: 'ok', expectOut: '1' });
+add('AD14', 'household-writes', "nobody records a consent in another guardian's name, the household's owner included",
+  { setup: coParentB, ...asScanParent, ...refusedBy(consentFor(ADMIN_B, ATH_A, 'media') + ';', CONSENT_RLS) });
+
+add('AD15', 'household-writes', 'THE CASE: the owner cannot make another account a member of the household without an invite',
+  { ...asScanParent, ...refusedBy(addMember(ADMIN_A, 'co_parent'), MEMBERS_RLS) });
+add('AD16', 'household-writes', 'nor make another account an owner',
+  { ...asScanParent, ...refusedBy(addMember(ADMIN_A, 'owner'), MEMBERS_RLS) });
+add('AD17', 'household-writes', 'a co-parent member cannot add an account either',
+  { setup: coParentB, role: 'authenticated', claims: ADMIN_B, ...refusedBy(addMember(ADMIN_A, 'co_parent'), MEMBERS_RLS) });
+add('AD18', 'household-writes', 'an account cannot add itself to a household it does not belong to',
+  { role: 'authenticated', claims: ADMIN_A, ...refusedBy(addMember(ADMIN_A, 'owner'), MEMBERS_RLS) });
+add('AD19', 'household-writes', "THE CASE: the owner cannot hand an existing membership to another account, which adds that account in two steps",
+  { setup: coParentB, ...asScanParent,
+    sql: `update public.family_members set guardian_id = '${ADMIN_A}' where family_id = '${SCAN_FAMILY}' and guardian_id = '${ADMIN_B}';` + scanMembers,
+    expect: 'ok', expectOut: `${ADMIN_B}:co_parent,${MEMBER_C}:owner` });
+add('AD20', 'household-writes', 'THE CASE: a co-parent member cannot make themselves owner, which would let them delete the household',
+  { setup: coParentB, role: 'authenticated', claims: ADMIN_B,
+    sql: `update public.family_members set role = 'owner' where family_id = '${SCAN_FAMILY}' and guardian_id = '${ADMIN_B}';` + scanMembers,
+    expect: 'ok', expectOut: `${ADMIN_B}:co_parent,${MEMBER_C}:owner` });
+add('AD21', 'household-writes', 'no INSERT, UPDATE or ALL policy is left on public.family_members for any role',
+  { sql: `select count(*)::text from pg_policies where schemaname = 'public' and tablename = 'family_members' and cmd in ('INSERT', 'UPDATE', 'ALL');`,
+    expect: 'ok', expectOut: '0' });
+add('AD22', 'household-writes', 'creating a household still makes its creator the owner',
+  { ...asScanParent,
+    sql: `insert into public.families(id, name, created_by) values ('${SECOND_FAMILY}', 'Synthetic household', '${MEMBER_C}');
+      reset role; select string_agg(guardian_id::text || ':' || role, ',') from public.family_members where family_id = '${SECOND_FAMILY}';`,
+    expect: 'ok', expectOut: `${MEMBER_C}:owner` });
+add('AD23', 'household-writes', 'accepting a family-wide co-parent invite still grants access to every child in the household, and no membership',
+  { setup: `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', 'co_parent', 'synthetic-household-invite', '${MEMBER_C}', 'family');`,
+    role: 'authenticated', claims: ADMIN_A,
+    sql: `select public.accept_invite('synthetic-household-invite') = '${ATH_A}';
+      reset role;
+      select (select count(*) from public.athlete_access where guardian_id = '${ADMIN_A}' and role = 'co_parent' and revoked_at is null)
+        || '|' || (select count(*) from public.family_members where guardian_id = '${ADMIN_A}');`,
+    expect: 'ok', expectOut: '3|0' });
+add('AD24', 'household-writes', 'both policy helpers run as definer with an empty search_path, and only authenticated may execute them',
+  { sql: `select string_agg(p.proname || '=' || p.prosecdef::text || ':' || array_to_string(p.proconfig, ',') || ':'
+        || has_function_privilege('authenticated', p.oid, 'EXECUTE')::text || ':' || has_function_privilege('anon', p.oid, 'EXECUTE')::text, ' ' order by p.proname)
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname in ('athlete_in_household', 'is_household_guardian_of');`,
+    expect: 'ok', expectOut: 'athlete_in_household=true:search_path="":true:false is_household_guardian_of=true:search_path="":true:false' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
