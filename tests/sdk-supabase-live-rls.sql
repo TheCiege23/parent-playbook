@@ -28,13 +28,16 @@ do $$ begin
 end $$;
 
 grant select on sdk_company_smoke_context to authenticated,anon;
+grant update on sdk_company_smoke_context to authenticated;
 select set_config('request.jwt.claim.sub',(select actor_id::text from sdk_company_smoke_context),true);
 set local role authenticated;
 
-insert into public.families(id,name,created_by)
-select family_id,'SDK live RLS smoke',actor_id from sdk_company_smoke_context;
-insert into public.athletes(id,family_id,first_name,birthdate,created_by)
-select athlete_id,family_id,'SDK Smoke Adult','1990-01-01',actor_id from sdk_company_smoke_context;
+-- Since 20260915180000_child_creation_requires_consent.sql a signed-in account adds anyone to a household only through
+-- create_athlete_onboarding(), with both required consents; the smoke takes the ids it created, and rolls them back.
+update sdk_company_smoke_context set athlete_id=public.create_athlete_onboarding(
+  true,null,'SDK live RLS smoke','SDK Smoke Adult','1990-01-01',null,'football','{}',null,
+  '[]'::jsonb,'[{"consent_type":"child_data"},{"consent_type":"account"}]'::jsonb);
+update sdk_company_smoke_context s set family_id=a.family_id from public.athletes a where a.id=s.athlete_id;
 insert into public.teams(id,name,created_by)
 select team_id,'SDK Smoke Organization',actor_id from sdk_company_smoke_context;
 insert into public.team_memberships(id,athlete_id,team_id,season)

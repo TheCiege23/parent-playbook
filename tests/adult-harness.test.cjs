@@ -105,11 +105,31 @@ test('the fake saves a child the way create_athlete_onboarding does, so adding o
   vm.runInContext(read('tools/adult-harness/fake-supabase.js'), ctx);
   const sb = ctx.window.supabase.createClient();
   const { db, USER } = ctx.window.__harness;
-  const migration = read('supabase/migrations/20260806143444_create_athlete_onboarding_fn.sql');
+  // The function's current definition: the last migration that creates or replaces it.
+  const definitions = fs.readdirSync(path.join(base, 'supabase/migrations')).filter(f => f.endsWith('.sql')).sort()
+    .filter(f => read('supabase/migrations/' + f).includes('create or replace function public.create_athlete_onboarding('));
+  assert.equal(definitions.at(-1), '20260915180000_child_creation_requires_consent.sql');
+  const migration = read('supabase/migrations/' + definitions.at(-1));
   const params = [...migration.matchAll(/^\s+(p_[a-z_]+) [a-z\[\]]+,?$/gm)].map(m => m[1]);
   const args = { p_new_family: true, p_family_id: null, p_family_name: '', p_first: 'Synthetic', p_birthdate: '2015-03-01', p_hand: null, p_sport: 'synthetic_sport',
     p_positions: [], p_level: '', p_goals: [{ type: 'skill', key: 'k', label: 'Synthetic goal' }], p_consents: [{ consent_type: 'child_data' }, { consent_type: 'account' }] };
   assert.deepEqual(Object.keys(args), params, 'the arguments the migration declares');
+
+  // Consent is refused the way the database refuses it: the same SQLSTATE and message, and nothing written.
+  const [malformed, , missing] = [...migration.matchAll(/raise exception '([^']+)' using errcode = '22023'/g)].map(m => m[1]);
+  assert.ok(missing && malformed, 'the migration names its two consent refusals');
+  const refusals = [
+    [[], missing], [null, missing], [[{ consent_type: 'child_data' }], missing], [[{ consent_type: 'account' }, { consent_type: 'media' }], missing],
+    [{ consent_type: 'child_data' }, malformed], [['child_data', 'account'], malformed], [[{}, { consent_type: 'child_data' }, { consent_type: 'account' }], malformed],
+    [[{ consent_type: 'child_data', granted: false }, { consent_type: 'account' }], malformed],
+    [[{ consent_type: 'child_data' }, { consent_type: 'child_data' }, { consent_type: 'account' }], malformed],
+    [[{ consent_type: 'everything' }, { consent_type: 'child_data' }, { consent_type: 'account' }], malformed],
+  ];
+  for (const [p_consents, message] of refusals) {
+    const refused = await sb.rpc('create_athlete_onboarding', { ...args, p_consents });
+    assert.equal(JSON.stringify([refused.data, refused.error && refused.error.code, refused.error && refused.error.message]), JSON.stringify([null, '22023', message]), JSON.stringify(p_consents));
+  }
+  assert.equal(JSON.stringify([db.families, db.athletes, db.consent_records].map(rows => (rows || []).length)), '[0,0,0]', 'a refusal writes nothing');
 
   const first = await sb.rpc('create_athlete_onboarding', args);
   assert.equal(first.error, null);
@@ -122,10 +142,15 @@ test('the fake saves a child the way create_athlete_onboarding does, so adding o
   assert.equal(goals.data.length, 1, 'the week lists only active goals, and the column defaults to active');
   assert.equal(JSON.stringify(db.consent_records.map(c => [c.consent_type, c.granted, c.method])), '[["child_data",true,"onboarding_checkbox"],["account",true,"onboarding_checkbox"]]');
 
-  const sibling = await sb.rpc('create_athlete_onboarding', { ...args, p_new_family: false, p_family_id: db.families[0].id, p_first: 'Sibling', p_goals: [], p_consents: [] });
+  const unconsented = await sb.rpc('create_athlete_onboarding', { ...args, p_new_family: false, p_family_id: db.families[0].id, p_first: 'Sibling', p_goals: [], p_consents: [] });
+  assert.equal(JSON.stringify([unconsented.error.code, db.athletes.length]), '["22023",1]', 'a sibling is not added without consent either');
+  const sibling = await sb.rpc('create_athlete_onboarding', { ...args, p_new_family: false, p_family_id: db.families[0].id, p_first: 'Sibling', p_goals: [],
+    p_consents: [{ consent_type: 'child_data' }, { consent_type: 'account' }, { consent_type: 'media' }] });
+  assert.equal(sibling.error, null);
   assert.equal(db.families.length, 1, 'a sibling joins the household');
   assert.equal(db.athletes.find(a => a.id === sibling.data).family_id, db.families[0].id);
-  assert.equal(db.consent_records.length, 2, 'like the database, it records only what it is given');
+  assert.equal(JSON.stringify(db.consent_records.filter(c => c.athlete_id === sibling.data).map(c => c.consent_type)), '["child_data","account","media"]',
+    'like the database, it records each consent it is given');
 
   await sb.from('goals').insert({ athlete_id: sibling.data, type: 'skill', label: 'Picked on the week' });
   assert.equal(db.goals.at(-1).status, 'active', 'a goal a screen inserts without a status is active too');

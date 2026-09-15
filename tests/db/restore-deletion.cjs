@@ -193,6 +193,8 @@ check('D07', 'deletion', 'tenant roles cannot run the retention sweep themselves
 // there once it is known to pass where it should and fail where it should, so both are proven here.
 const LIVE_DELETION = fs.readFileSync(path.join(__dirname, '..', 'company-deletion-live-rls.sql'), 'utf8');
 const rehearsalResidue = () => sql(`select (select count(*) from public.teams where name = 'Synthetic Deletion Organization')
+  + (select count(*) from public.families where name = 'Company deletion rehearsal (synthetic)')
+  + (select count(*) from public.athletes where first_name = 'Synthetic Deletion Adult')
   + (select count(*) from public.company_body_assessments where assessment_id like 'deletion-rehearsal-%')
   + (select count(*) from public.company_reference_assessments where assessment_id like 'deletion-rehearsal-%')
   + (select count(*) from public.access_log where detail->>'assessment_id' like 'deletion-rehearsal-%');`);

@@ -44,15 +44,18 @@ do $$ begin
   end if;
 end $$;
 
-grant select on company_deletion_context to authenticated;
+grant select, update on company_deletion_context to authenticated;
 select set_config('request.jwt.claim.sub', (select actor_id::text from company_deletion_context), true);
 set local role authenticated;
 
 -- A synthetic organization the administrator owns, with one rostered synthetic adult and a live release.
-insert into public.families(id, name, created_by)
-select family_id, 'Company deletion rehearsal (synthetic)', actor_id from company_deletion_context;
-insert into public.athletes(id, family_id, first_name, birthdate, created_by)
-select athlete_id, family_id, 'Synthetic Deletion Adult', '1990-01-01', actor_id from company_deletion_context;
+-- Since 20260915180000_child_creation_requires_consent.sql a signed-in account adds anyone to a household only through
+-- create_athlete_onboarding(), with both required consents, so the synthetic household and adult are made there and the
+-- rehearsal takes the ids it created. The consent rows go with the rollback like everything else.
+update company_deletion_context set athlete_id = public.create_athlete_onboarding(
+  true, null, 'Company deletion rehearsal (synthetic)', 'Synthetic Deletion Adult', '1990-01-01', null, 'football', '{}', null,
+  '[]'::jsonb, '[{"consent_type": "child_data"}, {"consent_type": "account"}]'::jsonb);
+update company_deletion_context s set family_id = a.family_id from public.athletes a where a.id = s.athlete_id;
 insert into public.teams(id, name, created_by)
 select team_id, 'Synthetic Deletion Organization', actor_id from company_deletion_context;
 insert into public.team_memberships(id, athlete_id, team_id, season)
