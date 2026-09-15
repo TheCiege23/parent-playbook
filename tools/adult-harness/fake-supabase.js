@@ -3,8 +3,8 @@
 // It lets the real app scripts run in a browser against an in-memory database, so a screen can be clicked through and
 // read back without a live project, an account or real data. Every row it holds is synthetic and lives only in this
 // page; a reload starts again. It is not a model of Postgres: it answers the query-builder calls the app makes, applies
-// a few foreign-key cascades the screens rely on, and implements save_adult_health_import. Row-level security, check
-// constraints and every other rule are the database's job and are tested in tests/db, not here.
+// a few foreign-key cascades the screens rely on, and implements save_adult_health_import and create_athlete_onboarding.
+// Row-level security, check constraints and every other rule are the database's job and are tested in tests/db, not here.
 (function(){
   const USER = Object.freeze({ id:'00000000-0000-4000-8000-0000000000aa', email:'synthetic-parent@example.invalid' });
   // Two scenarios, chosen with ?scenario= in the page address.
@@ -67,6 +67,7 @@
   // Column defaults the screens rely on, as the migrations declare them (a goal is saved without a status and listed
   // only when active).
   const DEFAULTS = {
+    goals:{ status:'active' },
     adult_profiles:{ units:'lb' },
     adult_goals:{ status:'active' },
     adult_schedule_exercises:{ position:0 },
@@ -158,6 +159,27 @@
       then(resolve, reject){ try { resolve(run()); } catch (e) { reject(e); } },
     };
     return b;
+  }
+
+  // create_athlete_onboarding, as 20260806143444 defines it: a household when asked for one, the athlete, their sport and
+  // goals, and a consent record for each consent given. Like the database it requires no consent; the browser is the only
+  // place that does, which is how the add-child flow could save without asking (fixed 2026-09-15).
+  function createAthleteOnboarding(a){
+    let family = a.p_family_id;
+    if (a.p_new_family || !family) {
+      family = uuid();
+      table('families').push({ id:family, name:a.p_family_name || 'My Family', created_by:USER.id, created_at:now() });
+      table('family_members').push({ family_id:family, guardian_id:USER.id, role:'owner', created_at:now() });
+    }
+    const athlete = uuid();
+    table('athletes').push({ id:athlete, family_id:family, first_name:a.p_first, nickname:null, birthdate:a.p_birthdate,
+      dominant_hand:a.p_hand || null, created_by:USER.id, created_at:now() });
+    table('athlete_sports').push({ id:uuid(), athlete_id:athlete, sport_key:a.p_sport, positions:a.p_positions || [], level:a.p_level || null,
+      is_primary:true, practice_days:[], game_day:null, season_start:null, season_end:null, season_state:null, parent_experience:null, created_at:now() });
+    for (const g of a.p_goals || []) table('goals').push({ id:uuid(), athlete_id:athlete, type:g.type, sport_key:a.p_sport, key:g.key, label:g.label,
+      status:'active', created_by:USER.id, created_at:now() });
+    for (const c of a.p_consents || []) table('consent_records').push({ id:uuid(), guardian_id:USER.id, athlete_id:athlete, consent_type:c.consent_type, granted:true, method:'onboarding_checkbox', created_at:now() });
+    return athlete;
   }
 
   // The one database function the adult screens call. Same duplicate keys as the migration's unique indexes.
@@ -308,6 +330,7 @@
       calls.push(['rpc', name]);
       if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
+      if (name === 'create_athlete_onboarding') return { data:createAthleteOnboarding(args), error:null };
       return { data:null, error:null };
     },
     auth:{

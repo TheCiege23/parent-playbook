@@ -539,14 +539,18 @@ function obReveal(){
     </div>`:''}
   </div>
   <div style="margin-top:18px">
+    ${state.user?H`${obConsentFields()}<div class="err" id="oberr"></div>`:''}
     <button class="btn amber" id="n">Save ${nm}'s playbook</button>
     <p class="muted-note" style="margin-top:10px">${state.user?'Adds them to your household — nothing else changes.':"Takes 20 seconds — then it's yours to keep."}</p>
+    ${state.user?obConsentNote():''}
   </div>
   <div style="margin-top:6px"><button class="btn ghost" id="b">Back</button></div>`;
 }
 function obRevealBind(){
   $("#b").onclick=obBack;
-  // Already signed in? There is no account step after this — save straight away.
+  // Already signed in? There is no account step after this, so consent is given here and the profile saved straight
+  // away. Signed out, the boxes are on the account step instead and this binds nothing.
+  obBindConsents();
   $("#n").onclick=()=>{ if(state.user) return finishOnboarding(); obNext(); };
 }
 
@@ -562,26 +566,18 @@ function obAccount(){
     <input id="obEmail" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(ob.email||'')}"/></div>
   <div class="field"><label>Password</label>
     <input id="obPw" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
-  <div class="card app-pad">
-    ${CONSENTS.map(c=>H`
-      <label style="display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)">
-        <input type="checkbox" data-c="${c.key}" ${ob.consents[c.key]?'checked':''} style="width:20px;height:20px;margin-top:1px;flex:0 0 auto" />
-        <span style="font-size:13.5px;line-height:1.45">${esc(c.label)} ${c.req?'<b style="color:var(--danger)">*</b>':''}</span>
-      </label>`).join('')}
-  </div>
+  ${obConsentFields()}
   <div class="err" id="oberr"></div>
   <div class="row2" style="margin-top:16px">
     <button class="btn ghost" id="b">Back</button><button class="btn amber" id="n">Create account</button>
   </div>
-  <p class="muted-note">By finishing you provide verifiable parental consent under COPPA for the data you've entered.<br>
-    Read the <a href="/privacy" target="_blank" rel="noopener" style="color:var(--green-d)">Privacy Policy</a> and
-    <a href="/terms" target="_blank" rel="noopener" style="color:var(--green-d)">Terms</a> — the consent above refers to them.</p>
+  ${obConsentNote()}
   <p class="muted-note" style="margin-top:4px">Already have an account? <a href="#" id="obLogin2" style="color:var(--green-d)">Log in</a></p>`;
 }
 function obAccountBind(){
   $("#b").onclick=obBack;
   { const l=$("#obLogin2"); if(l) l.onclick=e=>{ e.preventDefault(); renderAuth('login'); }; }
-  document.querySelectorAll('input[data-c]').forEach(x=>x.onchange=()=>ob.consents[x.dataset.c]=x.checked);
+  obBindConsents();
   $("#n").onclick=obCreateAccount;
 }
 
@@ -676,39 +672,45 @@ const CONSENTS = [
   {key:'account',    req:true,  label:"I agree to the Terms and understand I can delete this profile and its data at any time."},
   {key:'media',      req:false, label:"I may add photos to help track progress. Photos stay private to my household and people I invite. (optional)"},
 ];
-function obConsent(){
+// The consent boxes, wherever a profile is saved: on the account step when signing up, and on the reveal when someone
+// already signed in saves straight away (a sibling, or a first child on an account that has none). Until 2026-09-15 the
+// reveal had no boxes, so finishOnboarding() refused every such save and then crashed writing the refusal into an error
+// line the reveal did not have: no signed-in parent could add a child. Found by a signed-in regression in production.
+function obConsentFields(){
   return H`
-  <div class="ob-head"><div class="k">Consent & safety</div><h2>You're in control of the data</h2>
-  <p>A quick, required step to keep ${esc(ob.athlete.first)} safe.</p></div>
-  <div class="teach"><div class="ic">🎓</div><div><h4>Built child-safe by design</h4>
-    <p>Your child never logs in and is never public. Only you — and adults you explicitly invite — can ever see this profile. You can revoke access or delete everything anytime.</p></div></div>
   <div class="card app-pad">
     ${CONSENTS.map(c=>H`
       <label style="display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)">
-        <input type="checkbox" data-c="${c.key}" style="width:20px;height:20px;margin-top:1px;flex:0 0 auto" />
+        <input type="checkbox" data-c="${c.key}" ${ob.consents[c.key]?'checked':''} style="width:20px;height:20px;margin-top:1px;flex:0 0 auto" />
         <span style="font-size:13.5px;line-height:1.45">${esc(c.label)} ${c.req?'<b style="color:var(--danger)">*</b>':''}</span>
       </label>`).join('')}
-  </div>
-  <div class="err" id="oberr"></div>
-  <div class="row2" style="margin-top:16px">
-    <button class="btn ghost" id="b">Back</button><button class="btn amber" id="n">Create profile</button>
-  </div>
-  <p class="muted-note">By finishing you provide verifiable parental consent under COPPA for the data you've entered.<br>
+  </div>`;
+}
+function obConsentNote(){
+  return H`<p class="muted-note">By finishing you provide verifiable parental consent under COPPA for the data you've entered.<br>
     Read the <a href="/privacy" target="_blank" rel="noopener" style="color:var(--green-d)">Privacy Policy</a> and
     <a href="/terms" target="_blank" rel="noopener" style="color:var(--green-d)">Terms</a> — the consent above refers to them.</p>`;
 }
-function obConsentBind(){
-  $("#b").onclick=obBack;
+function obBindConsents(){
   document.querySelectorAll('input[data-c]').forEach(x=>x.onchange=()=>ob.consents[x.dataset.c]=x.checked);
-  $("#n").onclick=finishOnboarding;
 }
+// afterLogin() replays a stash with only a spinner on screen. The stash was saved on the account step, which a signed-in
+// parent no longer has, so its step number points past the end and obStep() threw, leaving the spinner up for good. The
+// reveal is the last step they do have, and it carries the boxes and the Save button.
+function obReopenReveal(){ ob.i=obSteps().indexOf('reveal'); obStep(); }
 
 async function finishOnboarding(){
   // Reachable from three places now: the reveal (sibling flow), the account step, and
   // afterLogin() replaying a stash. Only the first two have a visible button.
   const errEl=$("#oberr"); if(errEl) errEl.textContent="";
   const missing = CONSENTS.filter(c=>c.req && !ob.consents[c.key]);
-  if(missing.length){ errEl.textContent="Please check the required consent boxes."; return; }
+  if(missing.length){
+    // Said beside the boxes. A replayed stash has none on screen, so it opens the step that does first.
+    if(!errEl) obReopenReveal();
+    const line=$("#oberr"), msg="Please check the required consent boxes.";
+    if(line) line.textContent=msg; else toast(msg);
+    return;
+  }
   const btn=$("#n"); const label=btn?btn.textContent:'';
   if(btn){ btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true; }
   try{
@@ -789,7 +791,7 @@ async function finishOnboarding(){
     reportError(err,'onboarding:finish');
     if(errEl) errEl.textContent = "Something went wrong saving. "+(err.message||'');
     if(btn){ btn.innerHTML=label; btn.disabled=false; }
-    else { toast("Could not save the profile — try again"); obStep(); }
+    else { toast("Could not save the profile — try again"); obReopenReveal(); }
   }
 }
 

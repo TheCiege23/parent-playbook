@@ -97,3 +97,36 @@ test('the fake applies the cascades the screens rely on and the import dedupes l
   await sb.from('adult_health_import_batches').delete().eq('id', 'b1');
   assert.equal(db.adult_health_records.length, 0, 'undoing an import removes its readings');
 });
+
+test('the fake saves a child the way create_athlete_onboarding does, so adding one can be clicked through', async () => {
+  const vm = require('node:vm');
+  const ctx = vm.createContext({ console, crypto: require('node:crypto').webcrypto, Date, Math, JSON, Number, String, Array, Object, Set });
+  ctx.window = ctx;
+  vm.runInContext(read('tools/adult-harness/fake-supabase.js'), ctx);
+  const sb = ctx.window.supabase.createClient();
+  const { db, USER } = ctx.window.__harness;
+  const migration = read('supabase/migrations/20260806143444_create_athlete_onboarding_fn.sql');
+  const params = [...migration.matchAll(/^\s+(p_[a-z_]+) [a-z\[\]]+,?$/gm)].map(m => m[1]);
+  const args = { p_new_family: true, p_family_id: null, p_family_name: '', p_first: 'Synthetic', p_birthdate: '2015-03-01', p_hand: null, p_sport: 'synthetic_sport',
+    p_positions: [], p_level: '', p_goals: [{ type: 'skill', key: 'k', label: 'Synthetic goal' }], p_consents: [{ consent_type: 'child_data' }, { consent_type: 'account' }] };
+  assert.deepEqual(Object.keys(args), params, 'the arguments the migration declares');
+
+  const first = await sb.rpc('create_athlete_onboarding', args);
+  assert.equal(first.error, null);
+  assert.equal(db.families.length, 1);
+  assert.equal(db.families[0].name, 'My Family');
+  assert.equal(JSON.stringify([db.family_members[0].guardian_id, db.family_members[0].role]), JSON.stringify([USER.id, 'owner']));
+  assert.equal(db.athletes[0].id, first.data);
+  assert.equal(JSON.stringify([db.athlete_sports[0].is_primary, db.athlete_sports[0].practice_days]), '[true,[]]');
+  const goals = await sb.from('goals').select('*').eq('athlete_id', first.data).eq('status', 'active');
+  assert.equal(goals.data.length, 1, 'the week lists only active goals, and the column defaults to active');
+  assert.equal(JSON.stringify(db.consent_records.map(c => [c.consent_type, c.granted, c.method])), '[["child_data",true,"onboarding_checkbox"],["account",true,"onboarding_checkbox"]]');
+
+  const sibling = await sb.rpc('create_athlete_onboarding', { ...args, p_new_family: false, p_family_id: db.families[0].id, p_first: 'Sibling', p_goals: [], p_consents: [] });
+  assert.equal(db.families.length, 1, 'a sibling joins the household');
+  assert.equal(db.athletes.find(a => a.id === sibling.data).family_id, db.families[0].id);
+  assert.equal(db.consent_records.length, 2, 'like the database, it records only what it is given');
+
+  await sb.from('goals').insert({ athlete_id: sibling.data, type: 'skill', label: 'Picked on the week' });
+  assert.equal(db.goals.at(-1).status, 'active', 'a goal a screen inserts without a status is active too');
+});
