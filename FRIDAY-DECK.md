@@ -14,7 +14,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v130`; local production-shaped smoke 29/29; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 988/988 |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 993/993 |
 | Database suite | `node tests/db/run.cjs` | 425/425 on a disposable cluster built from the real migrations: 404 security cases plus a 21-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 219/219, exclusions clean, contracts 330/330, database 425/425, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
