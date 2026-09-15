@@ -1663,6 +1663,55 @@ add('Z15', 'adult-health-record', 'deleting the account removes every reading an
       select (${HEALTH_TABLE_LIST.map(t => `(select count(*) from public.${t} where guardian_id = '${ADULT_G}')`).join(' + ')})::text;`,
     expect: 'ok', expectOut: '0' });
 
+// =========================================================== AA. camp listings
+//
+// public.camps is a directory any signed-in account can submit to (camps_insert), and an administrator reviews
+// pending listings on a screen that renders each sign-up link. The browser checked a submission and the database
+// did not, so a listing sent straight to the API could carry a javascript: link onto that screen. The rules are in
+// 20260915120000_camp_listing_validation.sql.
+const campInsert = (o = {}) => {
+  const c = { email: `'camp@example.invalid'`, url: `'https://example.invalid/signup'`,
+    ageMin: 'null', ageMax: 'null', start: 'null', end: 'null', ...o };
+  return `insert into public.camps(org_name, contact_name, contact_email, location_text, external_signup_url,
+      age_min, age_max, start_date, end_date, created_by)
+    values ('Synthetic Youth Camp', 'Synthetic Contact', ${c.email}, 'Synthetic Town', ${c.url},
+      ${c.ageMin}, ${c.ageMax}, ${c.start}, ${c.end}, '${MEMBER_C}');`;
+};
+const asCampSubmitter = { role: 'authenticated', claims: MEMBER_C };
+const ownCamps = `select count(*)::text from public.camps where created_by = '${MEMBER_C}';`;
+const campUrlRefused = { expect: 'error', expectError: /camps_external_signup_url_check/ };
+
+add('AA01', 'camp-listings', 'a complete listing is accepted, with its ages and dates in order',
+  { ...asCampSubmitter, sql: campInsert({ ageMin: '8', ageMax: '12', start: `date '2027-06-01'`, end: `date '2027-06-05'` }) + ownCamps,
+    expect: 'ok', expectOut: '1' });
+add('AA02', 'camp-listings', 'ages and dates may still be left blank: "All ages", "Dates TBD"',
+  { ...asCampSubmitter, sql: campInsert() + ownCamps, expect: 'ok', expectOut: '1' });
+add('AA03', 'camp-listings', 'THE CASE: a javascript: sign-up link is refused',
+  { ...asCampSubmitter, sql: campInsert({ url: `'javascript:alert(document.cookie)'` }), ...campUrlRefused });
+add('AA04', 'camp-listings', 'a script link behind leading whitespace is refused, although a browser would strip the space',
+  { ...asCampSubmitter, sql: campInsert({ url: `' javascript:alert(1)'` }), ...campUrlRefused });
+add('AA05', 'camp-listings', 'a link without a web scheme is refused',
+  { ...asCampSubmitter, sql: campInsert({ url: `'www.example.invalid/signup'` }), ...campUrlRefused });
+add('AA06', 'camp-listings', 'a link longer than 2048 characters is refused',
+  { ...asCampSubmitter, sql: campInsert({ url: `'https://example.invalid/' || repeat('a', 2025)` }), ...campUrlRefused });
+add('AA07', 'camp-listings', 'an upper-case scheme is still a web address',
+  { ...asCampSubmitter, sql: campInsert({ url: `'HTTPS://EXAMPLE.INVALID/SIGNUP'` }) + ownCamps, expect: 'ok', expectOut: '1' });
+add('AA08', 'camp-listings', 'a contact email with no domain is refused',
+  { ...asCampSubmitter, sql: campInsert({ email: `'camp@localhost'` }), expect: 'error', expectError: /camps_contact_email_check/ });
+add('AA09', 'camp-listings', 'the youngest age cannot be above the oldest',
+  { ...asCampSubmitter, sql: campInsert({ ageMin: '12', ageMax: '8' }), expect: 'error', expectError: /camps_ages_check/ });
+add('AA10', 'camp-listings', 'an age above 19 is refused',
+  { ...asCampSubmitter, sql: campInsert({ ageMax: '25' }), expect: 'error', expectError: /camps_ages_check/ });
+add('AA11', 'camp-listings', 'a negative age is refused',
+  { ...asCampSubmitter, sql: campInsert({ ageMin: '-1' }), expect: 'error', expectError: /camps_ages_check/ });
+add('AA12', 'camp-listings', 'a camp cannot end before it starts',
+  { ...asCampSubmitter, sql: campInsert({ start: `date '2027-06-05'`, end: `date '2027-06-01'` }),
+    expect: 'error', expectError: /camps_dates_check/ });
+add('AA13', 'camp-listings', 'the rules bind the table owner too: a listing cannot be approved with a script link',
+  { setup: campInsert(),
+    sql: `update public.camps set status = 'approved', external_signup_url = 'javascript:alert(1)' where created_by = '${MEMBER_C}';`,
+    ...campUrlRefused });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
