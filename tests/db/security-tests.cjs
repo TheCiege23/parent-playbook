@@ -1918,6 +1918,47 @@ add('AB28', 'child-consent', 'the check is a deferred constraint trigger whose S
                     where p.oid = 'public.create_athlete_onboarding(boolean,uuid,text,text,date,text,text,text[],text,jsonb,jsonb)'::regprocedure);`,
     expect: 'ok', expectOut: 'true|true:search_path=""|false|search_path=""' });
 
+// =========================================================== AC. deleting an athlete with organization records
+// Deleting an athlete cascades to their organization body assessments and company composition results, and the audit of
+// each cascaded delete runs with the athlete row already gone. Both audits named the athlete, access_log's foreign key
+// refused the insert, and so the athlete could not be deleted at all: not by delete-athlete, and not with the household
+// by delete-account. The same failure was reproduced for external composition records (R32b) and fixed there as the body
+// scan audit already did it: no link to an athlete that is gone, with its id kept in the detail.
+const deleteAthleteA = "delete from public.athletes where id='" + ATH_A + "';";
+const auditAfterDelete = (action, key) => " select count(*)::text || '|' || count(*) filter (where athlete_id is null)::text || '|'"
+  + " || count(*) filter (where detail->>'" + key + "' = '" + ATH_A + "')::text from public.access_log where action='" + action + "';";
+const bodyA = bodyRow(B_LIVE, 'synthetic-live', C_LIVE);
+add('AC01', 'athlete-delete', 'an athlete with an organization body assessment can be deleted, and the assessment goes with them',
+  { setup: bodyA, sql: deleteAthleteA + ' select count(*)::text from public.company_body_assessments;', expect: 'ok', expectOut: '0' });
+add('AC02', 'athlete-delete', "the assessment's delete is audited with no link to the deleted athlete, its id kept in the detail",
+  { setup: bodyA, sql: deleteAthleteA + auditAfterDelete('company_body_assessment_delete', 'athlete_id'), expect: 'ok', expectOut: '1|1|1' });
+add('AC03', 'athlete-delete', 'an athlete with a company composition result can be deleted, and the result goes with them',
+  { setup: seedChildA, sql: deleteAthleteA + " select count(*)::text from public.company_composition_results where result_id='seeded-child-a';", expect: 'ok', expectOut: '0' });
+add('AC04', 'athlete-delete', "the result's delete is audited with no link to the deleted athlete, whose id its detail already carries as the subject",
+  { setup: seedChildA, sql: deleteAthleteA + auditAfterDelete('company_composition_result_delete', 'subject_reference'), expect: 'ok', expectOut: '1|1|1' });
+add('AC05', 'athlete-delete', 'deleting the household, as delete-account does for a sole guardian, takes an athlete with both',
+  { setup: bodyA + seedChildA,
+    sql: "delete from public.families where id=(select family_id from public.athletes where id='" + ATH_A + "');"
+      + " select (select count(*) from public.athletes where id='" + ATH_A + "')::text || '|' || (select count(*) from public.company_body_assessments)::text"
+      + " || '|' || (select count(*) from public.company_composition_results where athlete_id is not null)::text;",
+    expect: 'ok', expectOut: '0|0|0' });
+add('AC06', 'athlete-delete', 'the family owner deleting the athlete, as delete-athlete does with their own authorization, succeeds',
+  { setup: bodyA + seedChildA, claims: GUARDIAN, role: 'authenticated',
+    sql: 'with d as (' + deleteAthleteA.replace(/;$/, '') + ' returning 1) select count(*)::text from d;', expect: 'ok', expectOut: '1' });
+add('AC07', 'athlete-delete', 'while the athlete remains, deleting the assessment still links its audit row to them',
+  { setup: bodyA, sql: 'delete from public.company_body_assessments;'
+      + " select count(*) filter (where athlete_id = '" + ATH_A + "')::text from public.access_log where action='company_body_assessment_delete';",
+    expect: 'ok', expectOut: '1' });
+add('AC08', 'athlete-delete', 'and so does deleting the result',
+  { setup: seedChildA, sql: "delete from public.company_composition_results where result_id='seeded-child-a';"
+      + " select count(*) filter (where athlete_id = '" + ATH_A + "')::text from public.access_log where action='company_composition_result_delete';",
+    expect: 'ok', expectOut: '1' });
+add('AC09', 'athlete-delete', 'both replaced audit functions still pin an empty search_path, run as definer, and are each still a table\'s trigger',
+  { sql: "select string_agg(p.proname || '=' || array_to_string(p.proconfig, ',') || ':' || p.prosecdef::text || ':'"
+      + " || (select count(*) from pg_trigger t where t.tgfoid = p.oid and not t.tgisinternal)::text, ' ' order by p.proname)"
+      + " from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname in ('audit_company_body_assessment_change', 'audit_company_composition_change');",
+    expect: 'ok', expectOut: 'audit_company_body_assessment_change=search_path="":true:1 audit_company_composition_change=search_path="":true:1' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
