@@ -188,7 +188,7 @@ test('a reading line says how strong its strongest claim is', () => {
 });
 
 test('deleting warns that the attached report goes too', () => {
-  // The document may be the only copy the family has, and the trigger removes it with the record.
+  // The document may be the only copy the family has, and the store removes it, through the Storage API, before the record.
   const source = fs.readFileSync(path.join(base, 'js', 'composition-sharing-ui.js'), 'utf8');
   assert.match(source, /that document is deleted too/);
   assert.match(source, /cannot be undone/);

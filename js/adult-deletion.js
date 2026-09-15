@@ -95,8 +95,8 @@ function adultRecordLines(c){
 // Everything in Your training, then a count to prove it. Imported body composition results go one at a time through the
 // same store a single result's Delete uses. Nothing stops at the first failure: the parent asked for all of it to go, so
 // every part is tried, and what the count still finds is named rather than hidden. Deleting again only touches what is
-// left. (A result with a report attached cannot be deleted in production today: the report's purge trigger deletes
-// from storage.objects directly, which Supabase's storage.protect_delete refuses. Its count then says it is still here.)
+// left. A result's attached report goes first, through the Storage API (the store's remove()); a report that will not go
+// keeps its result, and the count then says it is still here.
 async function adultDeleteRecord(uid){
   let failure = null;
   const composition = await adultCompositionIds(uid);

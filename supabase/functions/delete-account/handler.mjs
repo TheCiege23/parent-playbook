@@ -18,6 +18,12 @@
 //
 // Order is deliberate: gather file paths -> delete rows -> purge files -> delete the user LAST, so a
 // failure part-way leaves the account intact and retryable rather than half-erased and unreachable.
+// Reports attached to imported body composition results are the one exception: the database refuses to
+// delete an attachment whose file is still stored (20260915200000), so each report goes through the
+// Storage API just before the delete that would otherwise be refused, and a report that will not go
+// stops the function there.
+
+import { reportKeysFor, removeReports } from '../_shared/composition-reports.mjs';
 
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
@@ -81,22 +87,21 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
 
       const svc = serviceClient;
 
-      // Reports attached to imported body composition results (a DXA printout, a clinic PDF) live in storage. When
-      // the records cascade away, the migration's attachment trigger deletes each report's storage.objects row; they
-      // are also removed here through the Storage API, the way this function removes photos, so the files go without
-      // relying on that trigger alone. Collect the keys while the rows still exist: the caller's own imports, child
-      // or adult, and (below) any import for a child whose household goes with them. A database without these
-      // tables has nothing to collect.
-      const reportKeys = new Set();
-      const collectReports = async (column, values) => {
-        if (!values.length) return;
-        const records = svc.from('external_composition_records').select('id');
-        const { data: recs, error } = await (column === 'guardian_id' ? records.eq(column, values[0]) : records.in(column, values));
-        if (error || !recs || !recs.length) return;
-        const { data: attachments } = await svc.from('external_composition_attachments').select('storage_key').in('record_uuid', recs.map(r => r.id));
-        for (const a of attachments || []) if (a.storage_key) reportKeys.add(a.storage_key);
+      // Reports attached to imported body composition results (a DXA printout, a clinic PDF) live in storage, and the
+      // database will not delete a record's attachment while its file is still stored. The caller's own imports, child
+      // or adult, cascade away with the login; an import for a child whose household goes with them cascades away with
+      // the household. Each is removed through the Storage API just before that delete (below).
+      let filesRemoved = 0;
+      const removed = new Set();
+      const removeReportsFor = async (column, values) => {
+        const found = await reportKeysFor(svc, column, values);
+        if (found.error) return found.error;
+        const keys = found.keys.filter(key => !removed.has(key));
+        const result = await removeReports(svc, keys);
+        keys.slice(0, result.removed).forEach(key => removed.add(key));
+        filesRemoved += result.removed;
+        return result.error;
       };
-      await collectReports('guardian_id', [uid]);
 
       // ---- 1. which households does this person belong to, and are they alone in them? ----
       const { data: myFams } = await svc.from('family_members').select('family_id').eq('guardian_id', uid);
@@ -117,7 +122,9 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
           // Sole guardian: the household goes with them. Collect photo paths BEFORE the rows
           // disappear; afterwards there is nothing left to tell us what to delete.
           for (const kid of kidIds) athleteIdsToPurge.push(kid);
-          await collectReports('athlete_id', kidIds);
+          if (await removeReportsFor('athlete_id', kidIds)) {
+            return json({ error: 'could not remove the reports attached to your children\'s imported results; the household was not deleted' }, 500);
+          }
           const { error } = await svc.from('families').delete().eq('id', fid);
           if (error) return json({ error: `could not delete household: ${error.message}` }, 500);
           familiesDeleted++;
@@ -145,7 +152,6 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
       }
 
       // ---- 3. purge the actual files. This is the part a parent actually means. ----
-      let filesRemoved = 0;
       for (const aid of athleteIdsToPurge) {
         const paths = await listFolder(svc, 'athlete-media', aid);
         if (paths.length) {
@@ -159,9 +165,13 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
         const { error } = await svc.storage.from('trainer-verification-docs').remove(trainerDocs);
         if (!error) filesRemoved += trainerDocs.length;
       }
-      if (reportKeys.size) {
-        const { error } = await svc.storage.from('composition-reports').remove([...reportKeys]);
-        if (!error) filesRemoved += reportKeys.size;
+      // Their own imports cascade away with the login below, which the database refuses while a report is stored.
+      if (await removeReportsFor('guardian_id', [uid])) {
+        return json({
+          error: 'Part of your data was removed, but the reports attached to your own imported body composition results '
+               + 'could not be, so your login was kept. Try again, or contact support@playbookbp.com.',
+          partial: true, families_deleted: familiesDeleted, files_removed: filesRemoved,
+        }, 500);
       }
 
       // ---- 3b. the parent's own training record ----

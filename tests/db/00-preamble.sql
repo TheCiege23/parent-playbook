@@ -131,6 +131,22 @@ alter table storage.objects enable row level security;
 create or replace function storage.foldername(name text) returns text[]
 language sql immutable as $$ select string_to_array(name, '/') $$;
 grant all on storage.buckets, storage.objects to authenticated, service_role;
+-- Supabase's own guard, as production defines it (read from the live catalog on 2026-09-15): a statement-level
+-- trigger that refuses any DELETE on storage.objects unless the Storage API set storage.allow_delete_query, because a
+-- row deleted from SQL leaves its file's bytes behind. Statement-level, so it fires even when nothing matches. Without
+-- it this stub let a migration's trigger delete report rows from SQL, which production refuses. A test that means
+-- "removed through the Storage API" sets the flag for its own transaction, as the Storage API does.
+create or replace function storage.protect_delete() returns trigger language plpgsql as $$
+begin
+  if coalesce(current_setting('storage.allow_delete_query', true), 'false') != 'true' then
+    raise exception 'Direct deletion from storage tables is not allowed. Use the Storage API instead.'
+      using hint = 'This prevents accidental data loss from orphaned objects.', errcode = '42501';
+  end if;
+  return null;
+end $$;
+drop trigger if exists protect_objects_delete on storage.objects;
+create trigger protect_objects_delete before delete on storage.objects
+  for each statement execute function storage.protect_delete();
 
 -- ---------------------------------------------------------------- vault STUB
 create schema if not exists vault;

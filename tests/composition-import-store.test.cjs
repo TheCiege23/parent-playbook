@@ -146,6 +146,73 @@ test('a child subject reference that is not the athlete id is refused at constru
 });
 
 // ----------------------------------------------------------------- attachments
+// ----------------------------------------------------------------- remove
+// A report's file must be gone before its attachment row can be deleted: the database refuses otherwise, and
+// Supabase refuses to delete a stored object from SQL (20260915200000). So remove() finds the record in the
+// store's scope, removes the report through the Storage API, and only then deletes the row. This stand-in records
+// the order of every call.
+const REMOVE_ID = '33333333-3333-4333-8333-333333333333';
+const removeClient = ({ found = [{ id: REMOVE_ID }], attachments = [{ storage_key: REMOVE_ID + '/report.pdf' }], storageError = null, deleted = [{ id: REMOVE_ID }], deleteError = null } = {}) => {
+  const log = [];
+  const client = {
+    auth: { getSession: async () => ({ data: { session: { user: { id: '11111111-1111-4111-8111-111111111111' } } } }) },
+    from(table) {
+      const b = {
+        op: 'select', filters: [],
+        select() { return b; }, delete() { b.op = 'delete'; return b; }, limit() { return b; },
+        eq(c, v) { b.filters.push(c + '=' + v); return b; }, is(c, v) { b.filters.push(c + ' is ' + v); return b; },
+        then(resolve) {
+          log.push([b.op, table, ...b.filters]);
+          if (table === 'external_composition_attachments') return Promise.resolve({ data: attachments }).then(resolve);
+          if (b.op === 'delete') return Promise.resolve(deleteError ? { error: deleteError } : { data: deleted }).then(resolve);
+          return Promise.resolve({ data: found }).then(resolve);
+        },
+      };
+      return b;
+    },
+    storage: { from: bucket => ({ remove: async keys => { log.push(['storage.remove', bucket, ...keys]); return storageError ? { error: storageError } : { data: keys.map(name => ({ name })) }; } }) },
+  };
+  return { client, log };
+};
+const adultStore = client => STORE.createExternalCompositionStore(client, { scope: 'adult_reference', subjectReference: 'synthetic-subject-001' });
+
+test('deleting a reading removes its report through the Storage API first, then the row', async () => {
+  const { client, log } = removeClient();
+  assert.equal(await adultStore(client).remove(REMOVE_ID), true);
+  assert.deepEqual(log, [
+    ['select', 'external_composition_records', 'subject_reference=synthetic-subject-001', 'subject_scope=adult_reference', 'athlete_id is null', 'id=' + REMOVE_ID],
+    ['select', 'external_composition_attachments', 'record_uuid=' + REMOVE_ID],
+    ['storage.remove', 'composition-reports', REMOVE_ID + '/report.pdf'],
+    ['delete', 'external_composition_records', 'subject_reference=synthetic-subject-001', 'subject_scope=adult_reference', 'athlete_id is null', 'id=' + REMOVE_ID],
+  ]);
+});
+
+test('a reading that is not this store\'s to delete keeps its document', async () => {
+  const { client, log } = removeClient({ found: [] });
+  assert.equal(await adultStore(client).remove(REMOVE_ID), false);
+  assert.deepEqual(log.map(l => l[0] + ' ' + l[1]), ['select external_composition_records'], 'no attachment read, no file removed, no row deleted');
+});
+
+test('a report the Storage API will not remove keeps the reading', async () => {
+  const { client, log } = removeClient({ storageError: { message: 'storage unavailable' } });
+  await assert.rejects(() => adultStore(client).remove(REMOVE_ID), err => err.code === 'DELETE_FAILED' && /could not be removed, so the measurement was kept/.test(err.message));
+  assert.equal(log.filter(l => l[0] === 'delete').length, 0);
+});
+
+test('a reading with no report is deleted without touching storage', async () => {
+  const { client, log } = removeClient({ attachments: [] });
+  assert.equal(await adultStore(client).remove(REMOVE_ID), true);
+  assert.equal(log.filter(l => l[0] === 'storage.remove').length, 0);
+});
+
+test('a row the database refuses is an error, and a malformed id reaches nothing', async () => {
+  const refused = removeClient({ deleteError: { message: 'A report file is still stored for this record.' } });
+  await assert.rejects(() => adultStore(refused.client).remove(REMOVE_ID), err => err.code === 'DELETE_FAILED' && /still stored/.test(err.message));
+  const malformed = removeClient();
+  await assert.rejects(() => adultStore(malformed.client).remove('not-a-uuid'), err => err.code === 'INVALID_SCOPE');
+  assert.deepEqual(malformed.log, []);
+});
+
 test('a report is stored under the record, and its filename is not kept', async () => {
   const { client, calls } = fakeClient();
   const store = STORE.createExternalCompositionStore(client, { scope: 'adult_reference', subjectReference: 'me' });

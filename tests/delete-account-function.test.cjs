@@ -15,7 +15,7 @@ const { pathToFileURL } = require('node:url');
 const dir = path.join(__dirname, '../supabase/functions/delete-account');
 const load = () => import(pathToFileURL(path.join(dir, 'handler.mjs')).href);
 
-function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError = null, familyDeleteError = null } = {}) {
+function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError = null, familyDeleteError = null, reportRemoveError = null } = {}) {
   const events = [];
   const service = {
     from(table) {
@@ -56,7 +56,7 @@ function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError =
           const names = (folders[bucket] || {})[folder] || [];
           return { data: names.slice(offset, offset + limit).map(name => ({ name })), error: null };
         },
-        remove: async paths => { events.push(['remove', bucket, [...paths].sort()]); return { error: null }; },
+        remove: async paths => { events.push(['remove', bucket, [...paths].sort()]); return { error: bucket === 'composition-reports' ? reportRemoveError : null }; },
       }),
     },
     auth: { admin: { deleteUser: async id => { events.push(['deleteUser', id]); return { error: deleteUserError }; } } },
@@ -203,30 +203,45 @@ test("a parent's own training record is deleted, scoped to them, before the logi
   assert.deepEqual(s.tables.adult_goals, [{ guardian_id: 'someone-else', label: 'theirs' }], "another guardian's record is untouched");
 });
 
-test('reports attached to imported body composition results are removed from storage before the login', async () => {
+const reportTables = () => ({
+  family_members: [{ family_id: 'f1', guardian_id: 'u', created_at: '2026-01-01' }],
+  families: [{ id: 'f1', created_by: 'u' }],
+  athletes: [{ id: 'k1', family_id: 'f1' }],
+  external_composition_records: [
+    { id: 'r-adult', guardian_id: 'u', athlete_id: null },
+    { id: 'r-child', guardian_id: 'someone-else', athlete_id: 'k1' },
+    { id: 'r-other', guardian_id: 'someone-else', athlete_id: 'k9' },
+  ],
+  external_composition_attachments: [
+    { record_uuid: 'r-adult', storage_key: 'r-adult/report.pdf' },
+    { record_uuid: 'r-child', storage_key: 'r-child/report.png' },
+    { record_uuid: 'r-other', storage_key: 'r-other/report.pdf' },
+  ],
+});
+
+test('reports attached to imported body composition results go through Storage just before the delete that needs them gone', async () => {
+  // The database refuses to delete an attachment whose file is still stored, so each report goes first: a child's with
+  // the household that takes the child's record, the caller's own before the login that takes theirs. Nobody else's.
   const { createDeleteAccountHandler } = await load();
-  const s = fakeSupabase({
-    tables: {
-      family_members: [{ family_id: 'f1', guardian_id: 'u', created_at: '2026-01-01' }],
-      families: [{ id: 'f1', created_by: 'u' }],
-      athletes: [{ id: 'k1', family_id: 'f1' }],
-      external_composition_records: [
-        { id: 'r-adult', guardian_id: 'u', athlete_id: null },
-        { id: 'r-child', guardian_id: 'someone-else', athlete_id: 'k1' },
-        { id: 'r-other', guardian_id: 'someone-else', athlete_id: 'k9' },
-      ],
-      external_composition_attachments: [
-        { record_uuid: 'r-adult', storage_key: 'r-adult/report.pdf' },
-        { record_uuid: 'r-child', storage_key: 'r-child/report.png' },
-        { record_uuid: 'r-other', storage_key: 'r-other/report.pdf' },
-      ],
-    },
-  });
+  const s = fakeSupabase({ tables: reportTables() });
   const response = await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
   assert.equal(response.status, 200);
-  const removedAt = indexOf(s.events, e => e[0] === 'remove' && e[1] === 'composition-reports');
-  assert.ok(removedAt !== -1, 'the report files are removed through Storage, as photos are');
-  assert.deepEqual(s.events[removedAt][2], ['r-adult/report.pdf', 'r-child/report.png'],
-    "their own imports and the imports for a child whose household goes with them; nobody else's");
-  assert.ok(removedAt < indexOf(s.events, e => e[0] === 'deleteUser'));
+  const removals = s.events.filter(e => e[0] === 'remove' && e[1] === 'composition-reports').map(e => e[2]);
+  assert.deepEqual(removals, [['r-child/report.png'], ['r-adult/report.pdf']]);
+  const childReport = indexOf(s.events, e => e[0] === 'remove' && e[1] === 'composition-reports' && e[2][0] === 'r-child/report.png');
+  const ownReport = indexOf(s.events, e => e[0] === 'remove' && e[1] === 'composition-reports' && e[2][0] === 'r-adult/report.pdf');
+  assert.ok(childReport < indexOf(s.events, e => e[0] === 'delete' && e[1] === 'families'), "a child's report goes before the household");
+  assert.ok(indexOf(s.events, e => e[0] === 'delete' && e[1] === 'families') < ownReport, 'the caller\'s own goes no earlier than it must');
+  assert.ok(ownReport < indexOf(s.events, e => e[0] === 'deleteUser'), 'and before the login');
+  assert.equal((await response.json()).files_removed, 2);
+});
+
+test('a report that will not go stops the function before the delete that needs it gone', async () => {
+  const { createDeleteAccountHandler } = await load();
+  const s = fakeSupabase({ tables: reportTables(), reportRemoveError: { message: 'storage unavailable' } });
+  const response = await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
+  assert.equal(response.status, 500);
+  assert.match((await response.json()).error, /the household was not deleted/);
+  assert.equal(indexOf(s.events, e => e[0] === 'delete' && e[1] === 'families'), -1);
+  assert.equal(indexOf(s.events, e => e[0] === 'deleteUser'), -1);
 });

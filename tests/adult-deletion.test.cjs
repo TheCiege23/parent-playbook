@@ -366,5 +366,7 @@ test('source: the privacy and data deletion pages say how to delete the training
   for (const phrase of ['<b>Readings you typed in</b>', '<b>Your imports</b> and choose <b>Undo</b>', '<b>Days you logged</b>', '<b>Delete your preferences</b>', '<b>Delete your training record</b>, type DELETE and confirm'])
     assert.ok(deletion.includes(phrase), phrase);
   assert.ok(deletion.indexOf('id="training"') < deletion.indexOf('<h2>Delete your entire account</h2>'));
-  assert.doesNotMatch(deletion + privacy, /report attached to it goes|with any reports? attached/, 'no promise about report files while their purge is blocked in production');
+  // Reports go through the Storage API before their result (20260915200000), so the pages may say so.
+  assert.match(deletion, /A report you attached to it, such as a scan printout, is deleted first, from storage itself\./);
+  assert.match(deletion + privacy, /imported body composition results and any reports attached to them/);
 });
