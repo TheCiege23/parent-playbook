@@ -162,11 +162,18 @@ test('the harness strap and treadmill notify frames the real parsers read', asyn
     await c.startNotifications();
     devices.push(device);
   }
-  await new Promise(r => setTimeout(r, 900));
+  // Wait for the frames the assertions need rather than sleeping a fixed time. A fixed 900 ms failed whenever a loaded
+  // machine fired the fake's timers late and too few frames landed inside it. The bound only turns a device that never
+  // notifies into a failure with the counts in it, instead of a hang.
+  const deadline = Date.now() + 15000;
+  while ((seen.heart.length < 2 || seen.treadmill.length < 3) && Date.now() < deadline) await new Promise(r => setTimeout(r, 20));
   devices.forEach(d => d.gatt.disconnect());
   assert.ok(seen.heart.length >= 2 && seen.heart.every(b => b >= 120 && b <= 140), JSON.stringify(seen.heart));
-  assert.ok(seen.treadmill.length >= 2 && seen.treadmill.every(d => d.speed === 10));
-  assert.ok(seen.treadmill.at(-1).distance > seen.treadmill[0].distance);
+  assert.ok(seen.treadmill.length >= 3, `expected at least three treadmill frames, got ${seen.treadmill.length}`);
+  assert.ok(seen.treadmill.every(d => d.speed === 10), JSON.stringify(seen.treadmill));
+  // Every frame the real parser read carries a total exactly one metre above the frame before it, however late it came.
+  const distances = seen.treadmill.map(d => d.distance);
+  assert.ok(distances.every((d, i) => i === 0 || d === distances[i - 1] + 1), `total distance should rise a metre a frame: ${distances}`);
   await assert.rejects(navigator.bluetooth.requestDevice({ filters: [{ services: [0x1234] }] }), /cancelled/);
   assert.deepEqual([...vm.runInContext('window.__harness.bluetooth.connected', ctx)], []);
 });
