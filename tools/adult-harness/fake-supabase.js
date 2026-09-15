@@ -246,7 +246,7 @@
   const bluetooth = { notifications:0, connected:[] };
   if (typeof navigator !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('bluetooth') === '1') {
     const notFound = message => Object.assign(new Error(message), { name:'NotFoundError' });
-    const fakeDevice = (name, service, characteristic, frame) => {
+    const fakeDevice = (name, service, characteristic, frame, everyMs = 250) => {
       const listeners = { device:[], char:[] };
       let timer = null, n = 0;
       const char = {
@@ -255,7 +255,7 @@
         removeEventListener(type, fn){ listeners.char = listeners.char.filter(f => f !== fn); },
         async startNotifications(){
           clearInterval(timer);
-          timer = setInterval(() => { n++; bluetooth.notifications++; char.value = frame(n); listeners.char.slice().forEach(fn => fn({ target:char })); }, 250);
+          timer = setInterval(() => { n++; bluetooth.notifications++; char.value = frame(n); listeners.char.slice().forEach(fn => fn({ target:char })); }, everyMs);
           return char;
         },
         async stopNotifications(){ clearInterval(timer); timer = null; return char; },
@@ -286,11 +286,12 @@
     const view = bytes => new DataView(Uint8Array.from(bytes).buffer);
     // Heart Rate Measurement: flags 0x06 (one-byte rate, skin contact detected), 120 to 140 bpm.
     const strap = () => fakeDevice('Synthetic HR strap', 0x180d, 0x2a37, n => view([0x06, 120 + (n % 21)]));
-    // Treadmill Data: flags 0x0004 (speed, and total distance), 10.00 km/h, 0.7 m further each quarter second.
-    const treadmill = () => fakeDevice('Synthetic treadmill', 0x1826, 0x2acd, n => {
-      const d = Math.round(n * 0.7);
-      return view([0x04, 0x00, 0xe8, 0x03, d & 255, (d >> 8) & 255, (d >> 16) & 255]);
-    });
+    // Treadmill Data: flags 0x0004 (speed, and total distance), 10.00 km/h. At that speed one metre takes exactly 360 ms,
+    // so the treadmill notifies every 360 ms and each frame's total distance is exactly one metre more than the last.
+    // Total distance is a whole-metre field, and the earlier 0.7 m per quarter second rounded two frames in a row to
+    // the same total, which made tests/bluetooth-equipment.test.cjs fail whenever a loaded machine delivered only those.
+    const treadmill = () => fakeDevice('Synthetic treadmill', 0x1826, 0x2acd,
+      n => view([0x04, 0x00, 0xe8, 0x03, n & 255, (n >> 8) & 255, (n >> 16) & 255]), 360);
     Object.defineProperty(navigator, 'bluetooth', { configurable:true, value:{
       async requestDevice(options){
         const services = ((options && options.filters) || []).flatMap(f => f.services || []);
