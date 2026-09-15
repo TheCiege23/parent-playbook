@@ -99,3 +99,72 @@ test('a date range names the year once, not on both ends', () => {
   // A single-day camp still carries it.
   assert.match(ctx.campWhen({ start_date: `${next}-01-05`, end_date: null }), new RegExp(String(next)));
 });
+
+// The admin review screen rendered a pending listing's sign-up link straight into an href. Any signed-in
+// account can send a pending listing to the API, and esc() cannot neutralise a javascript: URL — it holds
+// nothing to escape. The database now refuses such a link (20260915120000_camp_listing_validation.sql);
+// these hold the browser to the same rule wherever a link is rendered.
+test('a sign-up link becomes an href only when it is a web address', () => {
+  const ctx = context();
+  const longest = 'https://example.org/' + 'a'.repeat(2028);
+  for (const ok of ['https://example.org/camp', 'http://example.org/signup?id=1', 'HTTPS://EXAMPLE.ORG/CAMP', longest])
+    assert.equal(ctx.campSignupHref(ok), ok, `${ok.slice(0, 40)} should stay a link`);
+  for (const bad of ['javascript:alert(1)', 'JavaScript:alert(1)', ' javascript:alert(1)', ' https://example.org/camp',
+    'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)', '//example.org/camp', 'www.example.org/camp',
+    'https://', 'https://example.org/sign up', longest + 'a', '', null, undefined, 42])
+    assert.equal(ctx.campSignupHref(bad), null, `${JSON.stringify(bad)} must not become a link`);
+});
+
+test('the submission form refuses what the database refuses, in a sentence', () => {
+  const ctx = context();
+  const good = { org: 'Riverside Youth Football Camp', contactName: 'Sam', contactEmail: 'camp@example.org',
+    ageMin: '8', ageMax: '12', location: 'Bergenfield, NJ', start: '2027-06-01', end: '2027-06-05',
+    url: 'https://example.org/camp' };
+  const problem = change => ctx.campSubmissionProblem({ ...good, ...change });
+  assert.equal(problem({}), '');
+  // A listing can be "All ages" and "Dates TBD"; zero is a real bound; a camp can last one day.
+  assert.equal(problem({ ageMin: '', ageMax: '', start: '', end: '' }), '');
+  assert.equal(problem({ ageMin: '0', ageMax: '0' }), '');
+  assert.equal(problem({ start: '2027-06-01', end: '2027-06-01' }), '');
+  assert.match(problem({ org: '' }), /organization/);
+  assert.match(problem({ url: 'javascript:alert(1)' }), /sign-up link/);
+  for (const email of ['not-an-email', 'camp@localhost', 'a b@example.org', 'x@y@example.org', 'a@' + 'b'.repeat(250) + '.org'])
+    assert.match(problem({ contactEmail: email }), /email/, `${email.slice(0, 30)} should be refused`);
+  assert.match(problem({ ageMin: '12', ageMax: '8' }), /youngest age/);
+  for (const age of ['25', '-1', '7.5', '20'])
+    assert.match(problem({ ageMax: age }), /0 to 19/, `age ${age} should be refused`);
+  assert.match(problem({ start: '2027-06-05', end: '2027-06-01' }), /end before it starts/);
+});
+
+// The render functions run with the real esc() and H from js/core.js, so escaping is exercised, not stubbed.
+function renderContext() {
+  const ctx = vm.createContext({ console, Number, Math, String, Date, JSON, state: { ref: { sports: [] } } });
+  const core = fs.readFileSync(path.join(base, 'js', 'core.js'), 'utf8');
+  for (const name of ['esc', 'H']) {
+    const line = core.match(new RegExp('^const ' + name + ' = .*$', 'm'));
+    assert.ok(line, `js/core.js should still define ${name} on one line`);
+    vm.runInContext(line[0].replace(/^const /, 'var '), ctx);
+  }
+  vm.runInContext(fs.readFileSync(path.join(base, 'js', 'camps.js'), 'utf8'), ctx);
+  return ctx;
+}
+
+test('a stored link that is not a web address is shown as text and never linked', () => {
+  const ctx = renderContext();
+  const listing = { id: '00000000-0000-4000-8000-000000000001', org_name: 'Synthetic Camp', location_text: 'Somewhere',
+    contact_name: 'Sam', contact_email: 'camp@example.org', start_date: null, end_date: null, age_min: null,
+    age_max: null, description: null, status: 'pending' };
+  const crafted = { ...listing, external_signup_url: 'javascript:alert(document.cookie)' };
+  const review = ctx.campAdminCard(crafted);
+  assert.doesNotMatch(review, /href=/, 'the admin review card must not link a javascript: URL');
+  assert.match(review, /Sign-up link is not a web address: javascript:alert\(document\.cookie\)/,
+    'the reviewer still sees what was submitted, so they can reject it');
+  assert.doesNotMatch(ctx.campCard(crafted), /href=/, 'a family-facing card must not link it either');
+
+  // A web address is still linked on both cards, and still escaped inside the attribute.
+  const fine = { ...listing, external_signup_url: 'https://example.org/camp?a=1&b="2"' };
+  const escaped = /href="https:\/\/example\.org\/camp\?a=1&amp;b=&quot;2&quot;"/;
+  assert.match(ctx.campAdminCard(fine), escaped);
+  assert.match(ctx.campCard(fine), escaped);
+  assert.match(ctx.campCard(fine), /Sign up on their site/);
+});

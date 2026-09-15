@@ -38,6 +38,27 @@ function campAges(c){
   if(c.age_min!=null && c.age_max!=null) return `Ages ${c.age_min}–${c.age_max}`;
   return c.age_min!=null ? `Ages ${c.age_min}+` : `Up to age ${c.age_max}`;
 }
+// A sign-up link becomes an href only when it is a web address. Escaping cannot make a javascript: URL safe —
+// there is nothing in it to escape — and pending listings, which any signed-in account can send straight to the
+// API, are rendered as links on the admin review screen. The database refuses such a link as well
+// (20260915120000_camp_listing_validation.sql); this holds wherever a link is rendered, whatever is stored.
+function campSignupHref(url){
+  return typeof url === 'string' && url.length <= 2048 && /^https?:\/\/\S+$/i.test(url) ? url : null;
+}
+// The rules public.camps enforces, checked before sending so a parent reads a sentence rather than a
+// constraint name. Returns the first problem in form order, or '' when the listing can be submitted.
+function campSubmissionProblem(f){
+  const age = v => v === '' || (/^\d{1,2}$/.test(v) && Number(v) <= 19);
+  if(!f.org) return 'Add the organization\'s name.';
+  if(!f.contactName) return 'Add your name.';
+  if(f.contactEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.contactEmail)) return 'That email address doesn\'t look right.';
+  if(!age(f.ageMin) || !age(f.ageMax)) return 'Ages go from 0 to 19.';
+  if(f.ageMin !== '' && f.ageMax !== '' && Number(f.ageMin) > Number(f.ageMax)) return 'The youngest age can\'t be above the oldest.';
+  if(!f.location) return 'Add a location.';
+  if(f.start && f.end && f.end < f.start) return 'The camp can\'t end before it starts.';
+  if(!campSignupHref(f.url)) return 'Add a sign-up link starting with https://';
+  return '';
+}
 
 let campSport = '';
 
@@ -84,6 +105,7 @@ async function openCamps(){
 
 function campCard(c){
   const sportName = state.ref?.sports.find(s=>s.key===c.sport_key)?.name || '';
+  const href = campSignupHref(c.external_signup_url);
   return H`<div class="card app-pad" style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;gap:10px">
       <div style="min-width:0">
@@ -94,8 +116,8 @@ function campCard(c){
         ${c.description?H`<p style="font-size:13.5px;margin:8px 0 0">${esc(c.description)}</p>`:''}
       </div>
     </div>
-    <a href="${esc(c.external_signup_url)}" target="_blank" rel="noopener noreferrer"
-       class="btn sm ghost" style="margin-top:10px;display:inline-block;text-decoration:none">Sign up on their site ↗</a>
+    ${href?H`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer"
+       class="btn sm ghost" style="margin-top:10px;display:inline-block;text-decoration:none">Sign up on their site ↗</a>`:''}
   </div>`;
 }
 
@@ -107,9 +129,9 @@ function openSubmitCamp(){
       usually within a couple of days. Sign-up itself always stays on the organization's own site; this is a
       listing, not a booking.</p>
 
-    <div class="field"><label>Organization name</label><input id="cOrg" placeholder="e.g. Riverside Youth Football Camp"/></div>
-    <div class="field"><label>Your name</label><input id="cContactName" placeholder="Who we can reach about this listing"/></div>
-    <div class="field"><label>Contact email</label><input id="cContactEmail" type="email" placeholder="camp@example.com"/></div>
+    <div class="field"><label>Organization name</label><input id="cOrg" maxlength="200" placeholder="e.g. Riverside Youth Football Camp"/></div>
+    <div class="field"><label>Your name</label><input id="cContactName" maxlength="120" placeholder="Who we can reach about this listing"/></div>
+    <div class="field"><label>Contact email</label><input id="cContactEmail" type="email" maxlength="254" placeholder="camp@example.com"/></div>
     <div class="field"><label>Sport</label>
       <select id="cSport"><option value="">Not sport-specific</option>
         ${sports.map(s=>`<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
@@ -117,13 +139,13 @@ function openSubmitCamp(){
       <div style="flex:1"><label>Youngest age</label><input id="cAgeMin" type="number" min="0" max="19" inputmode="numeric"/></div>
       <div style="flex:1"><label>Oldest age</label><input id="cAgeMax" type="number" min="0" max="19" inputmode="numeric"/></div>
     </div>
-    <div class="field"><label>Location</label><input id="cLoc" placeholder="City, State"/></div>
+    <div class="field"><label>Location</label><input id="cLoc" maxlength="200" placeholder="City, State"/></div>
     <div class="field" style="display:flex;gap:10px">
       <div style="flex:1"><label>Starts</label><input id="cStart" type="date"/></div>
       <div style="flex:1"><label>Ends</label><input id="cEnd" type="date"/></div>
     </div>
     <div class="field"><label>Description</label><textarea id="cDesc" rows="3" maxlength="2000"></textarea></div>
-    <div class="field"><label>Sign-up link</label><input id="cUrl" type="url" placeholder="https://…"/></div>
+    <div class="field"><label>Sign-up link</label><input id="cUrl" type="url" maxlength="2048" placeholder="https://…"/></div>
 
     <div class="err" id="cErr"></div>
     <button class="btn amber" id="cSend">Submit for review</button>`);
@@ -131,23 +153,20 @@ function openSubmitCamp(){
   bg.querySelector('#cSend').onclick = async e => {
     const val = id => (bg.querySelector(id).value||'').trim();
     const err = bg.querySelector('#cErr'); err.textContent='';
-    const org=val('#cOrg'), cname=val('#cContactName'), cemail=val('#cContactEmail'),
-          loc=val('#cLoc'), url=val('#cUrl');
-    if(!org) return err.textContent='Add the organization\'s name.';
-    if(!cname) return err.textContent='Add your name.';
-    if(!/.+@.+\..+/.test(cemail)) return err.textContent='That email address doesn\'t look right.';
-    if(!loc) return err.textContent='Add a location.';
-    if(!/^https?:\/\/.+/.test(url)) return err.textContent='Add a sign-up link starting with https://';
+    const f = { org: val('#cOrg'), contactName: val('#cContactName'), contactEmail: val('#cContactEmail'),
+      ageMin: val('#cAgeMin'), ageMax: val('#cAgeMax'), location: val('#cLoc'),
+      start: val('#cStart'), end: val('#cEnd'), url: val('#cUrl') };
+    const problem = campSubmissionProblem(f);
+    if(problem) return err.textContent=problem;
 
     e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
-    const ageMin = val('#cAgeMin'), ageMax = val('#cAgeMax');
     const { error } = await sb.from('camps').insert({
-      org_name: org, contact_name: cname, contact_email: cemail,
+      org_name: f.org, contact_name: f.contactName, contact_email: f.contactEmail,
       sport_key: val('#cSport')||null,
-      age_min: ageMin?Number(ageMin):null, age_max: ageMax?Number(ageMax):null,
-      location_text: loc,
-      start_date: val('#cStart')||null, end_date: val('#cEnd')||null,
-      description: val('#cDesc')||null, external_signup_url: url,
+      age_min: f.ageMin?Number(f.ageMin):null, age_max: f.ageMax?Number(f.ageMax):null,
+      location_text: f.location,
+      start_date: f.start||null, end_date: f.end||null,
+      description: val('#cDesc')||null, external_signup_url: f.url,
       created_by: state.user.id,
     });
     if(error){
@@ -194,6 +213,7 @@ function campAdminCard(c){
   const map={ pending:['var(--line)','var(--ink)','Pending'], approved:['#E9F1EF','var(--good)','Approved'],
     rejected:['#FBE9DC','var(--danger)','Rejected'] };
   const [bg,col,txt]=map[c.status]||map.pending;
+  const href = campSignupHref(c.external_signup_url);
   return H`<div class="card app-pad" style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
       <div style="min-width:0">
@@ -201,7 +221,8 @@ function campAdminCard(c){
         <div style="font-size:12.5px;color:var(--muted);margin-top:3px">${esc(c.location_text)} · ${esc(campWhen(c))} · ${esc(campAges(c))}</div>
         <div style="font-size:12.5px;color:var(--muted);margin-top:2px">Contact: ${esc(c.contact_name)} · ${esc(c.contact_email)}</div>
         ${c.description?H`<p style="font-size:13px;margin:6px 0 0">${esc(c.description)}</p>`:''}
-        <a href="${esc(c.external_signup_url)}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px">${esc(c.external_signup_url)}</a>
+        ${href?H`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" style="font-size:12.5px">${esc(href)}</a>`
+          :H`<div style="font-size:12.5px;color:var(--danger);margin-top:2px;overflow-wrap:anywhere">Sign-up link is not a web address: ${esc(c.external_signup_url)}</div>`}
       </div>
       <span class="pill" style="background:${bg};color:${col};flex:none">${txt}</span>
     </div>
