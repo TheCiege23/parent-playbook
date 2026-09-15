@@ -142,7 +142,7 @@ test('Your training and Connections offer it only with Web Bluetooth and Adult T
   const index = read('index.html');
   const at = name => index.indexOf('<script src="/js/' + name + '"></script>');
   assert.ok(at('adult-health-record.js') < at('bluetooth-equipment.js') && at('screen-adult.js') < at('bluetooth-equipment.js') && at('bluetooth-equipment.js') < at('init.js'));
-  assert.match(read('sw.js'), /'\/js\/adult-progress\.js','\/js\/bluetooth-equipment\.js',/);
+  assert.match(read('sw.js'), /'\/js\/adult-progress\.js','\/js\/adult-deletion\.js','\/js\/bluetooth-equipment\.js',/);
 });
 
 test('the harness strap and treadmill notify frames the real parsers read', async () => {

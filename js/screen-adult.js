@@ -29,6 +29,8 @@ async function screenAdult(){
     sb.from('adult_health_records').select('*').eq('guardian_id', uid)
       .order('measured_on', { ascending:false }).order('created_at', { ascending:false }).limit(500),
     sb.from('adult_health_import_batches').select('*').eq('guardian_id', uid).order('received_at', { ascending:false }).limit(50),
+    // Counted, not read: the readings above are the newest 500 of every kind, which a large import can fill.
+    sb.from('adult_health_records').select('id', { count:'exact', head:true }).eq('guardian_id', uid).eq('source_kind', 'manual'),
   ]);
   const top = adultTopBar();
   if (results.some(r => r.error)) {
@@ -37,10 +39,10 @@ async function screenAdult(){
     bindAdultChrome();
     return;
   }
-  const [prof, goalRows, itemRows, exerciseRows, logRows, readingRows, batchRows] = results;
+  const [prof, goalRows, itemRows, exerciseRows, logRows, readingRows, batchRows, typedRows] = results;
   const profile = prof.data || null, goals = goalRows.data || [], items = itemRows.data || [];
   const exercises = exerciseRows.data || [], logs = logRows.data || [];
-  const readings = readingRows.data || [], batches = batchRows.data || [];
+  const readings = readingRows.data || [], batches = batchRows.data || [], typed = typedRows.count || 0;
   const week = adultWeek(items, exercises, logs, dateForDayIndex);
   const sum = adultWeekSummary(week);
   const units = (profile && profile.units) || 'lb';
@@ -119,9 +121,11 @@ async function screenAdult(){
         <button class="btn sm ghost" id="adultConnections" style="margin-top:10px">Connections</button>
         ${typeof bluetoothEquipmentAvailable === 'function' && bluetoothEquipmentAvailable() ? H`<button class="btn sm ghost" id="adultBluetooth" style="margin-top:10px">Bluetooth equipment</button>` : ''}
         ${batches.length ? H`<button class="btn sm ghost" id="adultImports" style="margin-top:10px">Your imports (${batches.length})</button>` : ''}
+        ${typed ? H`<button class="btn sm ghost" id="adultTypedReadings" style="margin-top:10px">Readings you typed in (${typed})</button>` : ''}
       </div>
 
       <div class="act-stop" style="margin-top:16px"><b>Stop if</b> you feel sharp pain, chest pain, dizziness or unusual shortness of breath. If you have a health condition, check with a doctor before starting something new.</div>
+      ${typeof adultRecordFooter === 'function' ? adultRecordFooter() : ''}
     </div>`;
 
   bindAdultChrome();
@@ -131,6 +135,8 @@ async function screenAdult(){
   { const b = $("#adultAddBody"); if (b) b.onclick = () => openAdultBodyEntry(units); }
   { const b = $("#adultImport"); if (b) b.onclick = () => openAdultImport(); }
   { const b = $("#adultImports"); if (b) b.onclick = () => openAdultImports(batches); }
+  // Delete one reading typed in, or the whole record. See js/adult-deletion.js.
+  { const b = $("#adultTypedReadings"); if (b) b.onclick = () => openAdultTypedReadings(); }
   // Results measured elsewhere (DXA, clinic, smart scale, health app), painted once they load. See js/adult-composition.js.
   if (typeof adultCompositionSection === 'function') adultCompositionSection($("#adultComposition"));
   { const b = $("#adultConnections"); if (b) b.onclick = () => openConnections(); }
@@ -182,6 +188,7 @@ function bindAdultChrome(){
   { const b = $("#adultBack"); if (b) b.onclick = () => renderApp('account'); }
   { const b = $("#adultAddChild"); if (b) b.onclick = () => startChildSetup(); }
   { const b = $("#adultLogout"); if (b) b.onclick = () => logOutOfApp(); }
+  { const b = $("#adultDeleteRecord"); if (b) b.onclick = () => openAdultDeleteRecord(); }
   $("#screen").querySelectorAll('[data-adult-section]').forEach(b => b.onclick = () => {
     state.adultSection = b.dataset.adultSection;
     renderApp('adult');

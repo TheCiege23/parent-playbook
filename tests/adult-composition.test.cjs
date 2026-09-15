@@ -97,8 +97,8 @@ test('it is part of Your training, exported with it, and described on the privac
   assert.ok(at('composition-import-ui.js') > -1 && at('composition-import-ui.js') < at('adult-composition.js') && at('adult-composition.js') < at('init.js'));
   assert.match(read('sw.js'), /'\/js\/screen-adult-eating\.js','\/js\/adult-composition\.js'/);
   const jsDir = path.join(base, 'js');
-  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|adult-composition)\.js$/.test(f)))
+  for (const file of fs.readdirSync(jsDir).filter(f => /\.(m?js)$/.test(f) && !/^(screen-adult|adult-composition|adult-deletion)\.js$/.test(f)))
     assert.doesNotMatch(fs.readFileSync(path.join(jsDir, file), 'utf8'), /adultComposition|ADULT_COMPOSITION_/, file);
   assert.match(read('privacy.html'), /You can also import body composition results about yourself from a DXA scan, a clinic, a smart scale or a health app; each number is shown as measured or as a device estimate, and Parent Playbook does not produce them\./);
-  assert.match(read('datadeletion.html'), /readings and imports, imported body composition results, food preferences, recipes and meal plans\.<\/li>/);
+  assert.match(read('datadeletion.html'), /readings and imports, imported body composition results, food preferences, recipes, meal plans and logged eating habits\.<\/li>/);
 });

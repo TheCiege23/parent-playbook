@@ -668,10 +668,13 @@ function confirmDeleteAccount(){
       <li>${kids.length?H`<b>${esc(kids.join(', '))}</b>'s profile${kids.length>1?'s':''}`:'Any child profiles you own'} and all their history</li>
       <li>Every photo and video you have uploaded</li>
       <li>Measurements, goals, games, milestones and completed sessions</li>
+      ${adultTrainingOn()?'<li>Your own training record</li>':''}
     </ul>
     <p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">
       If another adult shares your household, their children stay with them — only your access is removed.
       There is no undo and no backup we can restore from.</p>
+    ${adultTrainingOn()?`<p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">
+      Only want to stop using Your training? Delete your training record at the foot of Your training instead, and keep your account.</p>`:''}
     <div class="field"><label>Type DELETE to confirm</label><input id="delWord" autocapitalize="characters" placeholder="DELETE"/></div>
     <div class="err" id="delErr"></div>
     <button class="btn danger" id="delGo" style="margin-bottom:10px">Permanently delete everything</button>

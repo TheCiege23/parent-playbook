@@ -18,6 +18,7 @@ async function screenAdultEating(){
     sb.from('adult_recipes').select('*').eq('guardian_id', uid).order('title').limit(200),
     sb.from('adult_meal_plan_items').select('*').eq('guardian_id', uid).gte('planned_on', weekStart).lte('planned_on', weekEnd).order('created_at'),
     sb.from('adult_nutrition_days').select('*').eq('guardian_id', uid).gte('logged_on', weekStart).lte('logged_on', weekEnd),
+    sb.from('adult_nutrition_days').select('id', { count:'exact', head:true }).eq('guardian_id', uid),
   ]);
   if (results.some(r => r.error)) {
     results.filter(r => r.error).forEach(r => console.error(r.error));
@@ -26,8 +27,9 @@ async function screenAdultEating(){
     bindAdultChrome();
     return;
   }
-  const [prefRow, recipeRows, planRows, dayRows] = results;
+  const [prefRow, recipeRows, planRows, dayRows, dayCount] = results;
   const prefs = prefRow.data || null, recipes = recipeRows.data || [], plan = planRows.data || [], days = dayRows.data || [];
+  const loggedDays = dayCount.count || 0;
   const week = adultMealPlanWeek(plan, recipes, dateForDayIndex, prefs);
   const grocery = adultGroceryList(week);
   const cost = adultPlannedCost(week);
@@ -70,6 +72,7 @@ async function screenAdultEating(){
         ${habits.proteinDaysMet !== null ? H`<div class="mrow"><span>Your aim of ${esc(String(prefs.protein_meals_target))} meals with a protein food</span><b>${habits.proteinDaysMet} of ${habits.daysLogged} days</b></div>` : ''}
         ${habits.plateDaysMet !== null ? H`<div class="mrow"><span>Your aim of ${esc(String(prefs.plate_meals_target))} meals following the plate guide</span><b>${habits.plateDaysMet} of ${habits.daysLogged} days</b></div>` : ''}
         ${habits.proteinDaysMet === null && habits.plateDaysMet === null ? H`<p class="muted-note" style="margin:8px 0 0">Set your own daily aims in preferences, or just log what you ate. Start wherever you are.</p>` : ''}
+        ${loggedDays ? H`<button class="btn sm ghost" id="adultLoggedDays" style="margin-top:10px">Days you logged (${loggedDays})</button>` : ''}
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -110,6 +113,7 @@ async function screenAdultEating(){
       </div>
 
       <p class="muted-note" style="margin-top:16px">Allergen tags are the ones you put on each recipe, so check the label on anything you buy. No nutrient values are shown, because nothing here measures them. If you have a medical condition that affects what you eat, follow your doctor's or dietitian's advice.</p>
+      ${typeof adultRecordFooter === 'function' ? adultRecordFooter() : ''}
     </div>`;
 
   bindAdultChrome();
@@ -117,6 +121,8 @@ async function screenAdultEating(){
   $("#adultLogDay").onclick = () => openAdultNutritionDay(days.find(d => d.logged_on === today) || null, prefs);
   $("#adultPlanMeal").onclick = () => openAdultPlanMeal(recipes, prefs);
   $("#adultAddRecipe").onclick = () => openAdultRecipe(null);
+  // Delete one logged day. See js/adult-deletion.js.
+  { const b = $("#adultLoggedDays"); if (b) b.onclick = () => openAdultLoggedDays(); }
   { const b = $("#adultCopyGrocery"); if (b) b.onclick = async () => {
     const text = grocery.map(g => g.name).join('\n');
     try { await navigator.clipboard.writeText(text); toast('Grocery list copied'); }
@@ -171,7 +177,8 @@ function openAdultPreferences(prefs){
     </div>
     <p style="font-size:11.5px;color:var(--muted);margin:-4px 2px 12px">How much protein suits you depends on your body and how active you are. Pick aims that fit your week now.</p>
     <div class="err" id="anPrefErr"></div>
-    <button class="btn" id="anPrefSave">Save</button>`);
+    <button class="btn" id="anPrefSave">Save</button>
+    ${prefs ? '<button class="btn danger" id="anPrefDelete" style="margin-top:12px">Delete your preferences</button>' : ''}`);
   bindAdultChips(bg, 'data-avoid');
   bg.querySelector('#anPrefSave').onclick = async e => {
     const err = bg.querySelector('#anPrefErr'); err.textContent = '';
@@ -186,6 +193,15 @@ function openAdultPreferences(prefs){
     const { error } = await sb.from('adult_nutrition_preferences').upsert({ ...v.value, guardian_id:state.user.id, updated_at:new Date().toISOString() }, { onConflict:'guardian_id' });
     if (error) { adultFail(error, 'adult:nutritionPrefs', 'Could not save'); btn.disabled = false; return; }
     bg.remove(); toast('Saved'); renderApp('adult');
+  };
+  if (!prefs) return;
+  // The allergens avoided are what flags a recipe or a planned meal, so the confirm says those flags go too.
+  bg.querySelector('#anPrefDelete').onclick = async e => {
+    if (!confirm('Delete your food preferences, the allergens you avoid and your daily aims? Recipes and planned meals will no longer be flagged for allergens you avoid. Your recipes, planned meals and logged days stay.')) return;
+    const btn = e.currentTarget; btn.disabled = true;
+    const result = await adultDeletePreferences(state.user.id);
+    if (!result.ok) { adultFail(result.error, 'adult:nutritionPrefsDelete', 'Could not delete your preferences'); btn.disabled = false; return; }
+    bg.remove(); toast('Preferences deleted'); renderApp('adult');
   };
 }
 
