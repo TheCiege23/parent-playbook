@@ -69,6 +69,7 @@ const BUNDLE_MIGRATIONS = Object.freeze([
   'supabase/migrations/20260915200000_composition_report_removal.sql',
   'supabase/migrations/20260915210000_athlete_delete_audits.sql',
   'supabase/migrations/20260915220000_household_write_boundaries.sql',
+  'supabase/migrations/20260915230000_access_grants_come_from_invites.sql',
 ]);
 
 // Tooling the acquirer needs to verify what they were handed, not just run it.

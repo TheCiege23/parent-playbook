@@ -15,8 +15,8 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | --- | --- | --- |
 | Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v133`; local production-shaped smoke 29/29; live verification pending deployment |
 | JavaScript suite | `node --test "tests/*.test.cjs"` | 1026/1026 |
-| Database suite | `node tests/db/run.cjs` | 507/507 on a disposable cluster built from the real migrations: 486 security cases plus a 21-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 223/223, exclusions clean, contracts 335/335, database 507/507, signature verified, host serving |
+| Database suite | `node tests/db/run.cjs` | 524/524 on a disposable cluster built from the real migrations: 503 security cases plus a 21-case restore and deletion rehearsal |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | 7/7 checks: manifest 224/224, exclusions clean, contracts 335/335, database 524/524, signature verified, host serving |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
 
@@ -101,8 +101,8 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 223 files, checksummed, one command to verify it, and its own
-  bundled migrations rebuild the schema and pass all 507 cases on a clean database.
+- **The buyer archive stands alone**: 224 files, checksummed, one command to verify it, and its own
+  bundled migrations rebuild the schema and pass all 524 cases on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
 than judgment. Three defects worth admitting if pressed, because finding them is the point: the
