@@ -45,6 +45,12 @@
       athletes:[{ id:athlete, family_id:family, first_name:'Sam', nickname:null, birthdate:birth.toISOString().slice(0, 10), dominant_hand:null, created_by:USER.id, created_at:day(-60) }],
       athlete_sports:[{ id:'00000000-0000-4000-8000-0000000000e1', athlete_id:athlete, sport_key:'football', positions:['RB'], level:'Junior', is_primary:true,
         practice_days:[1, 3], game_day:5, season_start:day(-30), season_end:day(60), season_state:null, parent_experience:null, created_at:day(-60) }],
+      // One invitation waiting to be accepted, so the Profile screen has something to list under "Who can see" — and
+      // something to revoke. A link invitation: no email, no phone, and a code the recipient is told separately.
+      athlete_invites:[{ id:'00000000-0000-4000-8000-0000000000b1', athlete_id:athlete, role:'family_view', scope:'family',
+        token:'synthetic-invite-token', invited_email:null, invited_phone:null, code_hash:'synthetic-code-hash', code_attempts:0,
+        code_issued_at:null, sent_via:'link', created_by:USER.id, created_at:day(-2), expires_at:day(12),
+        accepted_by:null, accepted_at:null, revoked_at:null }],
       measurements:[
         { id:'00000000-0000-4000-8000-0000000000d1', athlete_id:athlete, metric_key:'height', value:56, unit:'in', measured_on:day(-40), source:'manual', created_by:USER.id, created_at:day(-40) },
         { id:'00000000-0000-4000-8000-0000000000d2', athlete_id:athlete, metric_key:'height', value:56.5, unit:'in', measured_on:day(-5), source:'manual', created_by:USER.id, created_at:day(-5) },
@@ -342,12 +348,63 @@
     } });
   }
 
+  // public.invite_preview() and public.accept_invite(), as 20260912123000_family_wide_parent_invites.sql define them:
+  // the preview says why a link no longer works without telling a stranger anything about the child, and accepting
+  // refuses a revoked, used, expired or locked invitation before it grants anything. The code check is the one part
+  // that is not reproduced — the real one compares a salted hash — so any code is accepted and a missing one is not.
+  const inviteStatus = i => i.revoked_at ? 'revoked'
+    : i.accepted_at ? 'accepted'
+    : (new Date(i.expires_at) < new Date()) ? 'expired'
+    : ((i.code_attempts || 0) >= 5) ? 'locked' : 'pending';
+  function invitePreview(token){
+    const i = table('athlete_invites').find(r => r.token === token);
+    if (!i) return [{ athlete_first_name:null, inviter:null, invite_role:null, status:'not_found', athlete_age:null,
+      sport_name:null, needs_code:false, sent_hint:null, invite_scope:null, athlete_count:null }];
+    const child = table('athletes').find(a => a.id === i.athlete_id) || {};
+    const guardian = table('guardians').find(g => g.id === i.created_by);
+    const sportKey = (table('athlete_sports').find(s => s.athlete_id === child.id) || {}).sport_key;
+    return [{
+      athlete_first_name:child.first_name ?? null,
+      inviter:(guardian && guardian.display_name) || 'A parent',
+      invite_role:i.role, status:inviteStatus(i),
+      athlete_age:child.birthdate ? Math.floor((Date.now() - new Date(child.birthdate).getTime()) / 31557600000) : null,
+      sport_name:(table('sports').find(s => s.key === sportKey) || {}).name ?? null,
+      needs_code:i.code_hash != null,
+      sent_hint:i.code_hash == null ? null : 'the message they sent you',
+      invite_scope:i.scope,
+      athlete_count:i.scope === 'family' ? table('athletes').filter(a => a.family_id === child.family_id).length : 1,
+    }];
+  }
+  function acceptInvite(token, code){
+    const i = table('athlete_invites').find(r => r.token === token);
+    if (!i) return { message:'invite_not_found' };
+    const status = inviteStatus(i);
+    if (status !== 'pending') return { message:{ revoked:'invite_revoked', accepted:'invite_already_used', expired:'invite_expired', locked:'invite_locked' }[status] };
+    if (i.code_hash != null && !code) { i.code_attempts = (i.code_attempts || 0) + 1; return { message:'invite_code_wrong' }; }
+    const child = table('athletes').find(a => a.id === i.athlete_id) || {};
+    const reaches = (i.scope === 'family' && ['co_parent', 'family_view'].includes(i.role))
+      ? table('athletes').filter(a => a.family_id === child.family_id) : [child];
+    for (const kid of reaches) {
+      const held = table('athlete_access').find(g => g.athlete_id === kid.id && g.guardian_id === USER.id);
+      if (held) Object.assign(held, { role:held.role === 'owner' ? held.role : i.role, revoked_at:null });
+      else table('athlete_access').push({ id:uuid(), athlete_id:kid.id, guardian_id:USER.id, role:i.role,
+        granted_by:i.created_by, granted_at:now(), revoked_at:null });
+    }
+    Object.assign(i, { accepted_by:USER.id, accepted_at:now() });
+    return { athlete:i.athlete_id };
+  }
+
   const client = {
     from:query,
     rpc:async (name, args) => {
       calls.push(['rpc', name]);
       if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
+      if (name === 'invite_preview') return { data:invitePreview(args && args.p_token), error:null };
+      if (name === 'accept_invite') {
+        const out = acceptInvite(args && args.p_token, args && args.p_code);
+        return out.message ? { data:null, error:{ code:'P0001', message:out.message } } : { data:out.athlete, error:null };
+      }
       if (name === 'create_athlete_onboarding') {
         const refused = onboardingConsentRefusal(args.p_consents);
         return refused ? { data:null, error:refused } : { data:createAthleteOnboarding(args), error:null };
