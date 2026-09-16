@@ -5,6 +5,7 @@
 // handler.mjs; these tests use an in-memory Supabase and a recording fetch.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -139,6 +140,98 @@ test('without an email key, a failed send or a wrong template, the caller is tol
   const wrong = await (await handlerWith({ callerClient: owner, db: service(), fetch: wrongFile.fetch }))(post({ invite_id: 'i1' }));
   assert.equal(wrong.status, 500);
   assert.equal(wrongFile.sends().length, 0, 'an email without its link is never sent');
+});
+
+// The template the site actually serves, so the function and the file are checked together.
+const REAL_TEMPLATE = fs.readFileSync(path.join(__dirname, '../emails/invite.html'), 'utf8');
+// issue_invite_code() stores sha256(code || ':' || token) as hex.
+const hashOf = (code, token) => crypto.createHash('sha256').update(code + ':' + token).digest('hex');
+const withCode = (code = '482913', invite = {}) => ({ code_hash: hashOf(code, invite.token ?? 'tok en/1'), ...invite });
+const htmlText = html => html.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/\s+/g, ' ');
+
+test('an invite with a code is mailed with that code, through the real template', async () => {
+  // The recipient is asked for six digits "from the email to …"; until 2026-09-16 the email carried none.
+  const net = recordingFetch({ template: REAL_TEMPLATE });
+  const res = await (await handlerWith({ callerClient: owner, db: service(withCode('482913', { scope: 'family' })), fetch: net.fetch }))(post({ invite_id: 'i1', code: '482913' }));
+  assert.equal(res.status, 200);
+  const sent = JSON.parse(net.sends()[0].init.body);
+  const text = htmlText(sent.html);
+  assert.match(text, /Your code 482913 You'll be asked for it after you open the link\./);
+  assert.match(text, /Jordan wants you to follow the family's sports journey\./);
+  assert.match(text, /Sent by Jordan Parent through Parent Playbook\./);
+  assert.doesNotMatch(sent.html, /\{\{\w+\}\}/, 'every placeholder in the served template is filled');
+  assert.equal((sent.html.match(/482913/g) || []).length, 1, 'the code appears once, in the body, not in a comment');
+});
+
+test('a code that is missing, malformed or not the one issued is not mailed, and only an editor learns that', async () => {
+  for (const [what, body, invite, error] of [
+    ['no code', { invite_id: 'i1' }, withCode(), 'code_required'],
+    ['five digits', { invite_id: 'i1', code: '48291' }, withCode(), 'code_required'],
+    ['text after the digits', { invite_id: 'i1', code: '482913 <b>hi</b>' }, withCode(), 'code_required'],
+    ['a different code', { invite_id: 'i1', code: '111111' }, withCode(), 'code_mismatch'],
+    ['this code hashed with another token', { invite_id: 'i1', code: '482913' }, { code_hash: hashOf('482913', 'other') }, 'code_mismatch'],
+  ]) {
+    const net = recordingFetch({ template: REAL_TEMPLATE });
+    const res = await (await handlerWith({ callerClient: owner, db: service(invite), fetch: net.fetch }))(post(body));
+    assert.equal(res.status, 400, what);
+    assert.equal((await res.json()).error, error, what);
+    assert.equal(net.sends().length, 0, what + ' must not send');
+  }
+  const net = recordingFetch({ template: REAL_TEMPLATE });
+  const stranger = await (await handlerWith({ callerClient: callerWithTables({ id: 'x9' }, {}), db: service(withCode()), fetch: net.fetch }))(post({ invite_id: 'i1', code: '111111' }));
+  assert.equal(stranger.status, 403, 'the permission gate answers before the code is compared');
+});
+
+test('an invite with a code is never mailed through a template with no place for it', async () => {
+  const net = recordingFetch(); // TEMPLATE above predates the code
+  const res = await (await handlerWith({ callerClient: owner, db: service(withCode()), fetch: net.fetch }))(post({ invite_id: 'i1', code: '482913' }));
+  assert.equal(res.status, 500);
+  assert.equal((await res.json()).error, 'template_outdated');
+  assert.equal(net.sends().length, 0);
+});
+
+test('an invite issued before codes existed is mailed without one, and ignores a code in the request', async () => {
+  const net = recordingFetch({ template: REAL_TEMPLATE });
+  const res = await (await handlerWith({ callerClient: owner, db: service({ code_hash: null }), fetch: net.fetch }))(post({ invite_id: 'i1', code: '482913' }));
+  assert.equal(res.status, 200);
+  const html = JSON.parse(net.sends()[0].init.body).html;
+  assert.doesNotMatch(htmlText(html), /Your code/);
+  assert.doesNotMatch(html, /482913/);
+});
+
+test('with no display name the email says "You\'re invited", never "A invited you"', async () => {
+  for (const [scope, subject, headline] of [
+    ['athlete', "You're invited to follow Sam's season", "You're invited to follow Sam's season."],
+    ['family', "You're invited to Parent Playbook for the whole family", "You're invited to follow the family's sports journey."],
+  ]) {
+    for (const displayName of [null, '', '   ']) {
+      const net = recordingFetch({ template: REAL_TEMPLATE });
+      const db = service(withCode('482913', { scope }));
+      db.tables.guardians[0].display_name = displayName;
+      const res = await (await handlerWith({ callerClient: owner, db, fetch: net.fetch }))(post({ invite_id: 'i1', code: '482913' }));
+      assert.equal(res.status, 200);
+      const sent = JSON.parse(net.sends()[0].init.body);
+      assert.equal(sent.subject, subject, `${scope}, ${JSON.stringify(displayName)}`);
+      const text = htmlText(sent.html);
+      assert.ok(text.includes(headline), text);
+      assert.match(text, /Sent through Parent Playbook\./);
+      assert.match(text, /and the sender can remove your access at any time/);
+      assert.doesNotMatch(text + sent.subject, /\bA (invited|parent|wants)\b/);
+    }
+  }
+});
+
+test('a coach invite is for one child and says what a coach can and cannot see', async () => {
+  const net = recordingFetch({ template: REAL_TEMPLATE });
+  const res = await (await handlerWith({ callerClient: owner, db: service(withCode('482913', { role: 'coach', scope: 'athlete' })), fetch: net.fetch }))(post({ invite_id: 'i1', code: '482913' }));
+  assert.equal(res.status, 200);
+  const sent = JSON.parse(net.sends()[0].init.body);
+  assert.equal(sent.subject, "Jordan wants you to follow Sam's season");
+  const text = htmlText(sent.html);
+  assert.match(text, /You'd get Team Connect access — athlete stats and training updates only/);
+  assert.match(text, /Growth, scan measurements and training updates/);
+  assert.match(text, /No games, journey, photos or weekly plan/);
+  assert.doesNotMatch(text, /every child|whole family/);
 });
 
 test('the entry point uses the publishable key for the caller and adds no logic', () => {

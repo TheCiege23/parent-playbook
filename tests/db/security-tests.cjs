@@ -2133,6 +2133,71 @@ add('AE17', 'access-grants', 'the grant helper runs as definer with an empty sea
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'access_grant_is';`,
     expect: 'ok', expectOut: 'true:search_path="":true:false' });
 
+// =========================================================== AF. a parent invites a coach to one child
+// The invite sheet offered "Team Connect (coach)" from 2026-09-08, but invite_role_chk still allowed only co_parent and
+// family_view, so every coach invitation was refused at insert and no coach could be connected (20260916120000). A
+// coach invitation now exists, for one child only, and what the coach reaches is the narrow set 20260908152418 and
+// 20260913170000 already defined. The coach is an account created inside each case: the three fixture accounts are
+// the household's owner and two organization admins, whose rosters would reach these children by another route.
+const COACH_D = 'dddddddd-0000-4000-8000-00000000000d';
+const SIBLING = SCAN_OTHER_ATHLETE;            // in the same household as ATH_A
+const coachAccount = `insert into auth.users(id, email) values ('${COACH_D}', 'synthetic-coach-d@example.invalid') on conflict (id) do nothing;
+  insert into public.guardians(id, display_name) values ('${COACH_D}', 'synthetic coach D') on conflict (id) do nothing;`;
+const INVITES_RLS = 'new row violates row-level security policy for table "athlete_invites"';
+const COACH_UPDATES_RLS = 'new row violates row-level security policy for table "coach_updates"';
+// The creator is the caller, as the app writes it, so a refusal below is about edit rights and not a mismatched author.
+const createInvite = (role, scope, token, creator = MEMBER_C) =>
+  `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', '${role}', '${token}', '${creator}', '${scope}')`;
+const COACH_GAME = 'af000000-0000-4000-8000-000000000001';
+const COACH_READING = 'af000000-0000-4000-8000-000000000002';
+// A connected coach, as accept_invite() leaves one, with one game and one reading on the child for the reads below.
+const connectedCoach = coachAccount
+  + createInvite('coach', 'athlete', 'synthetic-coach-connect') + ';'
+  + `insert into public.games(id, athlete_id, game_date, opponent) values ('${COACH_GAME}', '${ATH_A}', current_date - 2, 'Synthetic opponent');
+  insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by)
+    values ('${COACH_READING}', '${ATH_A}', 'wingspan', 60, 'in', 'manual', current_date - 1, '${MEMBER_C}');`
+  + `select set_config('request.jwt.claims','{"sub":"${COACH_D}","role":"authenticated"}',true); set local role authenticated;
+  select public.accept_invite('synthetic-coach-connect'); reset role;`;
+const asCoach = { role: 'authenticated', claims: COACH_D };
+const coachGrants = `reset role; select coalesce(string_agg(athlete_id::text || ':' || role, ',' order by athlete_id::text), '(none)')
+    || '|' || (select count(*) from public.family_members where guardian_id = '${COACH_D}')
+  from public.athlete_access where guardian_id = '${COACH_D}' and revoked_at is null;`;
+
+add('AF01', 'coach-invites', 'THE CASE: an owner can invite a coach to one of their children',
+  { ...asScanParent, sql: createInvite('coach', 'athlete', 'synthetic-coach-invite') + ` returning role || ':' || scope;`,
+    expect: 'ok', expectOut: 'coach:athlete' });
+add('AF02', 'coach-invites', 'a coach invitation cannot cover the whole household',
+  { ...asScanParent, sql: createInvite('coach', 'family', 'synthetic-coach-family') + ';',
+    expect: 'error', expectError: /athlete_invites_coach_one_child_chk/ });
+add('AF03', 'coach-invites', 'no invitation can make anyone an owner',
+  { ...asScanParent, sql: createInvite('owner', 'athlete', 'synthetic-owner-invite') + ';',
+    expect: 'error', expectError: /invite_role_chk/ });
+add('AF04', 'coach-invites', 'a family viewer cannot invite a coach',
+  { setup: scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
+    ...refusedBy(createInvite('coach', 'athlete', 'synthetic-viewer-coach', ADMIN_B) + ';', INVITES_RLS) });
+add('AF05', 'coach-invites', 'THE CASE: accepting connects the coach to that one child — no sibling, no household membership',
+  { setup: coachAccount + createInvite('coach', 'athlete', 'synthetic-coach-accept') + ';', ...asCoach,
+    sql: `select public.accept_invite('synthetic-coach-accept') = '${ATH_A}';` + coachGrants,
+    expect: 'ok', expectOut: `${ATH_A}:coach|0` });
+add('AF06', 'coach-invites', 'the connected coach reads the child and its measurements, never its games or a sibling',
+  { setup: connectedCoach, ...asCoach,
+    sql: `select (select count(*) from public.athletes where id = '${ATH_A}') || '|' || (select count(*) from public.athletes where id = '${SIBLING}')
+      || '|' || (select count(*) from public.measurements where id = '${COACH_READING}') || '|' || (select count(*) from public.games where id = '${COACH_GAME}');`,
+    expect: 'ok', expectOut: '1|0|1|0' });
+add('AF07', 'coach-invites', 'the connected coach cannot edit the child',
+  { setup: connectedCoach, ...asCoach,
+    sql: `with u as (update public.athletes set nickname = 'SyntheticCoachEdit' where id = '${ATH_A}' returning 1) select count(*)::text from u;`,
+    expect: 'ok', expectOut: '0' });
+add('AF08', 'coach-invites', 'the connected coach can send that child a training update',
+  { setup: connectedCoach, ...asCoach,
+    sql: `insert into public.coach_updates(athlete_id, sender_id, kind, body) values ('${ATH_A}', '${COACH_D}', 'workout', 'Synthetic drill for this week.') returning kind;`,
+    expect: 'ok', expectOut: 'workout' });
+add('AF09', 'coach-invites', "but not a sibling's",
+  { setup: connectedCoach, ...asCoach,
+    ...refusedBy(`insert into public.coach_updates(athlete_id, sender_id, kind, body) values ('${SIBLING}', '${COACH_D}', 'workout', 'Synthetic drill for this week.');`, COACH_UPDATES_RLS) });
+add('AF10', 'coach-invites', 'the connected coach cannot invite anyone',
+  { setup: connectedCoach, ...asCoach, ...refusedBy(createInvite('family_view', 'family', 'synthetic-coach-invites', COACH_D) + ';', INVITES_RLS) });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

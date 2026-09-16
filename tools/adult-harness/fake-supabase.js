@@ -80,6 +80,10 @@
     adult_schedule_exercises:{ position:0 },
     adult_nutrition_preferences:{ avoid_allergens:[] },
     adult_recipes:{ allergens:[], plate_groups:[] },
+    // A function where each row needs its own value: an invitation's token is two uuids without dashes, and it
+    // expires in 14 days (20260731121405).
+    athlete_invites:() => ({ token:uuid().replace(/-/g, '') + uuid().replace(/-/g, ''), scope:'athlete', code_attempts:0,
+      expires_at:new Date(Date.now() + 14 * 86400000).toISOString(), accepted_by:null, accepted_at:null, revoked_at:null }),
   };
 
   // What the screens expect a delete to take with it.
@@ -129,7 +133,8 @@
           const keys = st.onConflict ? st.onConflict.split(',').map(s => s.trim()) : null;
           const existing = keys ? rows.find(r => keys.every(k => r[k] === row[k])) : null;
           if (existing) { Object.assign(existing, row); written.push(existing); continue; }
-          const full = { id:uuid(), created_at:now(), ...(DEFAULTS[name] || {}), ...row };
+          const defaults = typeof DEFAULTS[name] === 'function' ? DEFAULTS[name]() : (DEFAULTS[name] || {});
+          const full = { id:uuid(), created_at:now(), ...defaults, ...row };
           rows.push(full); written.push(full);
         }
         return done(written.map(r => ({ ...r })));
@@ -401,6 +406,14 @@
       if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
       if (name === 'invite_preview') return { data:invitePreview(args && args.p_token), error:null };
+      // public.issue_invite_code() (20260905145010): the plaintext once to the editor, and only a stand-in for the hash
+      // on the row. The code is fixed so a check can read it back; accept_invite() above does not compare it.
+      if (name === 'issue_invite_code') {
+        const i = table('athlete_invites').find(r => r.id === (args && args.p_invite_id));
+        if (!i) return { data:null, error:{ code:'P0001', message:'invite_not_found' } };
+        Object.assign(i, { code_hash:'synthetic-code-hash', code_attempts:0, code_issued_at:new Date().toISOString() });
+        return { data:'482913', error:null };
+      }
       if (name === 'accept_invite') {
         const out = acceptInvite(args && args.p_token, args && args.p_code);
         return out.message ? { data:null, error:{ code:'P0001', message:out.message } } : { data:out.athlete, error:null };

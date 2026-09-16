@@ -394,8 +394,8 @@ function openInvite(){
         ${multi?H`<div class="sec-title">${esc(r.name)}</div>`:''}
         ${r.code?H`<div class="sec-title" style="margin-top:${multi?4:14}px">Their code</div>
           <div class="code-show">${esc(r.code)}</div>
-          <p style="font-size:11.5px;color:var(--muted);margin:0 2px 10px">Shown once. They'll be asked for it
-            after they open the link, so a forwarded message isn't enough on its own.</p>`:''}
+          <p style="font-size:11.5px;color:var(--muted);margin:0 2px 10px">Shown once here, and it goes with the link in the message.
+            They'll be asked for it after they open the link.</p>`:''}
         <div class="linkbox"><span style="flex:1">${esc(r.link)}</span></div>
         ${(r.chan==='text'||r.chan==='email')&&!r.sent
           ?H`<p style="font-size:11.5px;color:var(--danger);margin:6px 2px 0">Couldn't send automatically

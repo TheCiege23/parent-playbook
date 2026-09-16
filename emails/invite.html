@@ -7,10 +7,14 @@
 <meta name="supported-color-schemes" content="light dark" />
 <title>You've been invited — Parent Playbook</title>
 <!--
-  NOT a Supabase auth template. This one needs a sender (edge function + Resend/Postmark).
-  Subject: {{inviter_first}} is sharing {{athlete_first}}'s season with you
-  Variables: {{inviter_first}} {{inviter_full}} {{athlete_first}} {{athlete_age}}
-             {{sport}} {{role_label}} {{invite_url}} {{expires_human}}
+  NOT a Supabase auth template. supabase/functions/send-invite fills it and sends it through Resend,
+  and sets the subject itself.
+  Variables, each written in double braces in the body (never in this comment, where the function
+  would fill them too and a mention would pass its checks): invite_headline, invite_intro,
+  role_label, access_first, access_second, access_limit, invite_url, expires_human, inviter_first,
+  athlete_first, sent_by_line and code_block.
+  code_block is required: the function will not mail an invite that has a code into a template
+  without a place for it. It is built by the function, and is empty for an invite with no code.
 -->
 <style>
   @media only screen and (max-width:620px){
@@ -90,6 +94,7 @@
                 </td>
               </tr>
             </table>
+            {{code_block}}
             <div style="height:14px;line-height:14px;font-size:14px;">&nbsp;</div>
             <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#6C6A63;mso-line-height-rule:exactly;">This link expires {{expires_human}}, and {{inviter_first}} can remove your access at any time.</div>
           </td>
@@ -103,7 +108,7 @@
 
         <tr>
           <td bgcolor="#0B1F1A" style="background-color:#0B1F1A;padding:26px 40px;" class="pp-pad">
-            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#9DB5AD;mso-line-height-rule:exactly;">Sent by {{inviter_full}} through Parent Playbook.</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#9DB5AD;mso-line-height-rule:exactly;">{{sent_by_line}}</div>
             <div style="height:10px;line-height:10px;font-size:10px;">&nbsp;</div>
             <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:#7C948C;mso-line-height-rule:exactly;">A Brown Pig LLC company · 15 Carlisle St, Bergenfield, NJ 07621<br />One-off invitation — you won't be added to any mailing list.</div>
           </td>
