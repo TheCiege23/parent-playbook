@@ -69,7 +69,7 @@ function harness({ failWith = null } = {}) {
   const confirmRevokeInvite = new Function(...Object.keys(globals),
     extract(read('js/sheets.js'), 'function confirmRevokeInvite(invite){') + '\nreturn confirmRevokeInvite;')(...Object.values(globals));
   const db = ctx.window.__harness.db;
-  return { confirmRevokeInvite, ui, sheets, db, calls: ctx.window.__harness.calls, invite: () => db.athlete_invites.find(i => i.id === INVITE) };
+  return { confirmRevokeInvite, ui, sheets, db, client, calls: ctx.window.__harness.calls, invite: () => db.athlete_invites.find(i => i.id === INVITE) };
 }
 
 const press = async (bg, id) => { const b = bg.querySelector(id); assert.ok(b, 'no ' + id + ' button'); await b.onclick({ target: b }); return b; };
@@ -148,6 +148,35 @@ test('Keep it closes the sheet and changes nothing', async () => {
   assert.equal(h.invite().revoked_at, null);
   assert.deepEqual(h.ui.toasts, []);
   assert.equal(h.sheets.last().removed, true);
+});
+
+test('a live invitation previews as pending and can still be accepted', async () => {
+  const h = harness();
+  const { data: preview } = await h.client.rpc('invite_preview', { p_token: 'synthetic-invite-token' });
+  assert.equal(preview[0].status, 'pending');
+  assert.equal(preview[0].invite_scope, 'family');
+  assert.equal(preview[0].needs_code, true, 'a link invitation still carries a code');
+
+  const { data: athlete, error } = await h.client.rpc('accept_invite', { p_token: 'synthetic-invite-token', p_code: '123456' });
+  assert.equal(error, null);
+  assert.ok(athlete, 'it answers with the athlete');
+  assert.equal(h.db.athlete_access.length, 1, 'and grants access to the household\'s child');
+  assert.ok(h.invite().accepted_at, 'the invitation is marked used');
+});
+
+test('once revoked, the link previews as revoked and accepting it is refused', async () => {
+  const h = harness();
+  h.confirmRevokeInvite(h.invite());
+  await press(h.sheets.last(), '#yes');
+
+  const { data: preview } = await h.client.rpc('invite_preview', { p_token: 'synthetic-invite-token' });
+  assert.equal(preview[0].status, 'revoked', 'which is the state the redeem screen turns into "This invite was turned off"');
+
+  const { data, error } = await h.client.rpc('accept_invite', { p_token: 'synthetic-invite-token', p_code: '123456' });
+  assert.equal(data, null);
+  assert.equal(error.message, 'invite_revoked');
+  assert.equal((h.db.athlete_access || []).length, 0, 'nothing was granted');
+  assert.equal(h.invite().accepted_at, null, 'and the invitation was not marked used');
 });
 
 test('source: Profile offers Revoke to an editor only, and binds it to the sheet', () => {
