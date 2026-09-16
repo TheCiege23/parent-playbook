@@ -2057,6 +2057,82 @@ add('AD24', 'household-writes', 'both policy helpers run as definer with an empt
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname in ('athlete_in_household', 'is_household_guardian_of');`,
     expect: 'ok', expectOut: 'athlete_in_household=true:search_path="":true:false is_household_guardian_of=true:search_path="":true:false' });
 
+// =========================================================== AE. access to a child comes from an invite
+// aa_insert and aa_update checked only private.can_edit_athlete(athlete_id), so anyone who could edit a child could
+// grant any account any role on that child — including `owner`, which edits — without an invite, and could re-point an
+// existing grant at another account or upgrade it. Nothing writes this table except public.accept_invite(), which the
+// invited guardian runs themselves: no client code writes it at all, and the Profile screen's "who can see them" list
+// only reads it. A signed-in account may now revoke a grant, or delete it, and nothing else.
+const STRANGER = ADMIN_A;                      // no household, no grant, no invite
+const grantTo = (guardian, role) => `insert into public.athlete_access(athlete_id, guardian_id, role, granted_by) values ('${ATH_A}', '${guardian}', '${role}', '${MEMBER_C}');`;
+const revokedViewer = `insert into public.athlete_access(athlete_id, guardian_id, role, revoked_at) values ('${ATH_A}', '${ADMIN_B}', 'family_view', now());`;
+const ACCESS_RLS = 'new row violates row-level security policy for table "athlete_access"';
+const grantsForA = `reset role; select coalesce(string_agg(guardian_id::text || ':' || role || ':' || case when revoked_at is null then 'live' else 'revoked' end, ',' order by guardian_id::text), '(none)')
+  from public.athlete_access where athlete_id = '${ATH_A}';`;
+const inviteFor = (role, token) => `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', '${role}', '${token}', '${MEMBER_C}', 'athlete');`;
+
+add('AE01', 'access-grants', 'THE CASE: the owner cannot grant an account access to their child without an invite',
+  { ...asScanParent, ...refusedBy(grantTo(STRANGER, 'family_view'), ACCESS_RLS) });
+add('AE02', 'access-grants', 'THE CASE: nor grant one that can edit the child',
+  { ...asScanParent, ...refusedBy(grantTo(STRANGER, 'owner'), ACCESS_RLS) });
+add('AE03', 'access-grants', 'a co-parent invited to the child cannot grant access to anyone either',
+  { setup: invitedCoParentB, role: 'authenticated', claims: ADMIN_B, ...refusedBy(grantTo(STRANGER, 'co_parent'), ACCESS_RLS) });
+add('AE04', 'access-grants', 'THE CASE: the owner cannot upgrade a family viewer to a co-parent',
+  { setup: scanFamilyViewer, ...asScanParent,
+    ...refusedBy(`update public.athlete_access set role = 'co_parent' where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';`, ACCESS_RLS) });
+add('AE05', 'access-grants', 'THE CASE: nor hand a live grant to another account',
+  { setup: scanFamilyViewer, ...asScanParent,
+    ...refusedBy(`update public.athlete_access set guardian_id = '${STRANGER}' where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';`, ACCESS_RLS) });
+add('AE06', 'access-grants', 'THE CASE: nor bring back a grant the household revoked',
+  { setup: revokedViewer, ...asScanParent,
+    ...refusedBy(`update public.athlete_access set revoked_at = null where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';`, ACCESS_RLS) });
+add('AE07', 'access-grants', 'the owner can still revoke a grant',
+  { setup: scanFamilyViewer, ...asScanParent,
+    sql: `update public.athlete_access set revoked_at = now() where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';` + grantsForA,
+    expect: 'ok', expectOut: `${ADMIN_B}:family_view:revoked` });
+add('AE08', 'access-grants', 'a revoke may not change the grant on its way out',
+  { setup: scanFamilyViewer, ...asScanParent,
+    ...refusedBy(`update public.athlete_access set revoked_at = now(), role = 'owner' where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';`, ACCESS_RLS) });
+add('AE09', 'access-grants', 'and once revoked, the viewer no longer reaches the child',
+  { setup: scanFamilyViewer, ...asScanParent,
+    sql: `update public.athlete_access set revoked_at = now() where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';
+      reset role; select set_config('request.jwt.claims','{"sub":"${ADMIN_B}","role":"authenticated"}',true); set local role authenticated;
+      select count(*)::text from public.athletes where id = '${ATH_A}';`,
+    expect: 'ok', expectOut: '0' });
+add('AE10', 'access-grants', 'the owner can still delete a grant outright',
+  { setup: scanFamilyViewer, ...asScanParent,
+    sql: `delete from public.athlete_access where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';` + grantsForA,
+    expect: 'ok', expectOut: '(none)' });
+add('AE11', 'access-grants', "an account outside the household cannot revoke or delete somebody else's grant",
+  { setup: scanFamilyViewer, role: 'authenticated', claims: STRANGER,
+    sql: `update public.athlete_access set revoked_at = now() where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';
+      delete from public.athlete_access where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';` + grantsForA,
+    expect: 'ok', expectOut: `${ADMIN_B}:family_view:live` });
+add('AE12', 'access-grants', 'a family viewer cannot promote themselves',
+  { setup: scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
+    sql: `update public.athlete_access set role = 'co_parent' where athlete_id = '${ATH_A}' and guardian_id = '${ADMIN_B}';` + grantsForA,
+    expect: 'ok', expectOut: `${ADMIN_B}:family_view:live` });
+add('AE13', 'access-grants', 'accepting an invite still grants access, because the function is not bound by these policies',
+  { setup: inviteFor('family_view', 'synthetic-access-invite'), role: 'authenticated', claims: STRANGER,
+    sql: `select public.accept_invite('synthetic-access-invite') = '${ATH_A}';` + grantsForA,
+    expect: 'ok', expectOut: `${STRANGER}:family_view:live` });
+add('AE14', 'access-grants', 'and it still upgrades a family viewer who accepts a co-parent invite',
+  { setup: scanFamilyViewer + inviteFor('co_parent', 'synthetic-access-upgrade'), role: 'authenticated', claims: ADMIN_B,
+    sql: `select public.accept_invite('synthetic-access-upgrade') = '${ATH_A}';` + grantsForA,
+    expect: 'ok', expectOut: `${ADMIN_B}:co_parent:live` });
+add('AE15', 'access-grants', 'and brings back a grant the household had revoked, which no signed-in account can do',
+  { setup: revokedViewer + inviteFor('family_view', 'synthetic-access-again'), role: 'authenticated', claims: ADMIN_B,
+    sql: `select public.accept_invite('synthetic-access-again') = '${ATH_A}';` + grantsForA,
+    expect: 'ok', expectOut: `${ADMIN_B}:family_view:live` });
+add('AE16', 'access-grants', 'no INSERT or ALL policy is left on public.athlete_access for any role',
+  { sql: `select count(*)::text from pg_policies where schemaname = 'public' and tablename = 'athlete_access' and cmd in ('INSERT', 'ALL');`,
+    expect: 'ok', expectOut: '0' });
+add('AE17', 'access-grants', 'the grant helper runs as definer with an empty search_path, and only authenticated may execute it',
+  { sql: `select p.prosecdef::text || ':' || array_to_string(p.proconfig, ',') || ':'
+        || has_function_privilege('authenticated', p.oid, 'EXECUTE')::text || ':' || has_function_privilege('anon', p.oid, 'EXECUTE')::text
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'private' and p.proname = 'access_grant_is';`,
+    expect: 'ok', expectOut: 'true:search_path="":true:false' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {
