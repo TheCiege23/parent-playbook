@@ -707,6 +707,34 @@ function confirmDeleteAccount(){
   };
 }
 
+// An invitation nobody has accepted yet can be called back. The row stays and takes a revoked_at: Profile stops listing
+// it, public.invite_preview() reports it as revoked, and public.accept_invite() refuses it — so a link already sitting in
+// somebody's messages stops working, and the record of who invited whom survives. Access somebody has already accepted
+// is a different thing, lives in athlete_access, and is not touched here.
+function confirmRevokeInvite(invite){
+  const bg=sheet(H`<h3>Revoke this invitation?</h3>
+    <p style="color:var(--muted);font-size:14px;margin:8px 0 16px">
+      The link and its code stop working straight away, so nobody can still use them to join${invite.scope==='family'?' your household':''}.
+      Anyone who has already accepted keeps the access you gave them.</p>
+    <button class="btn danger" id="yes" style="margin-bottom:10px">Revoke invitation</button>
+    <button class="btn ghost" id="no">Keep it</button>`);
+  bg.querySelector('#no').onclick=()=>bg.remove();
+  bg.querySelector('#yes').onclick=async(e)=>{
+    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
+    // Only while it is still live: a second tap, or a co-parent revoking the same invitation a moment earlier, must not
+    // move the time it was revoked.
+    const { data, error }=await sb.from('athlete_invites').update({ revoked_at:new Date().toISOString() })
+      .eq('id',invite.id).is('revoked_at',null).select('id');
+    if(error){
+      console.error(error); reportError(error,'profile:revokeInvite'); toast('Could not revoke the invitation');
+      e.target.innerHTML='Revoke invitation'; e.target.disabled=false; return;
+    }
+    bg.remove();
+    toast((data||[]).length?'Invitation revoked':'That invitation was already revoked');
+    renderApp('profile');
+  };
+}
+
 function confirmRemoveSport(row, name){
   const bg=sheet(H`<h3>Remove ${esc(name)}?</h3>
     <p style="color:var(--muted);font-size:14px;margin:8px 0 16px">

@@ -45,6 +45,12 @@
       athletes:[{ id:athlete, family_id:family, first_name:'Sam', nickname:null, birthdate:birth.toISOString().slice(0, 10), dominant_hand:null, created_by:USER.id, created_at:day(-60) }],
       athlete_sports:[{ id:'00000000-0000-4000-8000-0000000000e1', athlete_id:athlete, sport_key:'football', positions:['RB'], level:'Junior', is_primary:true,
         practice_days:[1, 3], game_day:5, season_start:day(-30), season_end:day(60), season_state:null, parent_experience:null, created_at:day(-60) }],
+      // One invitation waiting to be accepted, so the Profile screen has something to list under "Who can see" — and
+      // something to revoke. A link invitation: no email, no phone, and a code the recipient is told separately.
+      athlete_invites:[{ id:'00000000-0000-4000-8000-0000000000b1', athlete_id:athlete, role:'family_view', scope:'family',
+        token:'synthetic-invite-token', invited_email:null, invited_phone:null, code_hash:'synthetic-code-hash', code_attempts:0,
+        code_issued_at:null, sent_via:'link', created_by:USER.id, created_at:day(-2), expires_at:day(12),
+        accepted_by:null, accepted_at:null, revoked_at:null }],
       measurements:[
         { id:'00000000-0000-4000-8000-0000000000d1', athlete_id:athlete, metric_key:'height', value:56, unit:'in', measured_on:day(-40), source:'manual', created_by:USER.id, created_at:day(-40) },
         { id:'00000000-0000-4000-8000-0000000000d2', athlete_id:athlete, metric_key:'height', value:56.5, unit:'in', measured_on:day(-5), source:'manual', created_by:USER.id, created_at:day(-5) },

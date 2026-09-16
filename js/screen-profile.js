@@ -107,7 +107,8 @@ async function screenProfile(){
           <div class="grow"><div class="gi">🤝</div><div class="gt"><b>Shared guardian</b><span>${esc(x.role)} · can ${x.role==='co_parent'||x.role==='owner'?'edit':'view'}</span></div></div>`).join('')}
         ${visibleInvites.map(i=>H`
           <div class="grow"><div class="gi">✉️</div><div class="gt"><b>${i.scope==='family'?'Family invite pending':'Invite pending'}</b><span>${esc(i.role)} · expires ${new Date(i.expires_at).toLocaleDateString()}</span></div>
-            <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button></div>`).join('')}
+            <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button>
+            ${canEdit?H`<button class="btn sm ghost" data-revoke-invite="${esc(i.id)}">Revoke</button>`:''}</div>`).join('')}
       </div>
 
       <div class="card app-pad" style="margin-top:14px">
@@ -168,6 +169,12 @@ async function screenProfile(){
       toast(n!=null?'Saved':'Cleared'); renderApp('profile');
     }; }
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('Link copied'); });
+  // The sheet says an invitation can be revoked at any time, and until now nothing here could: the screen only ever read
+  // this table. An editor gets the control; a family viewer sees the pending invitation and cannot end it.
+  document.querySelectorAll('[data-revoke-invite]').forEach(b=>b.onclick=()=>{
+    const row=visibleInvites.find(i=>i.id===b.dataset.revokeInvite);
+    if(row) confirmRevokeInvite(row);
+  });
 }
 
 function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }
