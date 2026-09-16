@@ -51,7 +51,7 @@ No invitation was sent by email or text, and no second account accepted one. PR 
 Found while preparing this checklist. Each is a bug in the live release unless noted. Problems 1 to 4 are fixed on
 branch `invite-message-fixes` (release `pp-v136`) and are not live yet: the migration has to be applied and
 `send-invite` and `send-invite-sms` redeployed. Until then, expect what each describes; afterwards, expect the
-fixed behaviour given in section 4.
+fixed behaviour given in section 4. Problem 5 is fixed on branch `adult-hash-link` (release `pp-v137`), not live yet.
 
 1. **A coach invitation cannot be created.** The invite sheet offers "Team Connect (coach)", but the live
    `invite_role_chk` accepts only `co_parent` and `family_view`. Expect "Could not create the invite".
@@ -223,7 +223,8 @@ and its measurements gone.
 
 Signed in as **your own account**, on a computer. Nothing here touches a child.
 
-1. Visit `https://playbookbp.com/#adult`. Record where it lands (known problem 5 predicts the Week).
+1. Visit `https://playbookbp.com/#adult`. Record where it lands: before `pp-v137`, the Week (known problem 5);
+   from `pp-v137`, Your training.
 2. Settings → **Your training** → **Your own training**.
 3. **Set up** → units **lb**, the other fields as you like → **Save**.
 4. **Your goals** → **＋ Add** → a kind, a sentence → **Save goal**.
