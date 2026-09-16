@@ -53,7 +53,9 @@ async function openTeamConnect(subject){
   ]);
 
   const senderName = new Map();
-  const ids = Array.from(new Set((updates||[]).map(u=>u.sender_id)));
+  // A sender whose account was deleted is null (20260916140000) and shows as "A coach"; a null in the lookup would
+  // fail it and leave every sender unnamed.
+  const ids = Array.from(new Set((updates||[]).map(u=>u.sender_id).filter(Boolean)));
   if(ids.length){
     const { data: gs } = await sb.from('guardians').select('id,display_name').in('id', ids);
     (gs||[]).forEach(g => senderName.set(g.id, (g.display_name||'').trim() || 'A coach'));
@@ -156,7 +158,8 @@ async function screenCoach(){
   const senderName = new Map();
   for(const u of (updates||[])) if(!senderName.has(u.sender_id))
     senderName.set(u.sender_id, u.sender_id===state.user.id ? 'You' : null);
-  const unresolved = Array.from(senderName.entries()).filter(([,v])=>v===null).map(([k])=>k);
+  // A deleted sender is null and stays "A parent"; it is never looked up, or the lookup fails for everyone.
+  const unresolved = Array.from(senderName.entries()).filter(([k,v])=>k && v===null).map(([k])=>k);
   if(unresolved.length){
     const { data: gs } = await sb.from('guardians').select('id,display_name').in('id', unresolved);
     (gs||[]).forEach(g => senderName.set(g.id, (g.display_name||'').trim() || 'A parent'));

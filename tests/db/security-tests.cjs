@@ -2198,6 +2198,120 @@ add('AF09', 'coach-invites', "but not a sibling's",
 add('AF10', 'coach-invites', 'the connected coach cannot invite anyone',
   { setup: connectedCoach, ...asCoach, ...refusedBy(createInvite('family_view', 'family', 'synthetic-coach-invites', COACH_D) + ';', INVITES_RLS) });
 
+// =========================================================== AG. an account that made things elsewhere can be deleted
+// supabase/functions/delete-account removes a parent's data and then the login, and anything still pointing at the login
+// with NO ACTION refuses that last step. Read from the live schema on 2026-09-16, an ordinary account could be stopped
+// by a camp listing, an invitation sent as an invited co-parent, a scan permission it withdrew, a coach update or report,
+// and, as an organization admin, a company record or results API key. Each case builds the situation for an account
+// created inside it, does what the function does (as the owner; the function uses the service role), and deletes the
+// login. The "without" cases show the function's step is what makes the difference. 20260916140000 covers the rest.
+const GONE = 'eeeeeeee-0000-4000-8000-00000000000e';
+const GONE_TEAM = 'e7000000-0000-4000-8000-000000000001';
+const GONE_UPDATE = 'e7000000-0000-4000-8000-000000000002';
+const GONE_BODY = 'e7000000-0000-4000-8000-000000000003';
+const GONE_REF = 'e7000000-0000-4000-8000-000000000004';
+const goneAccount = `insert into auth.users(id, email) values ('${GONE}', 'synthetic-gone-e@example.invalid') on conflict (id) do nothing;
+  insert into public.guardians(id, display_name) values ('${GONE}', 'synthetic account E') on conflict (id) do nothing;`;
+// The function's release of nullable references, as supabase/functions/delete-account/handler.mjs lists them.
+// tests/delete-account-function.test.cjs keeps this list equal to the function's.
+const DELETE_ACCOUNT_NULLABLE = [
+  ['athletes', 'created_by'], ['goals', 'created_by'], ['measurements', 'created_by'],
+  ['sessions', 'created_by'], ['schedule_events', 'created_by'],
+  ['schedule_exceptions', 'created_by'], ['teams', 'created_by'],
+  ['access_log', 'actor_id'], ['athlete_access', 'granted_by'],
+  ['athlete_invites', 'accepted_by'], ['biometric_consents', 'revoked_by'],
+  ['camps', 'reviewed_by'], ['coach_update_reports', 'reviewed_by'], ['company_api_keys', 'revoked_by'],
+];
+const releaseNullable = DELETE_ACCOUNT_NULLABLE.map(([t, c]) => `update public.${t} set ${c} = null where ${c} = '${GONE}';`).join('\n');
+const deleteGone = `delete from auth.users where id = '${GONE}';`;
+const gonePreamble = 'reset role; ';
+const campBy = who => `insert into public.camps(org_name, contact_name, contact_email, location_text, external_signup_url, status, created_by)
+  values ('Synthetic Camp', 'Synthetic Contact', 'camp@example.invalid', 'Synthetic Field', 'https://example.invalid/signup', 'approved', '${who}');`;
+const inviteByGone = `insert into public.athlete_access(athlete_id, guardian_id, role, granted_by) values ('${ATH_A}', '${GONE}', 'co_parent', '${MEMBER_C}');
+  insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', 'family_view', 'synthetic-gone-invite', '${GONE}', 'family');`;
+const handOver = `update public.athlete_invites set created_by = '${MEMBER_C}', revoked_at = now() where created_by = '${GONE}' and accepted_at is null and revoked_at is null;
+  update public.athlete_invites set created_by = '${MEMBER_C}' where created_by = '${GONE}';`;
+const withdrawnByGone = scanConsent() + `update public.biometric_consents set revoked_at = now(), revoked_by = '${GONE}' where id = '${SCAN_CONSENT}';`;
+const updateBy = who => `insert into public.coach_updates(id, athlete_id, sender_id, kind, body) values ('${GONE_UPDATE}', '${ATH_A}', '${who}', 'workout', 'Synthetic drill for this week.');`;
+const goneAdmin = `insert into public.teams(id, name, created_by) values ('${GONE_TEAM}', 'Synthetic Org E', '${GONE}');`;
+
+add('AG01', 'account-deletion', 'THE CASE: an account that submitted a camp listing can be deleted once its listings are',
+  { setup: goneAccount + campBy(GONE),
+    sql: gonePreamble + `delete from public.camps where created_by = '${GONE}';` + releaseNullable + deleteGone
+      + `select (select count(*) from auth.users where id = '${GONE}') || '|' || (select count(*) from public.camps where org_name = 'Synthetic Camp');`,
+    expect: 'ok', expectOut: '0|0' });
+add('AG02', 'account-deletion', 'without that step, the listing refuses the login delete',
+  { setup: goneAccount + campBy(GONE), sql: gonePreamble + releaseNullable + deleteGone, expect: 'error', expectError: /camps_created_by_fkey/ });
+add('AG03', 'account-deletion', 'THE CASE: an invited co-parent who sent an invitation can be deleted once it is handed to the household, and revoked',
+  { setup: goneAccount + inviteByGone,
+    sql: gonePreamble + handOver + releaseNullable + deleteGone
+      + `select created_by || ':' || (revoked_at is not null) || '|' || (select count(*) from public.athlete_access where guardian_id = '${GONE}')
+         from public.athlete_invites where token = 'synthetic-gone-invite';`,
+    expect: 'ok', expectOut: `${MEMBER_C}:true|0` });
+add('AG04', 'account-deletion', 'without the hand-over, the invitation refuses the login delete',
+  { setup: goneAccount + inviteByGone, sql: gonePreamble + releaseNullable + deleteGone, expect: 'error', expectError: /athlete_invites_created_by_fkey/ });
+add('AG05', 'account-deletion', "THE CASE: an account that withdrew another parent's scan permission can be deleted, and the withdrawal stands",
+  { setup: goneAccount + withdrawnByGone,
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select (revoked_at is not null) || ':' || coalesce(revoked_by::text, 'nobody') from public.biometric_consents where id = '${SCAN_CONSENT}';`,
+    expect: 'ok', expectOut: 'true:nobody' });
+add('AG06', 'account-deletion', 'without clearing revoked_by, the withdrawal refuses the login delete',
+  { setup: goneAccount + withdrawnByGone,
+    sql: gonePreamble + releaseNullable.replace(`update public.biometric_consents set revoked_by = null where revoked_by = '${GONE}';`, '') + deleteGone,
+    expect: 'error', expectError: /biometric_consents_revoked_by_fkey/ });
+add('AG07', 'account-deletion', 'THE CASE: a coach who sent an update can be deleted, and the update stays with no sender',
+  { setup: goneAccount + `insert into public.athlete_access(athlete_id, guardian_id, role, granted_by) values ('${ATH_A}', '${GONE}', 'coach', '${MEMBER_C}');` + updateBy(GONE),
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select count(*) || ':' || string_agg(coalesce(sender_id::text, 'nobody'), ',') from public.coach_updates where id = '${GONE_UPDATE}';`,
+    expect: 'ok', expectOut: '1:nobody' });
+add('AG08', 'account-deletion', 'a parent who reported an update can be deleted, and the report stays with no reporter',
+  { setup: goneAccount + updateBy(MEMBER_C)
+      + `insert into public.coach_update_reports(update_id, reported_by, reason) values ('${GONE_UPDATE}', '${GONE}', 'Synthetic report.');`,
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select count(*) || ':' || string_agg(coalesce(reported_by::text, 'nobody'), ',') from public.coach_update_reports where update_id = '${GONE_UPDATE}';`,
+    expect: 'ok', expectOut: '1:nobody' });
+add('AG09', 'account-deletion', 'THE CASE: an organization admin who saved a body assessment copy can be deleted, and the copy keeps its creator id',
+  { setup: goneAccount + goneAdmin
+      + `insert into public.company_body_assessments(id,assessment_id,team_id,athlete_id,consent_id,created_by,captured_at,saved_at,retention_until,record)
+         values ('${GONE_BODY}','synthetic-gone-body','${ORG_A}','${ATH_A}','${C_LIVE}','${GONE}','2026-09-10T04:00:00Z','2026-09-10T04:05:00Z','2099-01-01T00:00:00Z',
+         public.test_company_assessment_payload('synthetic-gone-body','${ATH_A}','${ORG_A}','${GONE}','${C_LIVE}'));`,
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select count(*) || ':' || string_agg(created_by::text, ',') from public.company_body_assessments where id = '${GONE_BODY}';`,
+    expect: 'ok', expectOut: `1:${GONE}` });
+add('AG10', 'account-deletion', 'and so does an adult reference record',
+  { setup: goneAccount + refRow(GONE_REF, 'synthetic-gone-reference', { actor: GONE }),
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select count(*) || ':' || string_agg(created_by::text, ',') from public.company_reference_assessments where id = '${GONE_REF}';`,
+    expect: 'ok', expectOut: `1:${GONE}` });
+add('AG11', 'account-deletion', 'and a composition result',
+  { setup: goneAccount + insertSql({ result: 'synthetic-gone-result', actor: GONE }),
+    sql: gonePreamble + releaseNullable + deleteGone
+      + `select count(*) || ':' || string_agg(created_by::text, ',') from public.company_composition_results where result_id = 'synthetic-gone-result';`,
+    expect: 'ok', expectOut: `1:${GONE}` });
+add('AG12', 'account-deletion', "THE CASE: an admin's roster closes and its API key stops working, and then the login can be deleted",
+  { setup: goneAccount + goneAdmin + makeKey('gone', { team: GONE_TEAM, who: GONE }),
+    sql: gonePreamble
+      + `update public.teams set is_active = false where created_by = '${GONE}';
+         update public.company_api_keys set revoked_at = now() where created_by = '${GONE}' and revoked_at is null;`
+      + releaseNullable + deleteGone
+      + `select (select is_active || ':' || coalesce(created_by::text, 'nobody') from public.teams where id = '${GONE_TEAM}')
+         || '|' || (select (revoked_at is not null) || ':' || created_by from public.company_api_keys where team_id = '${GONE_TEAM}');`,
+    expect: 'ok', expectOut: `false:nobody|true:${GONE}` });
+add('AG13', 'account-deletion', 'the organization records no longer link their creator to a login, and coach messages clear their author',
+  { sql: `select string_agg(c.conrelid::regclass::text || '.' || a.attname || '=' || coalesce(
+        (select case f.confdeltype when 'n' then 'set null' when 'a' then 'no action' else f.confdeltype::text end
+           from pg_constraint f where f.contype = 'f' and f.conrelid = c.conrelid and f.conkey = array[a.attnum]), 'unlinked')
+        || ':' || case when a.attnotnull then 'not null' else 'nullable' end, ' ' order by (c.conrelid::regclass::text || '.' || a.attname) collate "C")
+      from (values ('public.company_body_assessments'::regclass, 'created_by'), ('public.company_reference_assessments'::regclass, 'created_by'),
+                   ('public.company_composition_results'::regclass, 'created_by'), ('public.company_api_keys'::regclass, 'created_by'),
+                   ('public.coach_updates'::regclass, 'sender_id'), ('public.coach_update_reports'::regclass, 'reported_by')) v(rel, col)
+      join pg_constraint c on c.conrelid = v.rel and c.contype = 'p'
+      join pg_attribute a on a.attrelid = v.rel and a.attname = v.col;`,
+    expect: 'ok',
+    expectOut: 'coach_update_reports.reported_by=set null:nullable coach_updates.sender_id=set null:nullable '
+      + 'company_api_keys.created_by=unlinked:not null company_body_assessments.created_by=unlinked:not null '
+      + 'company_composition_results.created_by=unlinked:not null company_reference_assessments.created_by=unlinked:not null' });
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

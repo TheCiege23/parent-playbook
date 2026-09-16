@@ -23,7 +23,7 @@ read from that commit. Production was checked read-only and nothing was changed.
 - **Photos:** a scan needs four photos of one real person. Section 6 uses photos of a consenting adult
   (you) on a test child set to age 18, so no minor is photographed. The minor's three-box release is
   tested without photos.
-- **Do not submit a camp listing from A or B** (known problem 7).
+- **Do not submit a camp listing from A or B** until the account deletion fix (`pp-v138`) is live (known problem 7).
 - **Record for every step:** the time (UTC), browser and device, pass or fail, and the exact words on
   screen when anything is unexpected. After each section, tell Claude "done with section N": Claude checks
   the database read-only and records the result.
@@ -51,7 +51,9 @@ No invitation was sent by email or text, and no second account accepted one. PR 
 Found while preparing this checklist. Each is a bug in the live release unless noted. Problems 1 to 4 are fixed on
 branch `invite-message-fixes` (release `pp-v136`) and are not live yet: the migration has to be applied and
 `send-invite` and `send-invite-sms` redeployed. Until then, expect what each describes; afterwards, expect the
-fixed behaviour given in section 4. Problem 5 is fixed on branch `adult-hash-link` (release `pp-v137`), not live yet.
+fixed behaviour given in section 4. Problem 5 is fixed on branch `adult-hash-link` (release `pp-v137`), not live yet. Problems 7 and 8 are fixed on branch
+`delete-account-leftovers` (release `pp-v138`, with a migration and `delete-account` redeployed), not live yet; once
+they are, a deleted account's roster stays with its families with its join code closed, by decision.
 
 1. **A coach invitation cannot be created.** The invite sheet offers "Team Connect (coach)", but the live
    `invite_role_chk` accepts only `co_parent` and `family_view`. Expect "Could not create the invite".
@@ -160,7 +162,8 @@ revoked text invitation has `revoked_at`.
    consent record would name B, and nothing hands it on when B is deleted.
 7. As B, Settings → Danger zone → **Delete Testkid One's profile** → **Yes, delete permanently**. Expect
    the toast "Could not delete" and the child still there (known problem 6).
-8. **As B, do not create an invitation and do not withdraw a scan permission** (known problem 7).
+8. **As B, do not create an invitation and do not withdraw a scan permission** (known problem 7; no longer needed
+   once the account deletion fix is live).
 9. As A, reload Profile: the invitation no longer shows as pending.
 
 Claude checks: two `athlete_access` rows for B, the invitation accepted, both children still present.
@@ -268,8 +271,8 @@ Claude checks: every adult table empty for your account afterwards, and your all
 4. Open B's old invitation link. Expect a dead-link screen, not an error.
 
 Claude checks: no household, child, consent, invitation, scan or access row left for either account; both
-logins gone; "PP Regression Roster" left with no admin (known problem 8), to be removed with your
-authorization.
+logins gone; "PP Regression Roster" left with no admin (known problem 8). Before the account deletion fix its join code still
+works and it can be removed with your authorization; after it, the code is closed and the roster stays, by decision.
 
 ---
 
