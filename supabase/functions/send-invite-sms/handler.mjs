@@ -8,12 +8,14 @@
 //   1. THE NUMBER IS NEVER TAKEN FROM THE REQUEST. It comes off the invite row, which only someone with edit rights
 //      on that athlete could have set. Otherwise this is an open SMS relay with a Parent Playbook return address.
 //   2. THE LINK IS NOT SUFFICIENT. SMS is forwarded without thinking, so the text carries a six-digit confirmation
-//      code, and this function will not send without one. The row keeps only a hash of the code.
+//      code, and this function will not send without one. The row keeps only a hash of the code, and the code is
+//      sent only if it matches that hash, so a text never asks its recipient for digits that cannot open the invite.
 //   3. A MISSING SENDER CONFIGURATION FAILS LOUDLY, naming exactly what is missing. US carriers drop traffic from
 //      unregistered brands silently, so a misconfiguration must not look like a delivered text.
 //   4. Database and runtime error text is not echoed to the caller.
 
 import { callerCanEditAthlete } from '../_shared/invite-access.mjs';
+import { inviteCodeMatches } from '../_shared/invite-code.mjs';
 
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +48,7 @@ export function createSendInviteSmsHandler({ callerClient, db, fetch: fetchImpl 
       if (!/^\d{6}$/.test(code)) return json({ error: 'code_required', message: 'This text carries a confirmation code, and none was supplied.' }, 400);
 
       const { data: invite, error: inviteError } = await db.from('athlete_invites')
-        .select('id, athlete_id, role, scope, token, invited_phone, created_by, expires_at, accepted_at, revoked_at')
+        .select('id, athlete_id, role, scope, token, invited_phone, created_by, expires_at, accepted_at, revoked_at, code_hash')
         .eq('id', inviteId).maybeSingle();
       if (inviteError) return json({ error: 'internal_error' }, 500);
       if (!invite) return json({ error: 'not_found' }, 404);
@@ -56,6 +58,11 @@ export function createSendInviteSmsHandler({ callerClient, db, fetch: fetchImpl 
       // The read above used the service role and bypassed row-level security. Without this gate any signed-in
       // user could make this function text any invite's recipient.
       if (!(await callerCanEditAthlete(caller, invite.athlete_id, user.id))) return json({ error: 'forbidden' }, 403);
+
+      // After the gate, so only an editor learns whether a code fits.
+      if (!(await inviteCodeMatches(code, invite.token, invite.code_hash))) {
+        return json({ error: 'code_mismatch', message: 'That is not the code issued for this invite, so the text was not sent.' }, 400);
+      }
 
       const sid = env.TWILIO_ACCOUNT_SID;
       // An API key pair can be revoked on its own without rotating the account's master credential, so it wins
@@ -83,7 +90,10 @@ export function createSendInviteSmsHandler({ callerClient, db, fetch: fetchImpl 
         db.from('athletes').select('first_name').eq('id', invite.athlete_id).maybeSingle(),
         db.from('guardians').select('display_name').eq('id', invite.created_by).maybeSingle(),
       ]);
-      const inviterFirst = ((guardian?.display_name || '').trim() || 'A parent').split(/\s+/)[0];
+      // An account with no display name has nobody to name. The stand-in "A parent" cut to its first word read
+      // "A invited you…", so such a text says "You're invited" instead.
+      const inviterFirst = (guardian?.display_name || '').trim().split(/\s+/)[0];
+      const opener = inviterFirst ? `${inviterFirst} invited you` : "You're invited";
       const athleteFirst = athlete?.first_name || 'their athlete';
       const familyWide = invite.scope === 'family' && invite.role !== 'coach';
       const siteUrl = env.SITE_URL || 'https://playbookbp.com';
@@ -92,8 +102,8 @@ export function createSendInviteSmsHandler({ callerClient, db, fetch: fetchImpl 
       // Kept close to two segments. The opt-out line is required by US carriers on A2P traffic.
       const text =
         `${familyWide
-          ? `${inviterFirst} invited you to follow the family's sports journey on Parent Playbook.`
-          : `${inviterFirst} invited you to follow ${athleteFirst}'s season on Parent Playbook.`}\n\n`
+          ? `${opener} to follow the family's sports journey on Parent Playbook.`
+          : `${opener} to follow ${athleteFirst}'s season on Parent Playbook.`}\n\n`
         + `${inviteUrl}\n\nYour code: ${code}\n\n`
         + 'Reply STOP to opt out.';
 

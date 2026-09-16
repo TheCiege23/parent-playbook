@@ -10,7 +10,7 @@
 //      inside the app where that is true.
 //   2. State the LIMITS, not just the access. The one ✕ line does more for trust than
 //      any amount of reassurance copy.
-//   3. An expired link is not an error — it's a week-old text message.
+//   3. An expired link is not an error — it's a text message more than two weeks old.
 
 // What each role can and can't do, in the recipient's words. The ✕ line is the point.
 // Keys are access_role enum values. Getting this wrong still "worked" via the
@@ -55,7 +55,7 @@ async function renderRedeem(token){
                  locked:'Too many wrong codes' }[info.status] || 'This link can no longer be used';
     const why={ revoked:`${info.inviter} removed this invite. If that's a surprise, ask them for a new one.`,
                 accepted:'Someone already accepted it. If that was you, just log in — the athlete is still there.',
-                expired:'Invite links only last a week, so they can\'t be forwarded around forever. Nothing is wrong on your end.',
+                expired:'Invite links last two weeks, so they can\'t be forwarded around forever. Nothing is wrong on your end.',
                 locked:'This invite locked itself after five wrong codes, which is what stops someone guessing their way in. Ask for a new one — it takes about ten seconds and the new code arrives with it.'
               }[info.status] || 'Ask for a fresh link.';
     return renderInviteDead(head, why, token, info);
@@ -304,7 +304,7 @@ async function renderInviteAccepted(familyWide=false){
 }
 
 function friendlyAcceptErr(m){
-  if(/expired/i.test(m)) return 'Invite links only last a week. Ask for a new one — it takes about ten seconds.';
+  if(/expired/i.test(m)) return 'Invite links last two weeks. Ask for a new one — it takes about ten seconds.';
   if(/revoked/i.test(m)) return 'This invite was turned off before you got to it.';
   if(/locked/i.test(m)) return 'Five wrong codes locked this invite, which is what stops someone guessing their way in. Ask for a new one and a new code comes with it.';
   if(/code_wrong/i.test(m)) return 'That code is not right. Check the message it came in and try the link again.';

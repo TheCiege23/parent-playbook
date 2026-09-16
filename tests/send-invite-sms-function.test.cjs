@@ -1,10 +1,12 @@
 // send-invite-sms texts an invitation. Without its rules it would be an open SMS relay with Parent Playbook's
 // return address, so they are pinned here: only an owner or co-parent can trigger it, the number comes only from
-// the invite row, a six-digit code is required and is the only free text accepted, a missing sender configuration
+// the invite row, a six-digit code is required, is the only free text accepted and must be the one issued for the
+// invite, a blank display name never reads as "A invited you", a missing sender configuration
 // names exactly what is missing, and a failed send is reported and not marked as sent. The logic now lives in
 // handler.mjs; these tests use an in-memory Supabase and a recording fetch.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -18,10 +20,13 @@ const CONFIG = { TWILIO_ACCOUNT_SID: 'AC_synthetic', TWILIO_AUTH_TOKEN: 'auth_sy
 const post = (body, auth = 'Bearer user-token') => new Request('https://project.supabase.co/functions/v1/send-invite-sms', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body),
 });
-const service = (invite = {}) => fakeSupabase({
-  athlete_invites: [{ id: 'i1', athlete_id: 'a1', role: 'family_view', scope: 'athlete', token: 'tok1', invited_phone: '+15551234567', created_by: 'p1', expires_at: '2026-09-20T12:00:00Z', accepted_at: null, revoked_at: null, ...invite }],
+// issue_invite_code() stores sha256(code || ':' || token) as hex; the invite row here holds the hash of `code`.
+const hashOf = (code, token) => crypto.createHash('sha256').update(code + ':' + token).digest('hex');
+const service = (invite = {}, code = '123456', displayName = 'Jordan Parent') => fakeSupabase({
+  athlete_invites: [{ id: 'i1', athlete_id: 'a1', role: 'family_view', scope: 'athlete', token: 'tok1', invited_phone: '+15551234567', created_by: 'p1', expires_at: '2026-09-20T12:00:00Z', accepted_at: null, revoked_at: null,
+    code_hash: code === null ? null : hashOf(code, invite.token ?? 'tok1'), ...invite }],
   athletes: [{ id: 'a1', first_name: 'Sam', family_id: 'f1' }],
-  guardians: [{ id: 'p1', display_name: 'Jordan Parent' }],
+  guardians: [{ id: 'p1', display_name: displayName }],
 });
 const owner = callerWithTables(PARENT, { athlete_access: [{ athlete_id: 'a1', guardian_id: 'p1', role: 'owner', revoked_at: null }] });
 function recordingFetch(status = 201) {
@@ -51,7 +56,7 @@ test('an owner\'s invite is texted to the number on the invite row, with the lin
 test('an API key pair and a Messaging Service are preferred when configured', async () => {
   const net = recordingFetch();
   const env = { ...CONFIG, TWILIO_API_KEY: 'SK_synthetic', TWILIO_API_SECRET: 'secret_synthetic', TWILIO_MESSAGING_SERVICE_SID: 'MG_synthetic' };
-  await (await handlerWith({ callerClient: owner, db: service({ scope: 'family' }), fetch: net.fetch, env }))(post({ invite_id: 'i1', code: '654321' }));
+  await (await handlerWith({ callerClient: owner, db: service({ scope: 'family' }, '654321'), fetch: net.fetch, env }))(post({ invite_id: 'i1', code: '654321' }));
   assert.equal(net.calls[0].init.headers.Authorization, 'Basic ' + Buffer.from('SK_synthetic:secret_synthetic').toString('base64'));
   const form = new URLSearchParams(net.calls[0].init.body);
   assert.equal(form.get('MessagingServiceSid'), 'MG_synthetic');
@@ -67,6 +72,42 @@ test('without exactly six digits of code, nothing is looked up or sent', async (
     assert.equal(res.status, 400, String(code));
     assert.equal((await res.json()).error, 'code_required');
     assert.equal(net.calls.length, 0);
+  }
+});
+
+test('a code that is not the one issued for the invite is not texted, and only an editor learns that', async () => {
+  // A text that asks for six digits which cannot open the invite strands its recipient.
+  for (const [what, db] of [
+    ['a different code', service({}, '999999')],
+    ['an invite with no code issued', service({}, null)],
+    ['the hash of this code with another token', service({ code_hash: hashOf('123456', 'other-token') })],
+  ]) {
+    const net = recordingFetch();
+    const res = await (await handlerWith({ callerClient: owner, db, fetch: net.fetch }))(post({ invite_id: 'i1', code: '123456' }));
+    assert.equal(res.status, 400, what);
+    assert.equal((await res.json()).error, 'code_mismatch', what);
+    assert.equal(net.calls.length, 0, what + ' must not send');
+    assert.equal(db.tables.athlete_invites[0].sent_via, undefined, what);
+  }
+  const net = recordingFetch();
+  const stranger = await (await handlerWith({ callerClient: callerWithTables({ id: 'x9' }, {}), db: service({}, '999999'), fetch: net.fetch }))(post({ invite_id: 'i1', code: '123456' }));
+  assert.equal(stranger.status, 403, 'the permission gate answers before the code is compared');
+});
+
+test('with no display name the text says "You\'re invited", never "A invited you"', async () => {
+  for (const [scope, opening] of [
+    ['athlete', "You're invited to follow Sam's season on Parent Playbook."],
+    ['family', "You're invited to follow the family's sports journey on Parent Playbook."],
+  ]) {
+    for (const displayName of [null, '', '   ']) {
+      const net = recordingFetch();
+      const res = await (await handlerWith({ callerClient: owner, db: service({ scope }, '123456', displayName), fetch: net.fetch }))(post({ invite_id: 'i1', code: '123456' }));
+      assert.equal(res.status, 200);
+      const body = new URLSearchParams(net.calls[0].init.body).get('Body');
+      assert.ok(body.startsWith(opening + '\n\n'), `${scope}, ${JSON.stringify(displayName)}: ${body}`);
+      assert.doesNotMatch(body, /\bA (invited|parent)\b/);
+      assert.match(body, /Your code: 123456/);
+    }
   }
 });
 

@@ -48,7 +48,10 @@ No invitation was sent by email or text, and no second account accepted one. PR 
 
 ## Known problems — expect these
 
-Found while preparing this checklist. Each is a bug in the live release unless noted.
+Found while preparing this checklist. Each is a bug in the live release unless noted. Problems 1 to 4 are fixed on
+branch `invite-message-fixes` (release `pp-v136`) and are not live yet: the migration has to be applied and
+`send-invite` and `send-invite-sms` redeployed. Until then, expect what each describes; afterwards, expect the
+fixed behaviour given in section 4.
 
 1. **A coach invitation cannot be created.** The invite sheet offers "Team Connect (coach)", but the live
    `invite_role_chk` accepts only `co_parent` and `family_view`. Expect "Could not create the invite".
@@ -125,18 +128,21 @@ The one-day change and a tick are already covered. Two quick checks:
 ## 4. Invitations from A
 
 1. Profile → "Who can see…" → **＋ Invite** → **Team Connect (coach)** → **Just a link** → **Create
-   invite**. Expect failure (known problem 1). Nothing should be created.
+   invite**. Before the fix: expect failure (known problem 1), and nothing created. After it: a link and a code
+   for Testkid One only; then **Revoke** it from Profile.
 2. **＋ Invite** → **Co-parent (edit)** → **Email** → B's address → **Create invite**.
    Expect "Invite sent to …", then **write down the six-digit code** shown under "Their code".
 3. In B's inbox, record the sender, the subject and whether a code is in the email.
-   Expect sender "Parent Playbook", subject "A invited you to Parent Playbook for the whole family" and no
-   code (known problems 2 and 3). If it never arrives, record that: it means `RESEND_API_KEY` is not set.
+   Before the fix: expect sender "Parent Playbook", subject "A invited you to Parent Playbook for the whole
+   family" and no code (known problems 2 and 3). After it: subject "You're invited to Parent Playbook for the whole
+   family", the same six digits under "Your code", and the footer "Sent through Parent Playbook." If it never arrives, record that: it means `RESEND_API_KEY` is not set.
 4. Optional, only to your own mobile: **＋ Invite** → **Family view** → **Text** → your number → **Create
    invite**. Record whether the text arrives and what it says. "sms_not_configured" in the fallback message
    means the Twilio keys are not set. Then revoke it from Profile → **Revoke** → **Revoke invitation**.
 5. Settings → **Your name** → set a name. (A later invitation would now use it.)
 
-Claude checks: the coach attempt left no row; one pending co-parent invitation for the household; the
+Claude checks: the coach attempt left no row (before the fix) or one revoked coach invitation for Testkid One
+(after it); one pending co-parent invitation for the household; the
 revoked text invitation has `revoked_at`.
 
 ## 5. Account B accepts
