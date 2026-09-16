@@ -118,6 +118,10 @@
         calls.push([st.op + ' (missing)', name]);
         return { data:null, error:{ code:'PGRST205', message:"Could not find the table 'public." + name + "' in the schema cache" } };
       }
+      if (st.badIn) {
+        calls.push([st.op + ' (refused)', name]);
+        return { data:null, error:{ code:'22P02', message:'invalid input syntax for type uuid: "null"' } };
+      }
       const rows = table(name);
       if (st.op === 'select') {
         let out = rows.filter(matches);
@@ -156,7 +160,8 @@
       delete(){ st.op = 'delete'; return b; },
       eq(c, v){ st.filters.push(r => r[c] === v); return b; },
       neq(c, v){ st.filters.push(r => r[c] !== v); return b; },
-      in(c, vs){ st.filters.push(r => (vs || []).includes(r[c])); return b; },
+      // PostgREST sends a null in an in() list as the word null, which a uuid column refuses; so does this.
+      in(c, vs){ if ((vs || []).some(v => v === null || v === undefined)) st.badIn = c; st.filters.push(r => (vs || []).includes(r[c])); return b; },
       is(c, v){ st.filters.push(r => (v === null ? r[c] == null : r[c] === v)); return b; },
       gte(c, v){ st.filters.push(r => r[c] != null && r[c] >= v); return b; },
       lte(c, v){ st.filters.push(r => r[c] != null && r[c] <= v); return b; },

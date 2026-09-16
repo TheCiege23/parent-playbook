@@ -15,15 +15,24 @@ const { pathToFileURL } = require('node:url');
 const dir = path.join(__dirname, '../supabase/functions/delete-account');
 const load = () => import(pathToFileURL(path.join(dir, 'handler.mjs')).href);
 
-function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError = null, familyDeleteError = null, reportRemoveError = null } = {}) {
+function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError = null, familyDeleteError = null, reportRemoveError = null, errors = {} } = {}) {
   const events = [];
   const service = {
     from(table) {
       const state = { op: 'select', patch: null, filters: [], order: null };
       const rows = () => (tables[table] ||= []);
-      const matches = row => state.filters.every(([kind, column, value]) => kind === 'eq' ? row[column] === value : value.includes(row[column]));
-      const where = () => state.filters.map(([kind, column, value]) => kind === 'eq' ? column + '=' + value : column + ' in [' + value.join(',') + ']').join(' & ');
+      const check = {
+        eq: (row, column, value) => row[column] === value,
+        in: (row, column, value) => value.includes(row[column]),
+        is: (row, column, value) => (row[column] ?? null) === value,
+      };
+      const matches = row => state.filters.every(([kind, column, value]) => check[kind](row, column, value));
+      const where = () => state.filters.map(([kind, column, value]) =>
+        kind === 'eq' ? column + '=' + value : kind === 'is' ? column + ' is ' + value : column + ' in [' + value.join(',') + ']').join(' & ');
       const execute = () => {
+        // errors: { 'update:teams': {...} } makes that operation on that table fail.
+        const injected = errors[state.op + ':' + table];
+        if (injected) { events.push([state.op + ' refused', table, where()]); return { data: null, error: injected }; }
         const matched = rows().filter(matches);
         if (state.op === 'select') {
           const data = state.order ? [...matched].sort((a, b) => String(a[state.order]).localeCompare(String(b[state.order]))) : matched;
@@ -45,6 +54,7 @@ function fakeSupabase({ tables = {}, folders = {}, user = 'u', deleteUserError =
         delete() { state.op = 'delete'; return builder; },
         eq(column, value) { state.filters.push(['eq', column, value]); return builder; },
         in(column, values) { state.filters.push(['in', column, values]); return builder; },
+        is(column, value) { state.filters.push(['is', column, value]); return builder; },
         order(column) { state.order = column; return builder; },
         then(resolve, reject) { try { resolve(execute()); } catch (error) { reject(error); } },
       };
@@ -140,6 +150,17 @@ test('every nullable reference to the user is released before the login is delet
   }
 });
 
+test('the database suite deletes accounts with the same list of references the function releases', async () => {
+  // tests/db/security-tests.cjs (cases AG01-AG12) emulates this function against the real schema. It ships in the buyer
+  // package, which does not include the function, so it carries its own copy of the list; this keeps the two equal.
+  const { NULLABLE_BACK_REFERENCES } = await load();
+  const suite = fs.readFileSync(path.join(__dirname, 'db/security-tests.cjs'), 'utf8');
+  const block = suite.match(/const DELETE_ACCOUNT_NULLABLE = \[([\s\S]*?)\];/);
+  assert.ok(block, 'the database suite should declare DELETE_ACCOUNT_NULLABLE');
+  const copied = [...block[1].matchAll(/\['(\w+)', '(\w+)'\]/g)].map(m => [m[1], m[2]]);
+  assert.deepEqual(copied, NULLABLE_BACK_REFERENCES.map(pair => [...pair]));
+});
+
 test('nothing is touched without a signed-in caller and a typed confirmation', async () => {
   const { createDeleteAccountHandler } = await load();
   for (const [request, status, options] of [
@@ -201,6 +222,90 @@ test("a parent's own training record is deleted, scoped to them, before the logi
     assert.ok(at !== -1 && at < deletedAt, table + ' must be deleted for the caller before the login is');
   }
   assert.deepEqual(s.tables.adult_goals, [{ guardian_id: 'someone-else', label: 'theirs' }], "another guardian's record is untouched");
+});
+
+// What an account can leave outside its own households (decided with the user on 2026-09-16): its camp listings,
+// invitations it sent as an invited co-parent, rosters it started and results API keys it issued.
+const elsewhereTables = () => ({
+  camps: [{ id: 'c-mine', created_by: 'u', status: 'approved' }, { id: 'c-theirs', created_by: 'other', status: 'approved' }],
+  athletes: [{ id: 'k9', family_id: 'f9' }],
+  family_members: [{ family_id: 'f9', guardian_id: 'owner9', created_at: '2026-01-01' }, { family_id: 'f9', guardian_id: 'second9', created_at: '2026-03-01' }],
+  athlete_invites: [
+    { id: 'i-pending', athlete_id: 'k9', created_by: 'u', accepted_at: null, revoked_at: null },
+    { id: 'i-used', athlete_id: 'k9', created_by: 'u', accepted_at: '2026-09-01T00:00:00Z', revoked_at: null },
+    { id: 'i-nowhere', athlete_id: 'k-gone', created_by: 'u', accepted_at: null, revoked_at: null },
+    { id: 'i-theirs', athlete_id: 'k9', created_by: 'owner9', accepted_at: null, revoked_at: null },
+  ],
+  teams: [{ id: 't-mine', created_by: 'u', is_active: true }, { id: 't-theirs', created_by: 'other', is_active: true }],
+  company_api_keys: [
+    { id: 'key-live', created_by: 'u', revoked_at: null },
+    { id: 'key-revoked', created_by: 'u', revoked_at: '2026-09-01T00:00:00Z' },
+    { id: 'key-theirs', created_by: 'other', revoked_at: null },
+  ],
+});
+
+test('what the account made outside its households goes, is handed on or stops working, before the login', async () => {
+  const { createDeleteAccountHandler } = await load();
+  const s = fakeSupabase({ tables: elsewhereTables() });
+  const res = await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
+  assert.equal(res.status, 200);
+  const deletedAt = indexOf(s.events, e => e[0] === 'deleteUser');
+  assert.equal(deletedAt, s.events.length - 1, 'the login is still last');
+
+  assert.deepEqual(s.tables.camps.map(c => c.id), ['c-theirs'], 'its listings go, approved or not; nobody else\'s');
+
+  const invite = id => s.tables.athlete_invites.find(i => i.id === id);
+  assert.equal(invite('i-pending').created_by, 'owner9', 'handed to the household\'s first member');
+  assert.ok(invite('i-pending').revoked_at, 'and a pending one stops working');
+  assert.equal(invite('i-used').created_by, 'owner9');
+  assert.equal(invite('i-used').revoked_at, null, 'an accepted one is history, and stays as it was');
+  assert.equal(invite('i-nowhere'), undefined, 'one with no household to go to is deleted');
+  assert.deepEqual(invite('i-theirs'), { id: 'i-theirs', athlete_id: 'k9', created_by: 'owner9', accepted_at: null, revoked_at: null });
+
+  const team = id => s.tables.teams.find(t => t.id === id);
+  assert.deepEqual(team('t-mine'), { id: 't-mine', created_by: null, is_active: false }, 'the roster stays, closed, with no admin');
+  assert.deepEqual(team('t-theirs'), { id: 't-theirs', created_by: 'other', is_active: true });
+  const closed = indexOf(s.events, e => e[0] === 'update' && e[1] === 'teams' && e[2] === '{"is_active":false}' && e[3] === 'created_by=u');
+  const released = indexOf(s.events, e => e[0] === 'update' && e[1] === 'teams' && e[2] === '{"created_by":null}');
+  assert.ok(closed !== -1 && closed < released, 'closed while it can still be found by its creator');
+
+  const key = id => s.tables.company_api_keys.find(k => k.id === id);
+  assert.ok(key('key-live').revoked_at, 'its live key stops working');
+  assert.equal(key('key-live').created_by, 'u', 'and keeps the id, which no longer links to a login');
+  assert.equal(key('key-revoked').revoked_at, '2026-09-01T00:00:00Z', 'an already revoked key keeps its date');
+  assert.equal(key('key-theirs').revoked_at, null);
+  for (const table of ['camps', 'athlete_invites', 'teams', 'company_api_keys']) {
+    assert.ok(indexOf(s.events, e => e[1] === table && e[0] !== 'select') < deletedAt, table + ' before the login');
+  }
+});
+
+test('a failure in any of those stops before the login is touched', async () => {
+  const { createDeleteAccountHandler } = await load();
+  for (const [op, error] of [
+    ['delete:camps', 'could not delete your camp listings'],
+    ['select:athlete_invites', 'could not read the invitations you sent'],
+    ['update:athlete_invites', 'could not hand on the invitations you sent'],
+    ['delete:athlete_invites', 'could not hand on the invitations you sent'],
+    ['update:teams', 'could not close your rosters'],
+    ['update:company_api_keys', 'could not revoke your organization API keys'],
+  ]) {
+    const s = fakeSupabase({ tables: elsewhereTables(), errors: { [op]: { message: 'synthetic failure' } } });
+    const res = await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
+    assert.equal(res.status, 500, op);
+    assert.deepEqual(await res.json(), { error }, op);
+    assert.equal(indexOf(s.events, e => e[0] === 'deleteUser'), -1, op + ': the login stays, so the request can be retried');
+  }
+});
+
+test('a household that cannot be read does not turn a hand-over into a deletion', async () => {
+  const { createDeleteAccountHandler } = await load();
+  for (const op of ['select:athletes', 'select:family_members']) {
+    const s = fakeSupabase({ tables: elsewhereTables(), errors: { [op]: { message: 'synthetic failure' } } });
+    const res = await createDeleteAccountHandler(s.handlerOptions)(post({ confirm: 'DELETE' }));
+    assert.equal(res.status, 500, op);
+    assert.equal(s.tables.athlete_invites.length, 4, op + ': no invitation is deleted');
+    assert.equal(indexOf(s.events, e => e[0] === 'deleteUser'), -1, op);
+  }
 });
 
 const reportTables = () => ({

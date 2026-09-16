@@ -15,6 +15,9 @@
 //      deleting the user fails outright while any of them survive.
 //   3. Co-parents. If a grandparent or second parent shares the household, deleting one adult must NOT
 //      delete the other adult's children. Ownership transfers instead.
+//   4. What the account made elsewhere: camp listings, invitations sent as an invited co-parent, rosters and
+//      organization API keys (step 1b). Coach updates and reports lose their author, and organization records keep
+//      an id that no longer links to the login, in the database itself (20260916140000).
 //
 // Order is deliberate: gather file paths -> delete rows -> purge files -> delete the user LAST, so a
 // failure part-way leaves the account intact and retryable rather than half-erased and unreachable.
@@ -32,12 +35,15 @@ export const CORS = Object.freeze({
 });
 
 // Nullable columns that reference the user. Left set, they make the user delete fail.
+// biometric_consents.revoked_by is whoever withdrew a scan permission, which a co-parent can do for a permission
+// another parent gave; the withdrawal itself (revoked_at) stays. The last three name a reviewer or a revoker.
 export const NULLABLE_BACK_REFERENCES = Object.freeze([
   ['athletes', 'created_by'], ['goals', 'created_by'], ['measurements', 'created_by'],
   ['sessions', 'created_by'], ['schedule_events', 'created_by'],
   ['schedule_exceptions', 'created_by'], ['teams', 'created_by'],
   ['access_log', 'actor_id'], ['athlete_access', 'granted_by'],
-  ['athlete_invites', 'accepted_by'],
+  ['athlete_invites', 'accepted_by'], ['biometric_consents', 'revoked_by'],
+  ['camps', 'reviewed_by'], ['coach_update_reports', 'reviewed_by'], ['company_api_keys', 'revoked_by'],
 ]);
 
 // A parent's own training record (Adult Training). It is theirs alone, so nobody inherits it: every row is deleted,
@@ -146,6 +152,55 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
         }
       }
 
+      // ---- 1b. what the account made outside its own households ----
+      // Each of these would refuse the login delete below, or outlive the account in a way the user decided against
+      // (2026-09-16). A failure stops here, before the login goes, so the request can be retried.
+      // Camp listings it submitted, in any status.
+      const { error: campsError } = await svc.from('camps').delete().eq('created_by', uid);
+      if (campsError) return json({ error: 'could not delete your camp listings' }, 500);
+
+      // Invitations it made as an invited co-parent, for children in households it does not belong to (its own
+      // households were dealt with above). They pass to that household's first member, like the invitations of a
+      // member who leaves, and one nobody has accepted stops working: its sender is gone.
+      const { data: leftInvites, error: leftError } = await svc.from('athlete_invites')
+        .select('id, athlete_id, accepted_at, revoked_at').eq('created_by', uid);
+      if (leftError) return json({ error: 'could not read the invitations you sent' }, 500);
+      if ((leftInvites || []).length) {
+        const athleteIds = [...new Set(leftInvites.map(i => i.athlete_id))];
+        // A failed read must not turn a hand-over into a deletion, so each one stops the request.
+        const { data: homes, error: homesError } = await svc.from('athletes').select('id, family_id').in('id', athleteIds);
+        if (homesError) return json({ error: 'could not read the invitations you sent' }, 500);
+        const familyOf = new Map((homes || []).map(a => [a.id, a.family_id]));
+        const heirOf = new Map();
+        for (const fid of new Set(familyOf.values())) {
+          const { data: members, error: membersError } = await svc.from('family_members')
+            .select('guardian_id, created_at').eq('family_id', fid).order('created_at');
+          if (membersError) return json({ error: 'could not read the invitations you sent' }, 500);
+          const heir = (members || []).find(m => m.guardian_id !== uid);
+          if (heir) heirOf.set(fid, heir.guardian_id);
+        }
+        for (const invite of leftInvites) {
+          const heir = heirOf.get(familyOf.get(invite.athlete_id));
+          const pending = !invite.accepted_at && !invite.revoked_at;
+          const { error } = heir
+            ? await svc.from('athlete_invites')
+              .update({ created_by: heir, ...(pending ? { revoked_at: new Date().toISOString() } : {}) }).eq('id', invite.id)
+            : await svc.from('athlete_invites').delete().eq('id', invite.id);
+          if (error) return json({ error: 'could not hand on the invitations you sent' }, 500);
+        }
+      }
+
+      // Rosters it started stay with the families on them, but nobody administers them any more, so their join code
+      // stops working. Done before teams.created_by is cleared below, which is how they are found.
+      const { error: rosterError } = await svc.from('teams').update({ is_active: false }).eq('created_by', uid);
+      if (rosterError) return json({ error: 'could not close your rosters' }, 500);
+
+      // Results API keys it issued stop working. The key rows, like the organization records it saved, keep its id
+      // with no link to the login (20260916140000).
+      const { error: keyError } = await svc.from('company_api_keys')
+        .update({ revoked_at: new Date().toISOString() }).eq('created_by', uid).is('revoked_at', null);
+      if (keyError) return json({ error: 'could not revoke your organization API keys' }, 500);
+
       // ---- 2. release the nullable back-references, or the user delete is refused ----
       for (const [table, col] of NULLABLE_BACK_REFERENCES) {
         await svc.from(table).update({ [col]: null }).eq(col, uid);
@@ -188,7 +243,8 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
       const { error: delErr } = await svc.auth.admin.deleteUser(uid);
       if (delErr) {
         // Most likely a NO ACTION reference we do not clear on purpose: a booking, payment or review,
-        // which are financial records. Say so plainly instead of failing silently.
+        // which are financial records, or a staff reference left for later (trainer reviews, provider
+        // approvals, a verified attachment). Say so plainly instead of failing silently.
         return json({
           error: 'Your data was removed, but the login could not be deleted automatically: ' +
                  delErr.message + ' Please contact support@playbookbp.com to finish.',
