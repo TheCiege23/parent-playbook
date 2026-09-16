@@ -198,7 +198,11 @@ function bindCodeRow(id, onChange){
 // Screen 4 — invalid, revoked, accepted and expired all land here. The tone is
 // "here's how to get a new one", never "invalid token".
 function renderInviteDead(title, why, token, info){
-  const who=info&&info.inviter?esc(info.inviter):'whoever sent it';
+  // invite_preview() never answers with an empty name: a guardian who has never set a display name comes back as the
+  // literal 'A parent'. That reads as a name where a sentence starts with it ("A parent removed this invite.") and as
+  // a mistake where one does not ("Ask A parent for a new one"), so here it counts as no name.
+  const named=(info&&info.inviter||'').trim();
+  const who=(named&&named!=='A parent')?esc(named):'whoever sent it';
   const msg=`Hi — could you send me a new Parent Playbook invite link? The last one stopped working.`;
   root.innerHTML = H`
   <div class="app-pad inv-wrap">
