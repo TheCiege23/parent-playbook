@@ -45,7 +45,9 @@
   // /#journey while signed in fell through to hasStoredSession(), and enterApp then
   // REPLACED the hash with '#app' — so #journey and #profile both silently landed on
   // the week screen. Deep links to a tab are the most natural thing to paste.
-  var APP_HASHES = ['#app','#week','#growth','#scan','#insights','#journey','#profile','#account','#activity'];
+  // '#adult' is Your training (js/shell.js APP_TABS). Left out, a signed-in parent's /#adult link was rewritten to
+  // '#app' before the app booted, so it opened the Week or child setup and never Your training.
+  var APP_HASHES = ['#app','#week','#growth','#scan','#insights','#journey','#profile','#account','#activity','#adult'];
   function isAppLink(){
     var h = location.hash || '', s = location.search || '';
     return APP_HASHES.indexOf(h) !== -1

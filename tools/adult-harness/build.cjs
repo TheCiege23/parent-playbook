@@ -16,7 +16,8 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const LEFT_OUT = ['/js/landing.js'];
+const LANDING_SRC = '/js/landing.js';
+const LEFT_OUT = [LANDING_SRC];
 const scripts = [...index.matchAll(/<script src="(\/js\/[a-z0-9-]+\.js)"><\/script>/g)].map(m => m[1]).filter(s => !LEFT_OUT.includes(s));
 const styles = [...index.matchAll(/<link rel="stylesheet" href="(\/css\/[a-z0-9-]+\.css)" \/>/g)].map(m => m[1]).filter(s => s !== '/css/landing.css');
 // The fake is loaded with a content hash in its URL, so a browser never runs a stale copy after it changes. Line
@@ -31,6 +32,9 @@ for (const src of scripts) {
   // pwa.js defines registerServiceWorker, which init.js calls at once. A harness on localhost must not install the
   // site's service worker, or its cache would serve stale files to the next local session.
   if (src === '/js/pwa.js') tags.push('<script>registerServiceWorker = function(){}; releasePushOnThisDevice = async function(){};</script>');
+  // ?landing=1 loads the site's landing script where the site does, right after init.js, so a deep link goes through
+  // the same decision a visitor's does. Written, not a plain tag, so the default page stays without it.
+  if (src === '/js/init.js') tags.push(`<script>if (new URLSearchParams(location.search).get('landing') === '1') document.write('<script src="${LANDING_SRC}"><\\/script>');</script>`);
 }
 
 const html = `<!doctype html>
@@ -52,12 +56,27 @@ ${styles.map(s => `<link rel="stylesheet" href="${s}" />`).join('\n')}
 <div id="appbg"></div>
 <div id="appveil"></div>
 <div id="harnessBar" role="note"><span>Local harness · synthetic in-memory data · nothing reaches production</span><button type="button" onclick="location.reload()">Start again</button></div>
-<!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out. -->
+<!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out unless ?landing=1. -->
 <div class="wrap" id="root"></div>
 <script>
   // ?scenario=family opens the synthetic child's week, against a database shaped like production today. Otherwise it
   // opens Your training for the synthetic account, which has Adult Training and no child profile.
-  history.replaceState(null, '', location.pathname + location.search + (new URLSearchParams(location.search).get('scenario') === 'family' ? '#week' : '#adult'));
+  // ?landing=1 goes through js/landing.js as a returning, signed-in visitor would: the page has a marketing shell,
+  // #root starts hidden, a stored-session marker is set, and the address carries ?hash= (default: none) as its hash.
+  (function(){
+    var params = new URLSearchParams(location.search);
+    var landing = params.get('landing') === '1';
+    var hash = landing ? (params.get('hash') ? '#' + params.get('hash') : '') : (params.get('scenario') === 'family' ? '#week' : '#adult');
+    history.replaceState(null, '', location.pathname + location.search + hash);
+    try {
+      if (landing) localStorage.setItem('sb-harness-auth-token', '{"synthetic":true}');
+      else localStorage.removeItem('sb-harness-auth-token');
+    } catch (e) {}
+    if (landing) {
+      document.getElementById('root').hidden = true;
+      document.write('<div id="landing"><p style="padding:24px">Landing page stand-in (harness)</p></div>');
+    }
+  })();
 </script>
 ${tags.join('\n')}
 </body>

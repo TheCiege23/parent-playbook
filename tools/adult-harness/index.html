@@ -18,12 +18,27 @@
 <div id="appbg"></div>
 <div id="appveil"></div>
 <div id="harnessBar" role="note"><span>Local harness · synthetic in-memory data · nothing reaches production</span><button type="button" onclick="location.reload()">Start again</button></div>
-<!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out. -->
+<!-- Not hidden: on the site js/landing.js reveals #root when a visitor enters the app, and the harness leaves that script out unless ?landing=1. -->
 <div class="wrap" id="root"></div>
 <script>
   // ?scenario=family opens the synthetic child's week, against a database shaped like production today. Otherwise it
   // opens Your training for the synthetic account, which has Adult Training and no child profile.
-  history.replaceState(null, '', location.pathname + location.search + (new URLSearchParams(location.search).get('scenario') === 'family' ? '#week' : '#adult'));
+  // ?landing=1 goes through js/landing.js as a returning, signed-in visitor would: the page has a marketing shell,
+  // #root starts hidden, a stored-session marker is set, and the address carries ?hash= (default: none) as its hash.
+  (function(){
+    var params = new URLSearchParams(location.search);
+    var landing = params.get('landing') === '1';
+    var hash = landing ? (params.get('hash') ? '#' + params.get('hash') : '') : (params.get('scenario') === 'family' ? '#week' : '#adult');
+    history.replaceState(null, '', location.pathname + location.search + hash);
+    try {
+      if (landing) localStorage.setItem('sb-harness-auth-token', '{"synthetic":true}');
+      else localStorage.removeItem('sb-harness-auth-token');
+    } catch (e) {}
+    if (landing) {
+      document.getElementById('root').hidden = true;
+      document.write('<div id="landing"><p style="padding:24px">Landing page stand-in (harness)</p></div>');
+    }
+  })();
 </script>
 <script src="/js/dates.js"></script>
 <script src="/js/device-evidence.js"></script>
@@ -94,5 +109,6 @@
 <script src="/js/pwa.js"></script>
 <script>registerServiceWorker = function(){}; releasePushOnThisDevice = async function(){};</script>
 <script src="/js/init.js"></script>
+<script>if (new URLSearchParams(location.search).get('landing') === '1') document.write('<script src="/js/landing.js"><\/script>');</script>
 </body>
 </html>

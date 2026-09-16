@@ -46,6 +46,19 @@ test('the fake client is loaded before core.js creates the client, and nothing r
   assert.match(fake, /window\.supabase = \{ createClient:\(\) => client \};/);
 });
 
+test('?landing=1 puts the site landing script back, after init.js as on the site, and only then', () => {
+  // The /#adult deep link broke in js/landing.js, which the default harness leaves out; this option is how a browser
+  // check reaches it. init.js boots on its own when the page has no #landing element, so the option adds one first.
+  const harness = read('tools/adult-harness/index.html');
+  const loader = "if (new URLSearchParams(location.search).get('landing') === '1') document.write('<script src=\"/js/landing.js\"><\\/script>');";
+  assert.ok(harness.includes(loader), 'the landing script is written only with ?landing=1');
+  assert.ok(harness.indexOf('<script src="/js/init.js"></script>') < harness.indexOf(loader), 'after init.js, as index.html has it');
+  assert.ok(read('index.html').indexOf('<script src="/js/init.js"></script>') < read('index.html').indexOf('<script src="/js/landing.js"></script>'));
+  assert.match(harness, /if \(landing\) \{\s*document\.getElementById\('root'\)\.hidden = true;\s*document\.write\('<div id="landing">/);
+  assert.ok(harness.indexOf('id="landing"') < harness.indexOf('<script src="/js/init.js"></script>'), 'the shell exists before init.js looks for it');
+  assert.match(harness, /else localStorage\.removeItem\('sb-harness-auth-token'\);/, 'the session marker does not outlive a landing run');
+});
+
 test('it is never deployed and never packaged', () => {
   const docker = read('Dockerfile');
   assert.doesNotMatch(docker, /adult-harness/);
