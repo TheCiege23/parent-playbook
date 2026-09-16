@@ -189,6 +189,28 @@ test('source: Profile offers Revoke to an editor only, and binds it to the sheet
     'the list the screen reads already excludes revoked invitations');
 });
 
+test('the dead-invite screen asks for a new link by name, or without one', () => {
+  // invite_preview() answers with the literal 'A parent' when the inviter has never set a display name, which a
+  // signed-in regression on 2026-09-16 caught reading as "Ask A parent for a new one" on the revoked screen.
+  const root = { innerHTML: '' };
+  const globals = {
+    root, $: () => ({ onclick: null }), toast() {}, renderAuth() {}, logUsageEvent() {},
+    H: (strings, ...v) => strings.reduce((a, s, i) => a + s + (v[i] ?? ''), ''),
+    esc: s => (s ?? '').toString().replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+    navigator: { clipboard: { writeText() {} } },
+  };
+  const renderInviteDead = new Function(...Object.keys(globals),
+    extract(read('js/invites.js'), 'function renderInviteDead(title, why, token, info){') + '\nreturn renderInviteDead;')(...Object.values(globals));
+
+  const screen = info => { renderInviteDead('This invite was turned off', 'A parent removed this invite.', 'synthetic-token', info); return root.innerHTML; };
+  assert.match(screen({ inviter: 'A parent' }), /Ask whoever sent it for a new one/,
+    "the database's stand-in name is not a name, and must not be read into the middle of a sentence");
+  assert.doesNotMatch(screen({ inviter: 'A parent' }), /Ask A parent/);
+  assert.match(screen({ inviter: 'Chris' }), /Ask Chris for a new one/, 'a real name is still used');
+  assert.match(screen(null), /Ask whoever sent it for a new one/, 'and a link with no invitation behind it still reads');
+  assert.match(screen({ inviter: '<script>' }), /Ask &lt;script&gt; for a new one/, 'a name is escaped');
+});
+
 test('source: the redeem screen already refuses a revoked invitation', () => {
   const invites = read('js/invites.js');
   assert.match(invites, /revoked:'This invite was turned off'/, 'invite_preview reports revoked, and the screen names it');
