@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+const {fakeSupabase}=require('./support/fake-supabase.cjs');
 function context(hash='#account',search=''){
   const calls=[],elements=new Map();
   const ctx={console,calls,root:{innerHTML:''},state:{user:{id:'coach',email:'coach@example.test'},athletes:[],active:null},
@@ -20,6 +21,18 @@ function context(hash='#account',search=''){
 test('a coach with no child profile reaches Account before parent onboarding or a pending parent draft',async()=>{
   const ctx=context();ctx.obReadStash=()=>{throw new Error('must not consume parent draft');};
   await ctx.afterLogin();assert.deepEqual(ctx.calls,['account']);
+});
+
+test('returning roster owners reach Account from a plain login link',async()=>{
+  const ctx=context('');ctx.sb=fakeSupabase({teams:[{id:'roster',created_by:'coach'}]});
+  await ctx.afterLogin();assert.deepEqual(ctx.calls,['account']);
+});
+
+test('starting a child profile clears coach routing while preserving other query parameters',async()=>{
+  const ctx=context('#account','?login=1&account=1&team=BEARS26');ctx.URLSearchParams=URLSearchParams;
+  let url;ctx.history.replaceState=(a,b,value)=>url=value;
+  ctx.myFamilyId=async()=>null;ctx.renderOnboarding=()=>ctx.calls.push('onboarding');
+  await ctx.startChildSetup();assert.equal(url,'/?team=BEARS26');assert.deepEqual(ctx.calls,['onboarding']);
 });
 test('organization signup and confirmation return preserve the account destination',async()=>{
   const ctx=context();ctx.renderAuth('login');

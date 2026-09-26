@@ -1034,3 +1034,6 @@
 .code-show{font-family:'Archivo',sans-serif;font-size:34px;font-weight:900;letter-spacing:.18em;
   text-align:center;color:var(--ink);background:#E3EDE8;border-radius:14px;padding:16px 10px;
   margin:14px 0 6px;user-select:all}
+
+.org-page{max-width:960px;margin:0 auto}
+.org-create{max-width:640px}

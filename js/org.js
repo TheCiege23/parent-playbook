@@ -64,9 +64,8 @@ async function openMyOrg(){
       .eq('created_by',state.user.id).order('created_at',{ascending:true});
     if(error) throw error; teams=data||[];
   }catch(err){ console.error(err); return orgError(openMyOrg); }
-  if(teams.length===1) return openOrgRoster(teams[0].id);
   if(!teams.length) return openOrgCreate();
-  root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
+  root.innerHTML = H`<div class="app-pad org-page" style="padding-top:26px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <h1 style="font-size:22px">Your rosters</h1><button class="pill" id="orgDone">Done</button>
     </div>
@@ -84,7 +83,7 @@ async function openMyOrg(){
 function sportName(k){ return state.ref?.sports.find(x=>x.key===k)?.name || k || ''; }
 
 function orgError(retry){
-  root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
+  root.innerHTML = H`<div class="app-pad org-page" style="padding-top:26px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <h1 style="font-size:22px">Organization</h1><button class="pill" id="orgErrDone">Done</button>
     </div>
@@ -98,7 +97,7 @@ function orgError(retry){
 // ---- create a roster: this account becomes its admin (teams.created_by), no separate signup ----
 async function openOrgCreate(){
   const sports=state.ref?.sports||[];
-  root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
+  root.innerHTML = H`<div class="app-pad org-page org-create" style="padding-top:26px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <h1 style="font-size:22px">Start a roster</h1><button class="pill" id="orgCancel">Cancel</button>
     </div>
@@ -106,15 +105,15 @@ async function openOrgCreate(){
       can see all at once, and the coaches connected to it. Stats and measurements only, same ceiling as
       Team Connect: never games, journey, or photos. Families join with a code you share; nobody is added
       without one.</p>
-    <div class="field"><label>Name</label><input id="ocName" placeholder="e.g. Eastside Youth Soccer"/></div>
-    <div class="field"><label>Sport</label><select id="ocSport"><option value="">Select…</option>
+    <div class="field"><label for="ocName">Name</label><input id="ocName" maxlength="120" placeholder="e.g. Eastside Youth Soccer"/></div>
+    <div class="field"><label for="ocSport">Sport</label><select id="ocSport"><option value="">Select…</option>
       ${sports.map(s=>`<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
-    <div class="field"><label>Level — optional</label><input id="ocLevel" placeholder="e.g. U12, Varsity"/></div>
+    <div class="field"><label for="ocLevel">Level — optional</label><input id="ocLevel" maxlength="60" placeholder="e.g. U12, Varsity"/></div>
     <div class="field"><label>Practice days — optional</label>${schedChips([],'ocDays')}</div>
-    <div class="field"><label>Game day — optional</label>
+    <div class="field"><label for="ocGameDay">Game day — optional</label>
       <select id="ocGameDay"><option value="">—</option>
         ${DAY_LABELS.map((d,i)=>`<option value="${i}">${d}</option>`).join('')}</select></div>
-    <div class="err" id="ocErr"></div>
+    <div class="err" id="ocErr" role="alert"></div>
     <button class="btn amber" id="ocGo" style="margin-top:6px">Create roster</button>
   </div>`;
   $("#orgCancel").onclick=()=>renderApp('account');
@@ -122,8 +121,10 @@ async function openOrgCreate(){
   root.querySelectorAll('#ocDays .chip').forEach(c=>c.onclick=()=>{
     const i=Number(c.dataset.d); days=days.includes(i)?days.filter(x=>x!==i):[...days,i];
     c.classList.toggle('on', days.includes(i));
+    c.setAttribute('aria-pressed',String(days.includes(i)));
   });
   $("#ocGo").onclick=async e=>{
+    const btn=$('#ocGo'); if(btn.disabled) return;
     const name=($("#ocName").value||'').trim();
     const sport=$("#ocSport").value;
     const level=($("#ocLevel").value||'').trim();
@@ -131,22 +132,27 @@ async function openOrgCreate(){
     const err=$("#ocErr"); err.textContent='';
     if(!name){ err.textContent='Give the roster a name.'; return; }
     if(!sport){ err.textContent='Pick a sport.'; return; }
-    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
+    if(gd!==''&&days.includes(Number(gd))){err.textContent='That day is already a practice day — pick a different game day.';return;}
+    if(days.length>=6){err.textContent='Six or more practice days doesn’t leave room to recover. Double-check the schedule.';return;}
+    btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     const row={ name, sport_key:sport, created_by:state.user.id, is_active:true };
     if(level) row.level=level;
     if(days.length) row.practice_days=days.sort((a,b)=>a-b);
     if(gd!=='') row.game_day=parseInt(gd,10);
     let created=null;
-    for(let attempt=0; attempt<5 && !created; attempt++){
-      const { data, error }=await sb.from('teams').insert({ ...row, join_code:orgCode() }).select('id').maybeSingle();
-      if(!error){ created=data; break; }
-      if(error.code!=='23505'){ console.error(error); err.textContent='Could not create that — try again.'; e.target.innerHTML='Create roster'; e.target.disabled=false; return; }
-      // 23505 = join_code collision, vanishingly rare — just try a fresh code.
-    }
-    if(!created){ err.textContent='Could not generate a unique code — try again.'; e.target.innerHTML='Create roster'; e.target.disabled=false; return; }
-    logUsageEvent('org_roster_created');
-    toast('Roster created 🎉');
-    openOrgRoster(created.id);
+    try{
+      for(let attempt=0; attempt<5 && !created; attempt++){
+        const { data, error }=await sb.from('teams').insert({ ...row, join_code:orgCode() }).select('id').maybeSingle();
+        if(!error){ created=data; break; }
+        if(error.code!=='23505') throw error;
+        // 23505 = join_code collision, vanishingly rare — just try a fresh code.
+      }
+      if(!created){err.textContent='Could not generate a unique code — try again.';return;}
+      logUsageEvent('org_roster_created');
+      toast('Roster created 🎉');
+      await openOrgRoster(created.id);
+      }catch(error){console.error(error);err.textContent='Could not create that — check your connection and try again.';}
+    finally{btn.innerHTML='Create roster';btn.disabled=false;}
   };
 }
 
@@ -176,6 +182,8 @@ async function openOrgRoster(teamId){
           .order('measured_on',{ascending:false}).order('created_at',{ascending:false}).order('id',{ascending:false}),
         sb.from('athlete_access').select('athlete_id,guardian_id').in('athlete_id',ids).eq('role','coach').is('revoked_at',null),
       ]);
+      const failed=[a,s,m,ac].find(result=>result.error);
+      if(failed) throw failed.error;
       athletes=a.data||[]; sports=s.data||[]; meas=m.data||[]; access=ac.data||[];
     }
   }catch(err){ console.error(err); return orgError(()=>openOrgRoster(teamId)); }
@@ -196,7 +204,7 @@ async function openOrgRoster(teamId){
 
   const rows=athletes.slice().sort((x,y)=>(x.first_name||'').localeCompare(y.first_name||''));
 
-  root.innerHTML = H`<div class="app-pad" style="padding-top:22px">
+  root.innerHTML = H`<div class="app-pad org-page" style="padding-top:22px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <button class="pill" id="orgBack">‹ Rosters</button><button class="pill" id="orgDone2">Done</button>
     </div>
@@ -206,8 +214,9 @@ async function openOrgRoster(teamId){
 
     <div class="card app-pad" style="margin-bottom:16px">
       <div class="mrow"><span>Join code</span><b style="letter-spacing:.06em;font-family:ui-monospace,monospace">${esc(team.join_code||'—')}</b></div>
-      <p style="font-size:11.5px;color:var(--muted);margin:8px 2px 0">Share this with families — entering it adds
-        their child to this roster. Nobody is added without it.</p>
+      <button class="btn sm ghost" id="orgCopyCode" ${team.join_code?'':'disabled'} style="margin-top:10px">Copy join code</button>
+      <p style="font-size:12.5px;color:var(--muted);margin:8px 2px 0">Ask families to open Profile → Account &amp; settings → Join with a code.
+        Joining shares their child's stats and measurements with this roster. Using the code during setup only prefills the schedule.</p>
     </div>
 
     <div class="sec-title">Roster</div>
@@ -237,6 +246,10 @@ async function openOrgRoster(teamId){
   $("#orgBack").onclick=openMyOrg;
   $("#orgDone2").onclick=()=>renderApp('account');
   $("#orgBodyInsights").onclick=()=>openOrgBodyInsights(teamId);
+  $('#orgCopyCode').onclick=async()=>{
+    try{await navigator.clipboard.writeText(team.join_code);toast('Join code copied');}
+    catch(error){toast('Select the join code above to copy it');}
+  };
   root.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>openOrgAthleteDetail(b.dataset.a, athletes, sports, meas, coachesByAthlete));
 }
 

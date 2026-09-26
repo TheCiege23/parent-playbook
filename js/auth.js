@@ -21,6 +21,7 @@ async function afterLogin(){
     // A parent keeping only their own training has no child to open the app on. A link to #adult, or a return there
     // after signing in, opens Your training instead of child setup. Without Adult Training nothing here changes.
     if((location.hash||'')==='#adult' && adultTrainingOn()) return renderApp('adult');
+    if(await hasOwnedRoster()) return renderApp('account');
     // No athletes doesn't mean no household. renderOnboarding() runs the `create` flow,
     // which mints a SECOND family and orphans the first along with its members and any
     // pending invites. If they already belong to one, add the child into it instead.
@@ -62,6 +63,12 @@ async function myFamilyId(){
   return (data.find(m=>m.role==='owner') || data[0]).family_id;
 }
 
+async function hasOwnedRoster(){
+  const {data,error}=await sb.from('teams').select('id').eq('created_by',state.user.id).limit(1);
+  if(error) throw error;
+  return !!(data&&data.length);
+}
+
 // Were they ever granted access to someone else's athlete? Distinguishes a revoked
 // co-parent/grandparent from a genuinely new signup.
 async function hadSharedAccess(){
@@ -93,7 +100,12 @@ function renderNoAccess(){
 // From Your training with no child profile yet: set one up, inside the household the parent already belongs to if
 // there is one. The #adult address is cleared first, so finishing setup lands on the child's week, not back here.
 async function startChildSetup(){
-  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  try{
+    const params=new URLSearchParams(location.search);
+    params.delete('account'); params.delete('login');
+    const query=params.toString();
+    history.replaceState(null,'',location.pathname+(query?'?'+query:''));
+  }catch(e){}
   const familyId = await myFamilyId();
   if(familyId){ document.body.classList.remove('auth'); setAppBg(); obReset({ mode:'addChild', familyId }); return obStep(); }
   return renderOnboarding();

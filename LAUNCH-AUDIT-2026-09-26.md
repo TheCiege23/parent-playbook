@@ -36,3 +36,8 @@ QA account: `qa-launch-20260926-6fe76ff6@example.com`. Created through the proje
 4. Re-run the remaining browser flows against the new production release. Deployment and the post-deployment smoke checks are complete.
 
 Evidence: `audit-test-results.txt`, `audit-db-results.txt`, `audit-live-results.txt`. Local preview: `node tools/audit-preview.cjs` at `http://127.0.0.1:8787/`; it serves only public assets, not environment files or audit notes.
+# Follow-up improvements — pp-v140
+
+Returning roster owners now reach Account from ordinary sign-in links. Starting a child profile clears coach routing markers while preserving team codes. A single roster retains the roster list and Start another roster action. Creation failures restore the submit button; schedule conflicts are rejected before saving. Partial roster query failures show Retry rather than incomplete data. Roster forms have associated labels, bounded desktop widths, and a copy-code action that explains the difference between schedule prefill and roster sharing.
+
+Validation: JavaScript suite 1066 declared, 1065 passed, 1 skipped, 0 failed. Six additional regression cases cover routing, roster navigation, failed creation, schedule conflicts, and partial data failure. Authenticated Chrome walkthrough awaits approval to accept the sign-in screen's displayed terms. Email delivery cannot be tested with the reserved example.com QA address.
