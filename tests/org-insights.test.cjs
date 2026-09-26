@@ -102,7 +102,7 @@ test('adult repeat comparison table preserves signed changes and escapes metric 
 });
 test('organization composition readiness never presents an estimate without a configured provider',()=>{
   const {c}=setup(),html=c.oiCompositionReadiness();
-  assert.match(html,/Provider integration ready/);assert.match(html,/Model not configured/);assert.match(html,/No composition value is generated today/);assert.match(html,/company-composition-demo/);
+  assert.match(html,/Body composition is unavailable/);assert.match(html,/No composition value is generated today/);assert.doesNotMatch(html,/company-composition-demo|validation room|Manifest/);
   for(const value of ['12%','60 kg','DEXA equivalent'])assert.equal(html.includes(value),false);
 });
 test('company consent RPC migration returns only the scoped reference and retention date',()=>{

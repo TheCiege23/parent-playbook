@@ -233,7 +233,7 @@ function obSport(){
   <div class="ob-head"><div class="k">The sport</div><h2>What's ${esc(ob.athlete.first)} playing right now?</h2>
   <p>Just today's focus. You can add more any time — most kids play a few.</p></div>
   ${ob.teamName?H`<div class="card app-pad" style="margin-bottom:14px;border-color:#CFE3DC;background:#EAF3F0">
-    <div class="grow" style="border:none;padding:0"><div class="gi" style="background:#fff">🏈</div>
+    <div class="grow" style="border:none;padding:0"><div class="gi" style="background:#fff" aria-hidden="true">✓</div>
       <div class="gt"><b>${esc(ob.teamName)}</b><span>Sport, level and practice days filled in from your coach's code.</span></div>
       <button class="btn sm ghost" id="obTeamClear">Clear</button></div>
   </div>`

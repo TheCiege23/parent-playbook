@@ -116,12 +116,12 @@ function lgStepScore(){
 
     <div id="lgDetails" ${LG.prefill.fromPlan&&!LG.editing?'hidden':''}>
       <div class="row2">
-        <div class="field"><label>Date</label>
+        <div class="field"><label for="lgDate">Date</label>
           <input id="lgDate" type="date" value="${esc(r.game_date)}" max="${isoDay(new Date())}"/></div>
-        <div class="field"><label>Season</label>
+        <div class="field"><label for="lgSeason">Season</label>
           <input id="lgSeason" value="${esc(r.season||'')}" placeholder="e.g. Fall 2026"/></div>
       </div>
-      <div class="field"><label>Opponent</label>
+      <div class="field"><label for="lgOpp">Opponent</label>
         <input id="lgOpp" value="${esc(r.opponent||'')}" placeholder="e.g. Northside Hawks"/></div>
     </div>
 
@@ -240,6 +240,7 @@ function lgResultLabel(r){
 async function lgCommit(errEl){
   LG.row.result = lgDerivedResult(LG.row);
   LG.row.sport_key = LG.row.sport_key || LG.sport;
+  LG.row.home_away = LG.row.home_away || null;
   if(!navigator.onLine && typeof owQueue==='function'){
     await owQueue({ kind_op:'game_log', row:{ ...LG.row } });
     LG.saved={ offline:true };
@@ -283,13 +284,13 @@ function lgStepExtras(){
       <button class="btn sm ghost" id="lgOther">＋ Add a stat</button></div>`}
 
     <div class="field">
-      <label>One thing ${nm} did well</label>
+      <label for="lgNote">One thing ${nm} did well</label>
       <textarea id="lgNote" rows="2" placeholder="Broke two tackles on the counter."></textarea>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">${nm} will read this in ten years. Skip it if you're not up to it.</p>
     </div>
 
     <div class="field">
-      <label>One thing to work on</label>
+      <label for="lgImprove">One thing to work on</label>
       <textarea id="lgImprove" rows="2" placeholder="Ball security in traffic."></textarea>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Just for you — it shapes next week's plan.</p>
     </div>

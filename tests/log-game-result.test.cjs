@@ -26,6 +26,31 @@ function context() {
 
 const row = over => ({ our_score: null, their_score: null, result: 'na', ...over });
 
+test('Journey loads the current athlete sports before first-game logging without visiting Profile', async () => {
+  const current=[{sport_key:'soccer',is_primary:true,game_day:5}];
+  const ctx=vm.createContext({console,state:{active:{id:'qa',first_name:'QA'},ref:{sports:[]},athleteSports:[{sport_key:'football'}]},
+    logUsageEvent(){},isoDay:()=> '2026-09-26',mondayOfThisWeek:()=>new Date(),dateForDayIndex:()=> '2026-09-27',setAppBg(){},
+    sb:{from(table){const q={select(){return q;},eq(){return q;},order(){return q;},gte(){return q;},lte(){return q;},limit(){return q;},then(resolve){resolve({data:table==='athlete_sports'?current:[]});}};return q;}}});
+  vm.runInContext(fs.readFileSync(path.join(base,'js/journey.js'),'utf8'),ctx);
+  // Rendering depends on the application shell; the data handoff occurs before it.
+  await ctx.screenJourney().catch(()=>{});
+  assert.equal(ctx.state.athleteSports,current);
+  vm.runInContext(fs.readFileSync(path.join(base,'js/log-game.js'),'utf8'),ctx);
+  ctx.uuid=()=> 'qa-game';ctx.lgRender=()=>{};ctx.lgPrefill=()=>({date:'2026-09-26'});ctx.state.user={id:'qa'};
+  ctx.openLogGame();assert.equal(vm.runInContext('LG.row.sport_key',ctx),'soccer');
+});
+
+test('optional game location saves as null online and in the offline queue', async () => {
+  for(const online of [true,false]){
+    const ctx=context();let saved;
+    ctx.LG={row:row({id:'qa-game',home_away:''}),sport:'soccer'};
+    ctx.navigator={onLine:online};
+    ctx.sb={from:()=>({upsert:async value=>{saved=value;return {error:null};}})};
+    ctx.owQueue=async value=>{saved=value.row;};
+    assert.equal(await ctx.lgCommit({}),true);assert.equal(saved.home_away,null);
+  }
+});
+
 test('a result is derived from the scores whenever both are present', () => {
   const ctx = context();
   assert.equal(ctx.lgDerivedResult(row({ our_score: 3, their_score: 1 })), 'win');

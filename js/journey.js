@@ -89,6 +89,7 @@ async function screenJourney(){
     state.canEdit===false ? Promise.resolve({data:[]}) : sb.from('goals').select('label').eq('athlete_id',a.id).eq('status','active').order('created_at').limit(1),
   ]);
   const primary = sports?.find(s=>s.is_primary)||sports?.[0];
+  state.athleteSports = sports || [];
   // loadRole() already resolves both direct athlete access and household membership.
   // Re-reading only athlete_access here used the retired `editor` role name and could
   // hide Journey controls from a valid co-parent.
