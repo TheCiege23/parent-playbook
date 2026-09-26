@@ -28,6 +28,7 @@
     const family = '00000000-0000-4000-8000-0000000000fa', athlete = '00000000-0000-4000-8000-0000000000c1';
     const birth = new Date(); birth.setFullYear(birth.getFullYear() - 11); birth.setMonth(2, 14);
     return {
+      media:new URLSearchParams(location.search).get('story')==='1'?[{id:'00000000-0000-4000-8000-0000000000f1',athlete_id:athlete,kind:'video',path:'synthetic-highlight.mp4',caption:'Synthetic color-bar highlight',created_at:new Date().toISOString()}]:[],
       sports:[
         { key:'general', name:'General Athleticism', level_vocab:[], selectable:false, sort:99 },
         { key:'football', name:'Football', level_vocab:['Flag', 'Pee Wee', 'Junior', 'Senior', 'Freshman', 'JV', 'Varsity'], selectable:true, sort:1 },
@@ -408,6 +409,11 @@
     from:query,
     rpc:async (name, args) => {
       calls.push(['rpc', name]);
+      if(name==='review_story_contribution'){
+        const row=table('story_contributions').find(r=>r.id===args.contribution_id);
+        if(!row)return {data:null,error:{message:'Contribution not found'}};
+        row.status=args.decision;return {data:null,error:null};
+      }
       if (MISSING_FUNCTIONS.includes(name)) return { data:null, error:{ code:'PGRST202', message:'Could not find the function public.' + name } };
       if (name === 'save_adult_health_import') return { data:saveAdultHealthImport(args), error:null };
       if (name === 'invite_preview') return { data:invitePreview(args && args.p_token), error:null };
@@ -440,6 +446,7 @@
     storage:{ from:() => ({
       upload:async path => ({ data:{ path }, error:null }), remove:async () => ({ data:[], error:null }), list:async () => ({ data:[], error:null }),
       getPublicUrl:() => ({ data:{ publicUrl:'' } }), createSignedUrl:async () => ({ data:{ signedUrl:'' }, error:null }),
+      createSignedUrls:async paths=>({data:paths.map(path=>({path,signedUrl:path==='synthetic-highlight.mp4'?'/tools/adult-harness/synthetic-highlight.mp4':''})),error:null}),
     }) },
     functions:{ invoke:async () => ({ data:null, error:null }) },
     channel(){ const ch = { on(){ return ch; }, subscribe(){ return ch; }, unsubscribe(){ return ch; } }; return ch; },

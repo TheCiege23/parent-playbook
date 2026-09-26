@@ -1,13 +1,15 @@
-// Private presentation of the existing Journey records. No new coach grants.
+// Private Journey records and parent-approved story contributions.
 async function storyLoad(athleteId){
   const results=await Promise.all([
     sb.from('athlete_sports').select('sport_key,positions,level,is_primary').eq('athlete_id',athleteId),
     sb.from('games').select('*').eq('athlete_id',athleteId).order('game_date',{ascending:false}),
     sb.from('milestones').select('*').eq('athlete_id',athleteId).order('milestone_date',{ascending:false}),
-    sb.from('media').select('*').eq('athlete_id',athleteId).order('created_at',{ascending:false})
+    sb.from('media').select('*').eq('athlete_id',athleteId).order('created_at',{ascending:false}),
+    sb.from('story_contributions').select('*').eq('athlete_id',athleteId).eq('status','approved').order('created_at',{ascending:false})
   ]);
   const failed=results.find(r=>r.error);if(failed)throw failed.error;
-  return {sports:results[0].data||[],games:results[1].data||[],achievements:results[2].data||[],media:results[3].data||[]};
+  const contributions=results[4].data||[];
+  return {sports:results[0].data||[],games:results[1].data||[],achievements:results[2].data||[],media:[...(results[3].data||[]),...contributions.filter(c=>c.storage_path).map(c=>({id:c.id,kind:c.kind,path:c.storage_path,caption:c.title,created_at:c.created_at,storyBucket:'story-contributions'}))],contributions};
 }
 function storyResumeHTML(athlete,data){
   const name=k=>state.ref?.sports.find(s=>s.key===k)?.name||k;
@@ -29,9 +31,8 @@ async function openAthleteStory(){
     data=await storyLoad(athlete.id);
     if(!sameSession()||!bg.isConnected)return bg.remove();
     if(data.media.length){
-      const signed=await sb.storage.from('athlete-media').createSignedUrls(data.media.map(m=>m.path),300);
-      if(signed.error)throw signed.error;
-      (signed.data||[]).forEach(m=>{if(m.signedUrl&&!m.error)urls[m.path]=m.signedUrl;});
+      const signed=await storySigned(data.media);
+      for(const m of data.media)urls[m.path]=signed[(m.storyBucket||'athlete-media')+':'+m.path];
     }
   }catch(error){
     console.error(error);if(!sameSession()||!bg.isConnected)return bg.remove();
@@ -48,12 +49,17 @@ async function openAthleteStory(){
     <div class="story-awards">${data.achievements.map(m=>`<article><span aria-hidden="true">🏆</span><time>${esc(fmtDate(m.milestone_date))}</time><h4>${esc(m.title)}</h4>${m.note?`<p>${esc(m.note)}</p>`:''}</article>`).join('')||'<p class="empty">Your first achievement belongs here. Add a title such as “League champions — Fall 2026.”</p>'}</div>
     ${data.media.some(m=>m.kind==='photo')?'<h4>Story photos</h4><div class="story-photos">'+data.media.filter(m=>m.kind==='photo').map(photoMarkup).join('')+'</div>':''}</section>
     <section id="storyHighlights"><div class="story-heading"><h3>Highlights</h3>${editable?'<button class="btn sm ghost" id="storyAddHighlight">＋ Photo or video</button>':''}</div><p class="muted-note">Your saved Journey videos, newest first. Add a caption such as “60-yard touchdown” and attach the clip to its game.</p>
-    <div class="story-clips">${videos.map(m=>`<article>${urls[m.path]?`<video controls playsinline preload="metadata" src="${esc(urls[m.path])}"></video>`:'<p>Video unavailable. Reopen the story to retry.</p>'}<h4>${esc(m.caption||'Untitled highlight')}</h4><p>${esc(fmtDate(m.taken_on||m.created_at?.split('T')[0]))}</p></article>`).join('')||'<p class="empty">Save a short game or practice clip to start your highlights.</p>'}</div><p class="muted-note">Video analysis and an edited reel are not available yet. Clips play individually.</p></section>
+    <div class="story-clips">${videos.map(m=>`<article>${urls[m.path]?`<video controls playsinline preload="metadata" src="${esc(urls[m.path])}"></video>`:'<p>Video unavailable. Reopen the story to retry.</p>'}<h4>${esc(m.caption||'Untitled highlight')}</h4><p>${esc(fmtDate(m.taken_on||m.created_at?.split('T')[0]))}</p></article>`).join('')||'<p class="empty">Save a short game or practice clip to start your highlights.</p>'}</div><p class="muted-note">Combine clips using Edit a reel. AI coaching reviews require provider setup and a separate opt-in.</p></section>
+    ${data.contributions.length?'<section><h3>Approved story contributions</h3><div class="story-awards">'+data.contributions.map(c=>'<article><h4>'+esc(c.title)+'</h4><p>'+esc(c.note||'')+'</p><p class="muted-note">Approved by a parent</p></article>').join('')+'</div></section>':''}
     <section id="storyResume">${storyResumeHTML(athlete,data)}${editable?'<button class="btn ghost" id="storyExport">Save printable résumé</button><p class="muted-note">Downloads a text-only HTML file. Open it and use Print → Save as PDF. Review the contents before sharing.</p>':''}<p id="storyMessage" role="status"></p></section>
+    ${editable?'<div class="story-links"><button class="btn ghost" id="storyCollab">Coach contributions &amp; sharing</button><button class="btn ghost" id="storyReel">Edit a highlight reel</button><button class="btn ghost" id="storyAI">AI coaching review</button></div>':''}
     <button class="btn ghost" id="storyClose">Back to Journey</button>`;
   bg.querySelectorAll('.story-links a').forEach(link=>link.onclick=e=>{e.preventDefault();bg.querySelector(link.getAttribute('href')).scrollIntoView({behavior:'smooth',block:'start'});});
   bg.querySelector('#storyClose').onclick=()=>bg.remove();
   if(editable){
+    bg.querySelector('#storyCollab').onclick=()=>{if(!sameSession())return bg.remove();bg.remove();openStoryCollaboration();};
+    bg.querySelector('#storyReel').onclick=()=>{if(!sameSession())return bg.remove();bg.remove();openStoryReel(data.media);};
+    bg.querySelector('#storyAI').onclick=()=>{if(!sameSession())return bg.remove();bg.remove();openStoryAnalysis(data.media);};
     bg.querySelector('#storyAddAward').onclick=()=>{if(!sameSession())return bg.remove();bg.remove();openAddMilestone();};
     bg.querySelector('#storyAddHighlight').onclick=()=>{if(!sameSession())return bg.remove();bg.remove();openAddMedia(data.games);};
     bg.querySelector('#storyExport').onclick=async()=>{

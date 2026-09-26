@@ -36,6 +36,7 @@ function world({ files = [], reports = [], allowed = true, askError = null, dele
     storage: {
       from: bucket => ({
         list: async (folder, { limit, offset }) => {
+          if(bucket==='story-contributions')return {data:[],error:null};
           events.push(['list', bucket, folder, offset]);
           return { data: files.slice(offset, offset + limit).map(name => ({ name })), error: null };
         },

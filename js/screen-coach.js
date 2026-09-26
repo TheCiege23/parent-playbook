@@ -169,6 +169,7 @@ async function screenCoach(){
     ${topBar(sub||'Team Connect', '<span class="pill" style="background:var(--green-pale);color:var(--green-d)">Coach view</span>')}
     <div class="app-pad" style="padding-top:6px">
       <button class="btn sm ghost" id="coachAccount" style="margin-bottom:14px">Account &amp; your rosters</button>
+      <button class="btn sm ghost" id="coachStory" style="margin-bottom:14px">Shared highlights &amp; story contributions</button>
 
       <div class="card app-pad">
         <h3 style="font-size:19px">${esc(a.first_name)}${age!=null?', '+age:''}</h3>
@@ -219,6 +220,7 @@ async function screenCoach(){
     </div>`;
   bindTop();
   $('#coachAccount').onclick=()=>renderApp('account');
+  $('#coachStory').onclick=openStoryCollaboration;
 
   let kind = 'general';
   const kindBox = $("#cuKind"), note = $("#cuNote");

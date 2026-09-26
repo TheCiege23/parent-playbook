@@ -1,8 +1,8 @@
 // Local preview with an explicit public-file allowlist. Never serves secrets or audit notes.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
-const pages=new Set(['index.html','404.html','coaches.html','organizations.html','privacy.html','terms.html','datadeletion.html','icon.svg','manifest.webmanifest','sw.js','og.png','tools/adult-harness/index.html','tools/adult-harness/fake-supabase.js']);
-const mime={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.mjs':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.webmanifest':'application/manifest+json','.wasm':'application/wasm'};
+const pages=new Set(['index.html','404.html','coaches.html','organizations.html','privacy.html','terms.html','datadeletion.html','icon.svg','manifest.webmanifest','sw.js','og.png','tools/adult-harness/index.html','tools/adult-harness/fake-supabase.js','tools/adult-harness/synthetic-highlight.mp4']);
+const mime={'.mp4':'video/mp4','.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.mjs':'text/javascript','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.webmanifest':'application/manifest+json','.wasm':'application/wasm'};
 http.createServer((req,res)=>{
   let file;
   try{file=decodeURIComponent(new URL(req.url,'http://localhost').pathname).slice(1)||'index.html';}catch{res.writeHead(400);return res.end();}

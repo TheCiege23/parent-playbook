@@ -2312,6 +2312,16 @@ add('AG13', 'account-deletion', 'the organization records no longer link their c
       + 'company_api_keys.created_by=unlinked:not null company_body_assessments.created_by=unlinked:not null '
       + 'company_composition_results.created_by=unlinked:not null company_reference_assessments.created_by=unlinked:not null' });
 
+
+// Story grants are independent of the existing stats-only coach invitation.
+const storyGrant = connectedCoach + "insert into public.story_coach_grants(athlete_id,coach_id,enabled) values ('"+ATH_A+"','"+COACH_D+"',true);";
+const storyInsert=(status='pending')=>"insert into public.story_contributions(athlete_id,author_id,title,kind,status) values ('"+ATH_A+"','"+COACH_D+"','Synthetic touchdown','note','"+status+"') returning status;";
+add('ST01','story','a connected coach cannot self-enable story access',{setup:connectedCoach,...asCoach,sql:"insert into public.story_coach_grants(athlete_id,coach_id,enabled) values ('"+ATH_A+"','"+COACH_D+"',true);",expect:'error',expectError:/row-level security/});
+add('ST02','story','stats access alone cannot submit story content',{setup:connectedCoach,...asCoach,sql:storyInsert(),expect:'error',expectError:/row-level security/});
+add('ST03','story','an explicitly enabled coach can submit only a pending draft',{setup:storyGrant,...asCoach,sql:storyInsert(),expect:'ok',expectOut:'pending'});
+add('ST04','story','a coach cannot bypass parent approval',{setup:storyGrant,...asCoach,sql:storyInsert('approved'),expect:'error',expectError:/row-level security/});
+add('ST05','story','revoking the story grant blocks new contributions',{setup:storyGrant+"update public.story_coach_grants set enabled=false;",...asCoach,sql:storyInsert(),expect:'error',expectError:/row-level security/});
+
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;
 const observed = text => {

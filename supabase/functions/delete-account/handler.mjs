@@ -27,6 +27,7 @@
 // stops the function there.
 
 import { reportKeysFor, removeReports } from '../_shared/composition-reports.mjs';
+import { purgeStoryFiles } from '../_shared/story-files.mjs';
 
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
@@ -208,6 +209,7 @@ export function createDeleteAccountHandler({ callerClient, serviceClient } = {})
 
       // ---- 3. purge the actual files. This is the part a parent actually means. ----
       for (const aid of athleteIdsToPurge) {
+        try{filesRemoved+=await purgeStoryFiles(svc,aid);}catch(e){return json({error:'Account cleanup could not remove story files. Contact support.',partial:true},500);}
         const paths = await listFolder(svc, 'athlete-media', aid);
         if (paths.length) {
           const { error } = await svc.storage.from('athlete-media').remove(paths);

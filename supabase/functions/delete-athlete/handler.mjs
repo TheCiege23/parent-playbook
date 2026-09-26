@@ -15,6 +15,7 @@
 // The service client never deletes a database row here, and if the caller is refused nothing is purged.
 
 import { reportKeysFor, removeReports } from '../_shared/composition-reports.mjs';
+import { purgeStoryFiles } from '../_shared/story-files.mjs';
 
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
@@ -69,6 +70,7 @@ export function createDeleteAthleteHandler({ callerClient, serviceClient, bucket
 
       // 5) ownership confirmed and the row is gone, so purge the actual files (service client)
       let filesRemoved = removal.removed;
+      try{filesRemoved+=await purgeStoryFiles(serviceClient,athleteId);}catch(e){return json({error:'Profile removed, but story file cleanup failed. Contact support.',partial:true},500);}
       if (paths.length) {
         const { error: rmErr } = await serviceClient.storage.from(bucket).remove(paths);
         if (!rmErr) filesRemoved += paths.length;
