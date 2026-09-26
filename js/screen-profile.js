@@ -104,7 +104,8 @@ async function screenProfile(){
       <div class="card app-pad">
         <div class="grow"><div class="gi">👤</div><div class="gt"><b>You</b><span>${isOwner?'Owner · full control':esc(myRole)+' access'}</span></div></div>
         ${(access||[]).filter(x=>x.guardian_id!==state.user.id).map(x=>H`
-          <div class="grow"><div class="gi">🤝</div><div class="gt"><b>Shared guardian</b><span>${esc(x.role)} · can ${x.role==='co_parent'||x.role==='owner'?'edit':'view'}</span></div></div>`).join('')}
+          <div class="grow"><div class="gi">🤝</div><div class="gt"><b>${x.role==='coach'?'Connected coach':'Shared guardian'}</b><span>${esc(x.role)} · can ${x.role==='co_parent'||x.role==='owner'?'edit':'view'}</span></div>
+            ${canEdit&&x.role!=='owner'?H`<button class="btn sm ghost" data-revoke-access="${esc(x.id)}">Remove access</button>`:''}</div>`).join('')}
         ${visibleInvites.map(i=>H`
           <div class="grow"><div class="gi">✉️</div><div class="gt"><b>${i.scope==='family'?'Family invite pending':'Invite pending'}</b><span>${esc(i.role)} · expires ${new Date(i.expires_at).toLocaleDateString()}</span></div>
             <button class="btn sm ghost" data-copy="${esc(inviteLink(i.token))}">Copy</button>
@@ -177,6 +178,10 @@ async function screenProfile(){
   document.querySelectorAll('[data-revoke-invite]').forEach(b=>b.onclick=()=>{
     const row=visibleInvites.find(i=>i.id===b.dataset.revokeInvite);
     if(row) confirmRevokeInvite(row);
+  });
+  $('#screen').querySelectorAll('[data-revoke-access]').forEach(b=>b.onclick=()=>{
+    const grant=(access||[]).find(x=>x.id===b.dataset.revokeAccess);
+    if(grant) confirmRemoveAthleteAccess(grant);
   });
 }
 

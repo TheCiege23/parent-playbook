@@ -144,11 +144,12 @@ function topBar(sub, extra){
       <div><h3>${esc(a.first_name)}</h3><span>${esc(sub)}</span></div></div>
     <div style="display:flex;gap:8px;align-items:center">${extra||''}${switcher}
       <button class="pill" id="logout">Log out</button></div>
-  </div>`;
+  </div><div id="storyReviewAlert" hidden></div>`;
 }
 function bindTop(){
   $("#logout").onclick=async()=>{ await releasePushOnThisDevice(); await sb.auth.signOut(); state.user=null;state.athletes=[];state.active=null; renderAuth('login'); };
   const sw=$("#switch"); if(sw) sw.onclick=openSwitch;
+  if(typeof refreshStoryReviewAlert==='function') refreshStoryReviewAlert();
 }
 
 // A small, consistent map of how the parent-facing product fits together. The bottom

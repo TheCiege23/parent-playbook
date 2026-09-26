@@ -22,6 +22,23 @@ async function storySigned(media){
     for(const file of r.data||[])if(file.signedUrl&&!file.error)urls[bucket+':'+file.path]=file.signedUrl;
   }return urls;
 }
+async function refreshStoryReviewAlert(){
+  const target=document.getElementById('storyReviewAlert'),athleteId=state.active?.id,userId=state.user?.id;
+  if(!target||!athleteId||!userId||state.canEdit===false||state.role==='coach')return;
+  const current=()=>target.isConnected&&state.active?.id===athleteId&&state.user?.id===userId&&state.canEdit!==false&&state.role!=='coach';
+  try{
+    const result=await sb.from('story_contributions').select('id',{count:'exact',head:true}).eq('athlete_id',athleteId).eq('status','pending');
+    if(result.error)throw result.error;if(!current())return;
+    const count=result.count||0;target.hidden=!count;
+    target.innerHTML=count?`<div class="app-pad" style="padding-top:0;padding-bottom:10px"><button class="btn ghost" data-story-review-alert>${count===1?'1 Story contribution needs':count+' Story contributions need'} your approval</button></div>`:'';
+  }catch(error){
+    if(!current())return;
+    target.hidden=false;target.innerHTML='<div class="app-pad" style="padding-top:0;padding-bottom:10px"><button class="btn ghost" data-story-review-alert>Check Story approvals</button><p class="muted-note">The approval count could not load.</p></div>';
+  }
+  if(!current())return;
+  const button=target.querySelector('[data-story-review-alert]');if(button)button.onclick=()=>{if(current())openStoryCollaboration();};
+}
+
 async function openStoryCollaboration(){
   const athleteId=state.active.id,userId=state.user.id,parent=state.canEdit!==false&&state.role!=='coach';
   const {bg,card}=storyPanel(parent?'Coach story contributions':'Shared highlights & contributions');
@@ -43,7 +60,7 @@ async function openStoryCollaboration(){
       ${parent?coaches.map(c=>{const id=c.guardian_id,enabled=(grants.data||[]).some(g=>g.coach_id===id&&g.enabled);return `<section class="card app-pad" style="margin:12px 0"><label><input type="checkbox" data-grant="${esc(id)}" ${enabled?'checked':''}> Allow ${esc(names[id]||'Coach')} to contribute</label>${enabled?(media.data||[]).map(m=>`<label style="display:block;margin:12px 0"><input type="checkbox" data-share="${esc(m.id)}" data-coach="${esc(id)}" ${(shared.data||[]).some(s=>s.media_id===m.id&&s.coach_id===id)?'checked':''}> Share ${esc(m.caption||m.kind)}</label>`).join(''):''}</section>`;}).join('')||'<p>No connected coaches. Invite a coach through Profile first.</p>':`<h4>Selected family highlights</h4>${(media.data||[]).map(m=>`<article class="card app-pad">${fileHTML(m.kind,m.path,'athlete-media')}<h4>${esc(m.caption||'Shared highlight')}</h4></article>`).join('')||'<p>No highlights have been shared with you.</p>'}`}
       <h4>Contributions</h4>${(submissions.data||[]).map(c=>`<article class="card app-pad" style="margin:12px 0"><p>${esc(c.status)} · ${c.author_id===userId?'You':'Contributor'}</p><h4>${esc(c.title)}</h4><p>${esc(c.note||'')}</p>${c.storage_path?fileHTML(c.kind,c.storage_path,'story-contributions'):''}${parent&&c.status==='pending'?`<button class="btn sm amber" data-review="${esc(c.id)}" data-decision="approved">Approve</button> <button class="btn sm ghost" data-review="${esc(c.id)}" data-decision="rejected">Reject</button>`:''}</article>`).join('')||'<p>No contributions yet.</p>'}
       ${parent||(grants.data||[]).some(g=>g.coach_id===userId&&g.enabled)?'<button class="btn amber" id="storySubmit">Submit a contribution</button>':'<p>Ask the parent to enable Story contributions.</p>'}<p id="collabMessage" role="status"></p><button class="btn ghost" id="collabClose">Close</button>`;
-    const refresh=()=>{bg.remove();openStoryCollaboration();};
+    const refresh=()=>{bg.remove();refreshStoryReviewAlert();openStoryCollaboration();};
     const write=(fn,button)=>storyMutation(fn,button,{current,success:refresh,failure:()=>{card.querySelector('#collabMessage').textContent='Could not save. Your change was not applied. Check your connection and retry.';}});
     card.querySelectorAll('[data-grant]').forEach(b=>b.onchange=()=>write(()=>sb.from('story_coach_grants').upsert({athlete_id:athleteId,coach_id:b.dataset.grant,enabled:b.checked}),b));
     card.querySelectorAll('[data-share]').forEach(b=>b.onchange=()=>write(()=>b.checked?sb.from('story_shared_media').insert({media_id:b.dataset.share,coach_id:b.dataset.coach}):sb.from('story_shared_media').delete().eq('media_id',b.dataset.share).eq('coach_id',b.dataset.coach),b));

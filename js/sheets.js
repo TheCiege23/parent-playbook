@@ -745,6 +745,32 @@ function confirmRevokeInvite(invite){
   };
 }
 
+function confirmRemoveAthleteAccess(grant){
+  const athleteId=state.active?.id,userId=state.user?.id;
+  if(!athleteId||!userId||state.canEdit===false||grant.athlete_id!==athleteId||grant.guardian_id===userId||grant.role==='owner') return;
+  const bg=sheet(H`<h3>Remove ${grant.role==='coach'?'coach':'shared'} access?</h3>
+    <p>This ends this person's access to ${esc(state.active.first_name)}. Their approved Story contributions stay in the athlete's story. Previously downloaded files or already loaded media cannot be recalled.</p>
+    <p>Access to other athletes is unchanged. A new invitation is needed to reconnect.</p>
+    <p id="accessRemoveError" role="alert"></p>
+    <button class="btn danger" id="accessRemoveYes">Remove access</button>
+    <button class="btn ghost" id="accessRemoveNo">Keep access</button>`);
+  const current=()=>bg.isConnected&&state.active?.id===athleteId&&state.user?.id===userId&&state.canEdit!==false;
+  bg.querySelector('#accessRemoveNo').onclick=()=>bg.remove();
+  bg.querySelector('#accessRemoveYes').onclick=async()=>{
+    if(!current())return bg.remove();
+    const button=bg.querySelector('#accessRemoveYes'),errorEl=bg.querySelector('#accessRemoveError');button.disabled=true;errorEl.textContent='';
+    try{
+      const result=await sb.from('athlete_access').update({revoked_at:new Date().toISOString()})
+        .eq('id',grant.id).eq('athlete_id',athleteId).eq('guardian_id',grant.guardian_id).is('revoked_at',null).select('id');
+      if(result.error)throw result.error;
+      if(!current())return;
+      if(!result.data?.length)throw Error('Access could not be changed. Reload Profile and try again.');
+      bg.remove();toast('Access removed');renderApp('profile');
+    }catch(error){console.error(error);if(current())errorEl.textContent='Could not remove access. Reload Profile or check your connection, then retry.';}
+    finally{button.disabled=false;}
+  };
+}
+
 function confirmRemoveSport(row, name){
   const bg=sheet(H`<h3>Remove ${esc(name)}?</h3>
     <p style="color:var(--muted);font-size:14px;margin:8px 0 16px">
