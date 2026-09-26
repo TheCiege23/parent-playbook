@@ -140,6 +140,7 @@ async function screenJourney(){
       ${topBar('Journey')}
       <div class="app-pad" style="padding-top:6px">
         ${playbookPath('journey')}
+        <button class="btn ghost" id="athleteStory">Hall of Fame, highlights &amp; résumé →</button>
         <div class="jrn-empty">
           <div class="k">${esc(a.first_name)}'s journey</div>
           <h2>Nothing here yet — and that's the point.</h2>
@@ -155,6 +156,7 @@ async function screenJourney(){
       </div>`;
     bindTop();
     bindPlaybookPath();
+    $('#athleteStory').onclick=openAthleteStory;
     { const b=$("#logGame"); if(b) b.onclick=()=>openLogGame(); }
     return;
   }
@@ -192,6 +194,7 @@ async function screenJourney(){
     <div class="app-pad" style="padding-top:6px">
 
       ${playbookPath('journey')}
+      <button class="btn ghost" id="athleteStory" style="margin-bottom:16px">Hall of Fame, highlights &amp; résumé →</button>
 
       <div class="journey-bridge">
         <div><span>Week</span><b>${(sessions||[]).length}</b><small>sessions done</small></div>
@@ -258,6 +261,7 @@ async function screenJourney(){
     </div>`;
   bindTop();
   bindPlaybookPath();
+  $('#athleteStory').onclick=openAthleteStory;
   { const b=$("#logGame");  if(b) b.onclick=()=>openLogGame(); }
   { const b=$("#addMile");  if(b) b.onclick=()=>openAddMilestone(); }
   { const b=$("#addMedia"); if(b) b.onclick=()=>openAddMedia(games||[]); }

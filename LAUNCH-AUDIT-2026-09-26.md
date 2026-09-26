@@ -38,6 +38,10 @@ QA account: `qa-launch-20260926-6fe76ff6@example.com`. Created through the proje
 Evidence: `audit-test-results.txt`, `audit-db-results.txt`, `audit-live-results.txt`. Local preview: `node tools/audit-preview.cjs` at `http://127.0.0.1:8787/`; it serves only public assets, not environment files or audit notes.
 # Follow-up improvements — pp-v140
 
+## Athlete Story foundation — pp-v142, local candidate
+
+Added a private Story dialog from Journey: milestones presented as Hall of Fame, Journey photos, individual video highlights and a text-only printable résumé. Export reloads authorized records and excludes birthdate, health measurements, notes and signed media URLs. No database migration or coach permission expansion. Synthetic local Chrome checks: empty state, achievement creation, Hall of Fame/résumé display and export success. JavaScript: 1071 passed, 1 skipped, 0 failed. Publication pending approval; uploaded-video playback and phone-device testing remain outstanding.
+
 Signed-in Chrome verification: pp-v140 roster creation succeeds; empty names and conflicting game/practice days are rejected; copy-code reports success; roster Back returns to the list with Start another roster; body dashboard empty state and disabled export render correctly. Fictional profile setup applies the roster schedule and generates a preview. The user completed final Terms/consent and saved the fictional athlete; Week and Growth loaded successfully.
 
 Additional pp-v141 UI cleanup prepared: remove internal company demo/validation links from the coach dashboard, explain unavailable photo body composition in plain language, and replace a hardcoded football icon in team-code prefill. Journey fixes: blank optional location normalizes to null for online/offline saves; Journey now loads current athlete sports for game logging before Profile is visited. Associated game-entry labels were added. Full JavaScript suite: 1067 passed, 1 skipped, 0 failed. QA height (60 in) and game completion saved successfully. A text-only QA game saved with Neutral selected; the live first-game categorization bug was reproduced. Pending publication approval.

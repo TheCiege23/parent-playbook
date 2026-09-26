@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-const EXPECTED_CACHE = 'pp-v141';
+const EXPECTED_CACHE = 'pp-v142';
 const required = [
   ['/', /Parent Playbook/i],
   ['/sw.js', new RegExp(`const CACHE = ['"]${EXPECTED_CACHE}['"]`)],
   ['/js/org-insights.js', /openOrgReferenceAssessment/],
+  ['/js/athlete-story.js', /openAthleteStory/],
   ['/js/body-sdk-record.mjs', /PP_COMPANY_BODY_ASSESSMENT_V1/],
   ['/js/body-sdk-report.mjs', /summarizeMeasurementResult/],
   ['/js/body-sdk-supabase.mjs', /company_body_assessments/],
