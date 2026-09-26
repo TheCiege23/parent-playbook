@@ -4,6 +4,26 @@
 // Design handoff, app screens §5. screenProfile was doing eight jobs; household,
 // password, notifications, export, legal, deletion and log out all moved one level
 // down into this route. Reachable, never in the way.
+function screenOrganizationAccount(){
+  document.body.classList.remove('auth'); setAppBg();
+  if(location.hash!=='#account') history.replaceState(null,'',location.pathname+location.search+'#account');
+  root.innerHTML=H`<div class="app-pad" style="padding-top:32px;max-width:640px;margin:0 auto">
+    <div class="ob-head"><div class="k">Your account</div><h1>Coach &amp; organization tools</h1>
+      <p>Manage a team, league, or club. Families choose when to share their athlete's stats with you.</p></div>
+    <div class="card app-pad"><p style="overflow-wrap:anywhere">${esc(state.user?.email||'')}</p>
+      <button class="btn" id="orgAccountRosters" style="margin-top:16px">Your rosters</button>
+      ${state.active?'<button class="btn ghost" id="orgAccountAthlete" style="margin-top:12px">Back to shared athlete</button>':'<button class="btn ghost" id="orgAccountChild" style="margin-top:12px">Start my child\'s playbook</button>'}
+    </div>
+    <p class="muted-note">For individual Team Connect access, ask the family to send you an invitation from their athlete's Profile.</p>
+    <p class="muted-note"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="mailto:support@playbookbp.com">Get help</a></p>
+    <button class="logout-plain" id="orgAccountLogout">Log out</button>
+  </div>`;
+  $('#orgAccountRosters').onclick=openMyOrg;
+  { const child=$('#orgAccountChild'); if(child) child.onclick=startChildSetup; }
+  { const athlete=$('#orgAccountAthlete'); if(athlete) athlete.onclick=()=>renderApp('week'); }
+  $('#orgAccountLogout').onclick=logOutOfApp;
+}
+
 async function screenAccount(){
   logUsageEvent('view_account');
   const a=state.active;

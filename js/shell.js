@@ -51,6 +51,7 @@ async function renderApp(tab, fromPop){
   if(tab==='adult' && adultTrainingOff()) return;
   // With no child profile there is nothing for the child-facing screens to show. Your training still opens; any other
   // route goes back through afterLogin(), which sends the parent to add a child.
+  if(!state.active && tab==='account') return screenOrganizationAccount();
   if(!state.active && tab!=='adult') return afterLogin();
   document.body.classList.remove('auth'); setAppBg();
   await loadRole();
@@ -59,6 +60,7 @@ async function renderApp(tab, fromPop){
   // Reusing the normal 7-tab shell for that role would render tabs that quietly come
   // back empty rather than explain why, so this bypasses renderApp()'s shell entirely
   // rather than trying to retrofit every screen to hide itself from a coach.
+  if(state.role==='coach' && tab==='account') return screenOrganizationAccount();
   if(state.role==='coach' && tab!=='adult') return renderCoachView();
   // Family view has no Growth or Scan tab: goals, measurements and starting a scan are
   // things a parent DOES, and an empty read-only version of them is just a locked door.

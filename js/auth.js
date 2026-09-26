@@ -5,6 +5,8 @@ async function afterLogin(){
   // and throws on save. Load it on every entry into the app, not just first-run.
   await Promise.all([ loadAthletes(), loadRef(), loadPremium(), loadAdultTrainingAccess() ]);
   if(state.athletes.length===0){
+    // Coaches managing rosters need an account, not a child profile.
+    if(location.hash==='#account' || /[?&]account=1(?:&|$)/.test(location.search||'')) return renderApp('account');
     // Account-last onboarding: the profile was built before the account existed and
     // stashed on this device. A session now exists, so finish the job silently — the
     // parent should land on the week they were already shown, not fill it in twice.
@@ -121,9 +123,12 @@ function authRedirectUrl(){
   const p=[];
   const t=inviteTokenFromUrl();  if(t)  p.push('invite='+encodeURIComponent(t));
   const tm=teamCodeFromUrl();    if(tm) p.push('team='+encodeURIComponent(tm));
+  if(location.hash==='#account' || /[?&]account=1(?:&|$)/.test(location.search||'')) p.push('login=1','account=1');
   return location.origin+location.pathname+(p.length?('?'+p.join('&')):'');
 }
 function renderAuth(mode='login', prefill=''){
+  const organizationEntry = location.hash==='#account' || /[?&]account=1(?:&|$)/.test(location.search||'');
+  const invitedEntry = !!inviteTokenFromUrl();
   document.body.classList.add('auth'); setAppBg();
   root.innerHTML = H`
   <div class="authwrap">
@@ -138,14 +143,14 @@ function renderAuth(mode='login', prefill=''){
       </div>
       <h2 style="font-size:20px;margin-bottom:2px">${mode==='signup'?'Create your account':'Welcome back'}</h2>
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">
-        ${mode==='signup'?'You create the account. Your child gets a profile you own and control.':'Log in to your dashboard.'}
+        ${mode==='signup'?(invitedEntry?'Create your own account to accept the family\'s invitation.':organizationEntry?'Create an account to manage your team or organization. No child profile is required.':'You create the account. Your child gets a profile you own and control.'):'Log in to your dashboard.'}
       </p>
       <form id="authform" novalidate>
-        <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
-        <div class="field"><label>Password</label><input id="pw" type="password" autocomplete="${mode==='signup'?'new-password':'current-password'}" placeholder="At least 8 characters"/></div>
+        <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
+        <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="${mode==='signup'?'new-password':'current-password'}" placeholder="At least 8 characters"/></div>
         ${mode==='signup' ? H`<label class="agree-row" for="agree" style="display:flex;align-items:flex-start;gap:9px;margin:14px 0 4px;font-size:13.5px;color:var(--muted);line-height:1.45;cursor:pointer">
           <input id="agree" type="checkbox" style="margin-top:3px;flex:none"/>
-          <span>I am the parent or legal guardian, and I agree to the
+          <span>${organizationEntry||invitedEntry?'I agree to the':'I am the parent or legal guardian, and I agree to the'}
             <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>,
             <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>, and
             <a href="/datadeletion" target="_blank" rel="noopener">Data Deletion</a> policy.</span>
@@ -156,7 +161,7 @@ function renderAuth(mode='login', prefill=''){
       <p class="muted-note">
         ${mode==='signup'
           ? `Already have an account? <a href="#" id="swap">Log in</a>`
-          : `New here? <a href="#" id="swap">Start your athlete's playbook</a>`}
+          : `New here? <a href="#" id="swap">${organizationEntry||invitedEntry?'Create a free account':"Start your athlete's playbook"}</a>`}
       </p>
       ${mode==='login' ? `<p class="muted-note" style="margin-top:2px"><a href="#" id="forgot">Forgot password?</a></p>` : ''}
     </div>
@@ -168,7 +173,7 @@ function renderAuth(mode='login', prefill=''){
   // From login, "new here" goes to ONBOARDING, not a signup form — the account comes
   // last now, and a bare email box before they have seen anything converts far worse.
   $("#swap").onclick = e=>{ e.preventDefault();
-    if(mode==='login') return renderOnboarding();
+    if(mode==='login') return organizationEntry||invitedEntry?renderAuth('signup'):renderOnboarding();
     renderAuth('login'); };
   { const f=$("#forgot"); if(f) f.onclick=e=>{ e.preventDefault(); renderForgot($("#email").value.trim()); }; }
   // A real <form> so Enter submits and password managers recognise the login.
@@ -181,7 +186,7 @@ function renderAuth(mode='login', prefill=''){
     if(mode==='signup'&&pw.length<8){ errEl.textContent="Password must be at least 8 characters."; return; }
     if(mode==='signup'){
       const agree=$("#agree");
-      if(agree && !agree.checked){ errEl.textContent="Please confirm you're the parent or legal guardian and agree to the Privacy Policy and Terms."; return; }
+      if(agree && !agree.checked){ errEl.textContent=organizationEntry||invitedEntry?'Please agree to the Privacy Policy and Terms.':"Please confirm you're the parent or legal guardian and agree to the Privacy Policy and Terms."; return; }
     }
     const btn=$("#go"); const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
     try{
@@ -283,7 +288,7 @@ function renderForgot(prefill=''){
       <h2 style="font-size:20px;margin-bottom:2px">Reset your password</h2>
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">Enter your email and we'll send you a link to set a new password.</p>
       <form id="forgotform" novalidate>
-        <div class="field"><label>Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
+        <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(prefill)}"/></div>
         <div class="err" id="autherr"></div>
         <button class="btn" id="send" type="submit">Send reset link</button>
       </form>
@@ -325,8 +330,8 @@ function renderResetPassword(){
       <h2 style="font-size:20px;margin-bottom:2px">Set a new password</h2>
       <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">Choose a new password for your account.</p>
       <form id="resetform" novalidate>
-        <div class="field"><label>New password</label><input id="np" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
-        <div class="field"><label>Confirm password</label><input id="np2" type="password" autocomplete="new-password" placeholder="Re-enter it"/></div>
+        <div class="field"><label for="np">New password</label><input id="np" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
+        <div class="field"><label for="np2">Confirm password</label><input id="np2" type="password" autocomplete="new-password" placeholder="Re-enter it"/></div>
         <div class="err" id="autherr"></div>
         <button class="btn" id="save" type="submit">Update password</button>
       </form>

@@ -156,8 +156,8 @@ function initInstallBanner(){
   var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
   var dismissed=false; try{ dismissed=localStorage.getItem(KEY)==='1'; }catch(e){}
   if(standalone || dismissed) return;
-  function show(){ el.classList.add('show'); }
-  function hide(persist){ el.classList.remove('show'); if(persist){ try{localStorage.setItem(KEY,'1');}catch(e){} } }
+  function show(){ if(!dismissed) el.classList.add('show'); }
+  function hide(persist){ el.classList.remove('show'); if(persist){ dismissed=true; try{localStorage.setItem(KEY,'1');}catch(e){} } }
   x.onclick=function(){ hide(true); };
   // beforeinstallprompt fires once, early — usually while the marketing page is still
   // up and long before this banner exists. landing.js stashes it; pick it up here so

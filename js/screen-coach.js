@@ -168,6 +168,7 @@ async function screenCoach(){
   $("#screen").innerHTML = H`
     ${topBar(sub||'Team Connect', '<span class="pill" style="background:var(--green-pale);color:var(--green-d)">Coach view</span>')}
     <div class="app-pad" style="padding-top:6px">
+      <button class="btn sm ghost" id="coachAccount" style="margin-bottom:14px">Account &amp; your rosters</button>
 
       <div class="card app-pad">
         <h3 style="font-size:19px">${esc(a.first_name)}${age!=null?', '+age:''}</h3>
@@ -217,6 +218,7 @@ async function screenCoach(){
         : H`<p class="empty">No updates sent yet.</p>`}
     </div>`;
   bindTop();
+  $('#coachAccount').onclick=()=>renderApp('account');
 
   let kind = 'general';
   const kindBox = $("#cuKind"), note = $("#cuNote");

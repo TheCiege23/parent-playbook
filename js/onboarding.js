@@ -78,7 +78,7 @@ function obStep(){
   // e.g. straight after deleting their last one — had NO way back to the sign-in screen.
   // Back stops at step 0, and there was nothing else on the page. That is a dead end you
   // can only escape by clearing site data. Always offer a way out.
-  root.innerHTML = H`<div class="app-pad" style="padding-top:26px">
+  root.innerHTML = H`<div class="app-pad" style="padding-top:26px;max-width:560px;margin:0 auto">
     ${state.user?`<div style="display:flex;justify-content:flex-end;margin-bottom:2px">
       <button class="pill" id="obLogout">Log out</button></div>`:''}
     ${dots?`<div class="steps">${dots}</div>`:''}
@@ -130,7 +130,7 @@ function obBindTeamCodeLink(){
     e.preventDefault();
     const bg=sheet(H`<h3>Enter your team code</h3>
       <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Fills in the sport, level and practice schedule. Your coach never sees your child's profile.</p>
-      <div class="field"><label>Code</label><input id="tcIn" autocapitalize="characters" placeholder="e.g. BEARS26"/></div>
+      <div class="field"><label for="tcIn">Code</label><input id="tcIn" autocapitalize="characters" placeholder="e.g. BEARS26"/></div>
       <div class="err" id="tcErr"></div>
       <button class="btn" id="tcGo">Apply code</button>
       <button class="btn ghost" id="tcNo" style="margin-top:8px">Skip for now</button>`);
@@ -153,7 +153,7 @@ function obFamily(){ return H`
   <p>Everything lives inside one private household you own.</p></div>
   <div class="teach"><div class="ic">🎓</div><div><h4>Why a household, not just a kid?</h4>
     <p>Siblings, co-parents, and multiple sports all fit under one roof. It keeps every child's data separate but easy for you to manage in one place.</p></div></div>
-  <div class="field"><label>Household name</label><input id="fam" placeholder="e.g. The Henson Family" value="${esc(ob.familyName)}"/></div>
+  <div class="field"><label for="fam">Household name</label><input id="fam" placeholder="e.g. The Henson Family" value="${esc(ob.familyName)}"/></div>
   <div class="err" id="oberr"></div>
   <div class="row2" style="margin-top:8px">
     <button class="btn ghost" id="b">Back</button><button class="btn" id="n">Continue</button>
@@ -174,8 +174,8 @@ function obChild(){ return H`
       <div class="gt"><b>${esc(ob.teamName)}</b><span>Your coach's code is applied — sport, level and practice days are set.</span></div></div>
   </div>`:H`<p class="muted-note" style="text-align:left;margin:0 2px 14px">
     Got a code from your coach? <a href="#" id="obWelcomeCode" style="color:var(--green-d)">Enter it</a> and we'll fill in the team's schedule.</p>`}
-  <div class="field"><label>First name</label><input id="cf" placeholder="Marcus" value="${esc(ob.athlete.first)}"/></div>
-  <div class="field"><label>Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${todayISO()}"/></div>
+  <div class="field"><label for="cf">First name</label><input id="cf" placeholder="Marcus" value="${esc(ob.athlete.first)}"/></div>
+  <div class="field"><label for="cb">Birthdate</label><input id="cb" type="date" value="${esc(ob.athlete.bd)}" max="${todayISO()}"/></div>
   <div class="err" id="oberr"></div>
   <div style="margin-top:8px"><button class="btn" id="n">Continue</button></div>
   ${state.user&&adultTrainingOn()?`<p class="muted-note" style="margin-top:14px">Just here for your own training? <a href="#" id="obAdult" style="color:var(--green-d)">Go to Your training</a></p>`:''}
@@ -203,7 +203,7 @@ function obChildBind(){
 function posChips(sportKey, selected, id){
   const list=(state.ref?.positions||[]).filter(p=>p.sport_key===sportKey);
   return `<div class="chipgrid two" id="${id}">${list.map(p=>
-    `<div class="chip ${selected.includes(p.code)?'on':''}" role="button" tabindex="0" data-p="${esc(p.code)}">${esc(p.code)}${
+    `<div class="chip ${selected.includes(p.code)?'on':''}" role="button" aria-pressed="${selected.includes(p.code)}" tabindex="0" data-p="${esc(p.code)}">${esc(p.code)}${
       p.name?`<span class="sub">${esc(p.name)}</span>`:''}</div>`).join('')}</div>`;
 }
 
@@ -237,7 +237,7 @@ function obSport(){
       <div class="gt"><b>${esc(ob.teamName)}</b><span>Sport, level and practice days filled in from your coach's code.</span></div>
       <button class="btn sm ghost" id="obTeamClear">Clear</button></div>
   </div>`
-  :H`<div class="field"><label>Have a code from your coach? (optional)</label>
+  :H`<div class="field"><label for="obTeamCode">Have a code from your coach? (optional)</label>
     <div style="display:flex;gap:8px">
       <input id="obTeamCode" placeholder="e.g. HAWKS26" autocapitalize="characters" style="flex:1;min-width:0"/>
       <button class="btn sm" id="obTeamGo" style="flex:0 0 auto">Apply</button>
@@ -247,7 +247,7 @@ function obSport(){
   </div>`}
   <div class="field"><label>Sport</label>
     <div class="chipgrid two" id="sports">
-      ${shown.map(s=>`<div class="chip ${chosen===s.key?'on':''}" role="button" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
+      ${shown.map(s=>`<div class="chip ${chosen===s.key?'on':''}" role="button" aria-pressed="${chosen===s.key}" tabindex="0" data-s="${s.key}">${esc(s.name)}</div>`).join('')}
     </div>
     ${allShown?'':`<button class="btn sm ghost" id="obAllSports" style="width:100%;margin-top:9px">All ${sports.length} sports ›</button>`}
   </div>
@@ -256,7 +256,7 @@ function obSport(){
       ${posChips(chosen, ob.positions, 'pos')}
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply — many young athletes play a few.</p>
     </div>
-    <div class="field"><label>Level — optional</label>
+    <div class="field"><label for="lvl">Level — optional</label>
       <select id="lvl"><option value="">Select level…</option>
         ${levels.map(l=>`<option ${ob.level===l?'selected':''}>${esc(l)}</option>`).join('')}
       </select></div>
@@ -291,6 +291,7 @@ function obSportBind(){
     const code=c.dataset.p;
     ob.positions = ob.positions.includes(code)?ob.positions.filter(x=>x!==code):[...ob.positions,code];
     c.classList.toggle('on');
+    c.setAttribute('aria-pressed',String(ob.positions.includes(code)));
   });
   const lvl=$("#lvl"); if(lvl) lvl.onchange=()=>ob.level=lvl.value;
   // Parent experience moved to Profile → Coach's Corner. It was the last optional
@@ -316,11 +317,11 @@ function obSchedule(){
     <p>Adding home training on practice days is the most common way young athletes get overused and burn out. The more the team trains, the less we add — and if the week is already full, we add nothing at all.</p></div></div>
   <div class="field"><label>Practice days</label>${schedChips(ob.practiceDays,'pd')}
     <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply. Not sure yet? Skip it — you can set this any time.</p></div>
-  <div class="field"><label>Usual game day (optional)</label>
+  <div class="field"><label for="gd">Usual game day (optional)</label>
     <select id="gd"><option value="">— No regular game day —</option>
       ${DAY_LABELS.map((d,i)=>`<option value="${i}" ${ob.gameDay===i?'selected':''}>${d}</option>`).join('')}
     </select></div>
-  <div class="field"><label>First game (approx., optional)</label>
+  <div class="field"><label for="ss">First game (approx., optional)</label>
     <input id="ss" type="date" value="${esc(ob.seasonStart||'')}"/>
     <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Season not started? Put a rough date — until then we treat it as camp and leave game days off the plan.</p></div>
   <div class="err" id="oberr"></div>
@@ -409,7 +410,7 @@ const GOAL_LIB = {
 function obGoals(){
   const on = k => ob.goals.some(g=>g.key===k);
   const lib = goalLibFor(ob.sport);
-  const grp = (type)=>lib[type].map(g=>`<div class="chip ${on(g.key)?'on':''}" role="button" tabindex="0" data-k="${g.key}" data-t="${type}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
+  const grp = (type)=>lib[type].map(g=>`<div class="chip ${on(g.key)?'on':''}" role="button" aria-pressed="${on(g.key)}" tabindex="0" data-k="${g.key}" data-t="${type}" data-l="${esc(g.label)}">${esc(g.label)}</div>`).join('');
   return H`
   <div class="ob-head"><div class="k">Goals</div><h2>What should we work toward?</h2>
   <p>Pick up to three. This is what shapes ${esc(ob.athlete.first)}'s week.</p></div>
@@ -431,6 +432,7 @@ function obGoalsBind(){
     if(ob.goals.some(g=>g.key===k)) ob.goals=ob.goals.filter(g=>g.key!==k);
     else{ if(ob.goals.length>=3){toast('Start with up to 3 goals');return;} ob.goals.push({key:k,type:c.dataset.t,label:c.dataset.l}); }
     c.classList.toggle('on');
+    c.setAttribute('aria-pressed',String(ob.goals.some(g=>g.key===k)));
   });
   $("#n").onclick=()=>{ if(ob.goals.length===0){$("#oberr").textContent="Pick at least one goal.";return;} obNext(); };
 }
@@ -562,9 +564,9 @@ function obAccount(){
   return H`
   <div class="ob-head"><div class="k">Last step</div><h2>Save it to your phone</h2>
   <p>One account holds every kid, every sport, every season.</p></div>
-  <div class="field"><label>Email</label>
+  <div class="field"><label for="obEmail">Email</label>
     <input id="obEmail" type="email" autocomplete="email" placeholder="you@email.com" value="${esc(ob.email||'')}"/></div>
-  <div class="field"><label>Password</label>
+  <div class="field"><label for="obPw">Password</label>
     <input id="obPw" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
   ${obConsentFields()}
   <div class="err" id="oberr"></div>

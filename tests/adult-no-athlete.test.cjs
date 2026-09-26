@@ -44,6 +44,7 @@ function shellStubs(state, opts = {}) {
       $: sel => (sel === '#nav' ? nav : null),
       screenWeek: screen('week'), screenGrowth: screen('growth'), screenScan: screen('scan'), screenBodyInsights: screen('insights'),
       screenJourney: screen('journey'), screenAccount: screen('account'), screenAdult: screen('adult'),
+      screenOrganizationAccount: screen('organizationAccount'),
       screenActivity: screen('activity'), screenProfile: screen('profile'),
     },
   };
@@ -53,18 +54,22 @@ const renderAppWith = (state, opts) => {
   return { ...s, renderApp: build('js/shell.js', 'async function renderApp(tab, fromPop){', 'renderApp', s.stubs) };
 };
 
-test('with no child profile, Your training opens on its own and every other route goes back to child setup', async () => {
+test('without a child, training and organization Account open; child screens return to setup', async () => {
   let r = renderAppWith({ active: null, canEdit: true, role: 'owner' });
   await r.renderApp('adult');
   assert.deepEqual(r.calls, ['bindNav', 'adult']);
   assert.equal(r.nav.removed, true, 'no Week, Growth, Scan or Journey buttons that would lead nowhere');
 
-  for (const tab of ['week', 'growth', 'scan', 'journey', 'profile', 'account']) {
+  for (const tab of ['week', 'growth', 'scan', 'journey', 'profile']) {
     r = renderAppWith({ active: null, canEdit: true, role: 'owner' });
     await r.renderApp(tab);
     assert.deepEqual(r.calls, ['afterLogin'], tab + ' should not render without a child');
     assert.equal(r.root.innerHTML, '');
   }
+
+  r = renderAppWith({ active: null, canEdit: true, role: 'owner' });
+  await r.renderApp('account');
+  assert.deepEqual(r.calls, ['organizationAccount'], 'roster managers do not need a child profile');
 
   r = renderAppWith({ active: null, canEdit: true, role: 'owner' }, { off: true });
   await r.renderApp('adult');

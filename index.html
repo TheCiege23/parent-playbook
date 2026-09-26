@@ -81,7 +81,7 @@
 (function(){try{
   var m=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
   var h=location.hash||'',s=location.search||'';
-  var link=/^#(app|week|growth|scan|insights|journey|profile|account|activity)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
+  var link=/^#(app|week|growth|scan|insights|journey|profile|account|activity|adult)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
   var sess=false;
   for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
     if(k&&k.indexOf('sb-')===0&&k.indexOf('-auth-token')!==-1&&localStorage.getItem(k)){sess=true;break;}}
@@ -244,12 +244,12 @@
         <ul>
           <li>Football</li><li>Basketball</li><li>Soccer</li><li>Baseball</li><li>Softball</li>
           <li>Volleyball</li><li>Track</li><li>Wrestling</li><li>Gymnastics</li><li>Swimming</li>
-          <li>Hockey</li><li>Cheer</li><li>Lacrosse</li><li>Cross country</li>
+          <li>Cheer</li><li>Dance</li><li>Tennis</li>
         </ul>
         <ul aria-hidden="true">
           <li>Football</li><li>Basketball</li><li>Soccer</li><li>Baseball</li><li>Softball</li>
           <li>Volleyball</li><li>Track</li><li>Wrestling</li><li>Gymnastics</li><li>Swimming</li>
-          <li>Hockey</li><li>Cheer</li><li>Lacrosse</li><li>Cross country</li>
+          <li>Cheer</li><li>Dance</li><li>Tennis</li>
         </ul>
       </div>
     </div>
@@ -264,7 +264,7 @@
             <span class="num" aria-hidden="true">01</span>
             <div class="blk" style="background:#0E3B31"></div>
             <h3>Tell us about your kid</h3>
-            <p>Age, sport, position, and what you're both working on. Two screens, no account gymnastics.</p>
+            <p>Age, sport, position, and what you're both working on. A few quick questions, then a preview of the week.</p>
           </div>
           <div class="lp-card" data-reveal>
             <span class="num" aria-hidden="true">02</span>
@@ -564,7 +564,7 @@
 
 <div id="appbg"></div>
 <div id="appveil"></div>
-<div id="a2hs" role="dialog" aria-label="Add Parent Playbook to your home screen">
+<div id="a2hs" role="region" aria-label="Add Parent Playbook to your home screen">
   <div class="c">
     <button class="x" id="a2hsX" aria-label="Dismiss">&times;</button>
     <div class="m">
