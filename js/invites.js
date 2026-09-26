@@ -29,7 +29,7 @@ const INVITE_ROLE = {
   coach: {
     heading:'Team Connect access',
     can:['Age, sport, position and current stats','Growth & scan measurements — jump, sprint, reaction, footwork','Can send training updates through the app'],
-    cant:'No games, journey, photos, or the weekly plan',
+    cant:'No full Journey or weekly plan. Highlight sharing and Story contributions need separate parent permission',
   },
 };
 function inviteRole(r){ return INVITE_ROLE[r] || INVITE_ROLE.family_view; }

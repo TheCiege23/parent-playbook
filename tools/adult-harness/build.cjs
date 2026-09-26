@@ -50,6 +50,7 @@ ${styles.map(s => `<link rel="stylesheet" href="${s}" />`).join('\n')}
 <style>
   #harnessBar{position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#3b1f00;color:#ffe7c2;font:12px/1.4 system-ui,sans-serif;padding:6px 10px;display:flex;gap:10px;align-items:center;justify-content:space-between}
   #harnessBar button{font:inherit;background:#ffe7c2;color:#3b1f00;border:0;border-radius:6px;padding:3px 8px}
+  @media(max-width:600px){#harnessBar{bottom:64px;pointer-events:none}#harnessBar button{display:none}}
 </style>
 </head>
 <body>

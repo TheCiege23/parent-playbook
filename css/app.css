@@ -1056,4 +1056,6 @@
 .story-tools input:not([type=checkbox]),.story-tools textarea,.story-tools select{display:block;width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);color:inherit;font:inherit}
 .story-tools textarea{min-height:96px;resize:vertical}.story-tools input[type=checkbox]{margin-right:8px}
 .story-tools fieldset{min-width:0;margin:16px 0}.story-tools .btn{margin-top:12px}
+.story-tools-footer{margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
+.story-tools [role=status],.story-tools [role=alert]{overflow-wrap:anywhere}
 @media(max-width:560px){.sheet.story-sheet{padding:18px}.story-hero{padding:22px}.story-clips,.story-awards{grid-template-columns:1fr}.story-links{gap:16px;font-size:13px}}

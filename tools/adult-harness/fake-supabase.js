@@ -28,7 +28,7 @@
     const family = '00000000-0000-4000-8000-0000000000fa', athlete = '00000000-0000-4000-8000-0000000000c1';
     const birth = new Date(); birth.setFullYear(birth.getFullYear() - 11); birth.setMonth(2, 14);
     return {
-      media:new URLSearchParams(location.search).get('story')==='1'?[{id:'00000000-0000-4000-8000-0000000000f1',athlete_id:athlete,kind:'video',path:'synthetic-highlight.mp4',caption:'Synthetic color-bar highlight',created_at:new Date().toISOString()}]:[],
+      media:new URLSearchParams(location.search).get('story')==='1'?[{id:'00000000-0000-4000-8000-0000000000f1',athlete_id:athlete,kind:'video',path:'synthetic-highlight.mp4',caption:'Synthetic color-bar highlight',created_at:new Date().toISOString()},{id:'00000000-0000-4000-8000-0000000000f2',athlete_id:athlete,kind:'video',path:'synthetic-highlight.mp4',caption:'Synthetic second highlight',created_at:new Date().toISOString()}]:[],
       sports:[
         { key:'general', name:'General Athleticism', level_vocab:[], selectable:false, sort:99 },
         { key:'football', name:'Football', level_vocab:['Flag', 'Pee Wee', 'Junior', 'Senior', 'Freshman', 'JV', 'Varsity'], selectable:true, sort:1 },
