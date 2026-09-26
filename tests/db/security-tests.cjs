@@ -2044,7 +2044,8 @@ add('AD22', 'household-writes', 'creating a household still makes its creator th
       reset role; select string_agg(guardian_id::text || ':' || role, ',') from public.family_members where family_id = '${SECOND_FAMILY}';`,
     expect: 'ok', expectOut: `${MEMBER_C}:owner` });
 add('AD23', 'household-writes', 'accepting a family-wide co-parent invite still grants access to every child in the household, and no membership',
-  { setup: `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', 'co_parent', 'synthetic-household-invite', '${MEMBER_C}', 'family');`,
+  { setup: `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', 'co_parent', 'synthetic-household-invite', '${MEMBER_C}', 'family');
+      update public.athlete_invites set code_hash = null where token = 'synthetic-household-invite'; -- legacy fixture`,
     role: 'authenticated', claims: ADMIN_A,
     sql: `select public.accept_invite('synthetic-household-invite') = '${ATH_A}';
       reset role;
@@ -2069,7 +2070,9 @@ const revokedViewer = `insert into public.athlete_access(athlete_id, guardian_id
 const ACCESS_RLS = 'new row violates row-level security policy for table "athlete_access"';
 const grantsForA = `reset role; select coalesce(string_agg(guardian_id::text || ':' || role || ':' || case when revoked_at is null then 'live' else 'revoked' end, ',' order by guardian_id::text), '(none)')
   from public.athlete_access where athlete_id = '${ATH_A}';`;
-const inviteFor = (role, token) => `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', '${role}', '${token}', '${MEMBER_C}', 'athlete');`;
+const inviteFor = (role, token) => `insert into public.athlete_invites(athlete_id, role, token, created_by, scope) values ('${ATH_A}', '${role}', '${token}', '${MEMBER_C}', 'athlete');
+  update public.athlete_invites set code_hash = null where token = '${token}'; -- legacy fixture
+  `;
 
 add('AE01', 'access-grants', 'THE CASE: the owner cannot grant an account access to their child without an invite',
   { ...asScanParent, ...refusedBy(grantTo(STRANGER, 'family_view'), ACCESS_RLS) });
@@ -2153,6 +2156,7 @@ const COACH_READING = 'af000000-0000-4000-8000-000000000002';
 // A connected coach, as accept_invite() leaves one, with one game and one reading on the child for the reads below.
 const connectedCoach = coachAccount
   + createInvite('coach', 'athlete', 'synthetic-coach-connect') + ';'
+  + `update public.athlete_invites set code_hash = null where token = 'synthetic-coach-connect';`
   + `insert into public.games(id, athlete_id, game_date, opponent) values ('${COACH_GAME}', '${ATH_A}', current_date - 2, 'Synthetic opponent');
   insert into public.measurements(id, athlete_id, metric_key, value, unit, source, measured_on, created_by)
     values ('${COACH_READING}', '${ATH_A}', 'wingspan', 60, 'in', 'manual', current_date - 1, '${MEMBER_C}');`
@@ -2176,7 +2180,7 @@ add('AF04', 'coach-invites', 'a family viewer cannot invite a coach',
   { setup: scanFamilyViewer, role: 'authenticated', claims: ADMIN_B,
     ...refusedBy(createInvite('coach', 'athlete', 'synthetic-viewer-coach', ADMIN_B) + ';', INVITES_RLS) });
 add('AF05', 'coach-invites', 'THE CASE: accepting connects the coach to that one child — no sibling, no household membership',
-  { setup: coachAccount + createInvite('coach', 'athlete', 'synthetic-coach-accept') + ';', ...asCoach,
+  { setup: coachAccount + createInvite('coach', 'athlete', 'synthetic-coach-accept') + '; update public.athlete_invites set code_hash = null where token = \'synthetic-coach-accept\';', ...asCoach,
     sql: `select public.accept_invite('synthetic-coach-accept') = '${ATH_A}';` + coachGrants,
     expect: 'ok', expectOut: `${ATH_A}:coach|0` });
 add('AF06', 'coach-invites', 'the connected coach reads the child and its measurements, never its games or a sibling',
@@ -2321,6 +2325,38 @@ add('ST02','story','stats access alone cannot submit story content',{setup:conne
 add('ST03','story','an explicitly enabled coach can submit only a pending draft',{setup:storyGrant,...asCoach,sql:storyInsert(),expect:'ok',expectOut:'pending'});
 add('ST04','story','a coach cannot bypass parent approval',{setup:storyGrant,...asCoach,sql:storyInsert('approved'),expect:'error',expectError:/row-level security/});
 add('ST05','story','revoking the story grant blocks new contributions',{setup:storyGrant+"update public.story_coach_grants set enabled=false;",...asCoach,sql:storyInsert(),expect:'error',expectError:/row-level security/});
+
+// Wrong-code checks must COMMIT their attempt counter; an exception rolls it back.
+const codeInvite = `insert into public.athlete_invites(athlete_id,role,token,created_by,scope)
+  values ('${ATH_A}','family_view','synthetic-code-limit','${MEMBER_C}','athlete');
+  update public.athlete_invites set code_hash=encode(extensions.digest('123456:synthetic-code-limit','sha256'),'hex')
+  where token='synthetic-code-limit';`;
+add('IC01','invite-code','wrong codes persist five attempts without granting access',{
+  setup:codeInvite,role:'authenticated',claims:ADMIN_A,
+  sql:`do $$begin for n in 1..5 loop perform public.accept_invite('synthetic-code-limit','000000'); end loop; end$$;
+    reset role; select code_attempts::text || ':' || (accepted_at is null)::text || ':' ||
+      (select count(*) from public.athlete_access where athlete_id='${ATH_A}' and guardian_id='${ADMIN_A}')::text
+    from public.athlete_invites where token='synthetic-code-limit';`,expect:'ok',expectOut:'5:true:0'});
+add('IC02','invite-code','a correct code cannot bypass the five-attempt lock',{
+  setup:codeInvite+`update public.athlete_invites set code_attempts=5 where token='synthetic-code-limit';`,
+  role:'authenticated',claims:ADMIN_A,sql:`select public.accept_invite('synthetic-code-limit','123456');`,
+  expect:'error',expectError:/invite_locked/});
+add('IC03','invite-code','a newly created invitation cannot be accepted before its code is issued',{
+  setup:`insert into public.athlete_invites(athlete_id,role,token,created_by,scope)
+    values ('${ATH_A}','family_view','synthetic-unissued','${MEMBER_C}','athlete');`,
+  role:'authenticated',claims:ADMIN_A,sql:`select public.accept_invite('synthetic-unissued') is null; reset role;
+    select (accepted_at is null)::text || ':' || code_attempts::text from public.athlete_invites where token='synthetic-unissued';`,
+  expect:'ok',expectOut:'true:1'});
+add('IC04','invite-code','issuing a code unlocks a new invite and a correct code works after three typos',{
+  setup:`insert into public.athlete_invites(athlete_id,role,token,created_by,scope)
+    values ('${ATH_A}','family_view','synthetic-issued','${MEMBER_C}','athlete');`,
+  ...asScanParent,sql:`do $$declare issued text; begin
+    issued := public.issue_invite_code((select id from public.athlete_invites where token='synthetic-issued'));
+    perform set_config('request.jwt.claims','{"sub":"${ADMIN_A}","role":"authenticated"}',true);
+    for n in 1..3 loop perform public.accept_invite('synthetic-issued',null); end loop;
+    if public.accept_invite('synthetic-issued',issued) is distinct from '${ATH_A}'::uuid then raise exception 'correct code rejected'; end if;
+    end$$; reset role; select (accepted_at is not null)::text || ':' || code_attempts::text
+      from public.athlete_invites where token='synthetic-issued';`,expect:'ok',expectOut:'true:3'});
 
 // =========================================================== execute
 const TAG = /^(BEGIN|COMMIT|ROLLBACK|SET|RESET|CREATE|DROP|ALTER|GRANT|REVOKE|DO|INSERT [0-9]+ [0-9]+|UPDATE [0-9]+|DELETE [0-9]+|SELECT [0-9]+)$/;

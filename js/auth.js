@@ -167,7 +167,7 @@ function renderAuth(mode='login', prefill=''){
             <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>, and
             <a href="/datadeletion" target="_blank" rel="noopener">Data Deletion</a> policy.</span>
         </label>` : ''}
-        <div class="err" id="autherr"></div>
+        <div class="err" id="autherr" role="alert"></div>
         <button class="btn" id="go" type="submit">${mode==='signup'?'Create account':'Log in'}</button>
       </form>
       <p class="muted-note">
@@ -282,9 +282,11 @@ function addResend(email, errEl){
   const b=document.createElement('button');
   b.className='btn ghost'; b.style.marginTop='8px'; b.textContent='Resend confirmation email';
   b.onclick=async()=>{ b.disabled=true; b.textContent='Sending…';
-    const { error }=await sb.auth.resend({ type:'signup', email });
-    toast(error?'Could not resend — try again shortly':'Sent — check your inbox and spam');
-    b.textContent='Resend confirmation email'; b.disabled=false; };
+    try{
+      const { error }=await sb.auth.resend({ type:'signup', email, options:{ emailRedirectTo:authRedirectUrl() } });
+      toast(error?'Could not resend — try again shortly':'Sent — check your inbox and spam');
+    }catch(e){ toast('Could not resend — check your connection and try again'); }
+    finally{ b.textContent='Resend confirmation email'; b.disabled=false; } };
   errEl.appendChild(b);
 }
 // ---- Forgot password: request a reset link ----

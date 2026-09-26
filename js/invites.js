@@ -235,8 +235,8 @@ function renderInviteDead(title, why, token, info){
 async function acceptAndEnter(token, code, familyWide=false){
   root.innerHTML = H`<div class="center-screen"><div class="spinner" role="status" aria-label="Loading" style="border-top-color:var(--green);border-color:var(--line)"></div><div>Accepting invite…</div></div>`;
   const { data:acceptedAthleteId, error } = await sb.rpc('accept_invite',{ p_token:token, p_code:code||null });
-  if(error){
-    const m=error.message||'';
+  if(error || !acceptedAthleteId){
+    const m=error?.message||'invite_code_wrong';
     // A wrong code is a TYPO, not a dead invite. Sending someone to the "ask for a new
     // link" screen for a mistyped digit would be the most annoying possible reading of
     // it — and it would be wrong, because they have four more tries. Back to the same

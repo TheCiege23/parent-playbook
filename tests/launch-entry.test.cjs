@@ -66,3 +66,17 @@ test('dismissing installation survives a later browser install event in the same
   events.beforeinstallprompt({preventDefault(){}});assert.equal(classes.has('show'),true);
   els.a2hsX.onclick();events.beforeinstallprompt({preventDefault(){}});assert.equal(classes.has('show'),false);
 });
+
+test('resending confirmation preserves an invite and the organization return',async()=>{
+  const ctx=context('#account');ctx.inviteTokenFromUrl=()=> 'synthetic-invite';
+  let resendArgs,button;
+  ctx.document.createElement=()=>button={style:{}};
+  ctx.sb={auth:{resend:async args=>{resendArgs=args;return {error:null};}}};
+  ctx.toast=()=>{};
+  ctx.addResend('coach@example.test',{appendChild(){}});
+  await button.onclick();
+  assert.equal(resendArgs.options.emailRedirectTo,'https://playbookbp.com/?invite=synthetic-invite&login=1&account=1');
+  assert.equal(button.disabled,false);
+  ctx.sb.auth.resend=async()=>{throw new Error('offline');};
+  await button.onclick();assert.equal(button.disabled,false,'failed resend remains retryable');
+});

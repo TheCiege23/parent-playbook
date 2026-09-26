@@ -256,6 +256,23 @@ test('enablePush claims through the function and never upserts the table', () =>
     'a false return is not success and must not be treated as one');
 });
 
+test('device status requires a subscription saved for the signed-in account',async()=>{
+  const db=[],session={id:'parent-A'},browser=fakeBrowser({subscribed:false});
+  const ctx=loadPwa(browser,session,db);
+  assert.equal(await ctx.pushIsOn(),false);
+  await ctx.enablePush();assert.equal(await ctx.pushIsOn(),true);
+  session.id='parent-B';assert.equal(await ctx.pushIsOn(),false,'another account does not inherit enabled status');
+  session.id='parent-A';db.length=0;
+  assert.equal(await ctx.pushIsOn(),false,'a browser subscription without its saved row needs re-enabling');
+});
+
+test('checking push status returns with no worker instead of awaiting an unresolved ready promise',async()=>{
+  const browser=fakeBrowser({registered:false});
+  browser.navigator.serviceWorker.ready=new Promise(()=>{});
+  const ctx=loadPwa(browser,{id:'parent'},[]);
+  assert.equal(await ctx.pushIsOn(),false);
+});
+
 test('every sign-out path releases this device first', () => {
   // The release is only worth anything if it is on every exit. Six places call signOut().
   const sites = [

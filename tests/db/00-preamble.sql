@@ -10,7 +10,8 @@
 --   * JWT claims are emulated with the standard current_setting('request.jwt.claims')
 --     pattern that Supabase's auth.uid() uses.
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------- roles
 do $$

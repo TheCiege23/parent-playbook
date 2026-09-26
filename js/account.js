@@ -68,14 +68,15 @@ async function screenAccount(){
       <div class="sec-title">Notifications</div>
       <div class="card app-pad">
         <div class="tgl">
-          <div class="gt"><b>The week ahead</b><span>One message on Sunday, when the new week is ready</span></div>
+          <div class="gt"><b>The week ahead</b><span>Sunday plans, daily practice nudges, and a monthly growth reminder</span></div>
           <button class="sw ${prefs.weekly?'on':''}" id="prefWeekly" role="switch" aria-checked="${prefs.weekly?'true':'false'}" aria-label="The week ahead"><i></i></button>
         </div>
         <div class="tgl">
           <div class="gt"><b>Game day reminder</b><span>The night before, with what to say on the way there</span></div>
           <button class="sw ${prefs.game_day?'on':''}" id="prefGame" role="switch" aria-checked="${prefs.game_day?'true':'false'}" aria-label="Game day reminder"><i></i></button>
         </div>
-        <div id="pushState"></div>
+        <p class="muted-note" style="text-align:left">These switches choose your reminders. Enable this device separately to receive them.</p>
+        <div id="pushState" role="status" aria-live="polite"></div>
       </div>
 
       ${state.canEdit?H`<!-- Not a launcher — the scan itself starts from an athlete's Growth screen, because
@@ -191,15 +192,38 @@ async function screenAccount(){
 // that lies.
 function bindNotifPrefs(prefs){
   const box=document.getElementById('pushState');
-  if(typeof pushNeedsInstall==='function' && pushNeedsInstall() && box){
-    box.innerHTML='<p class="muted-note" style="text-align:left;margin:10px 2px 0">On iPhone, reminders need Parent Playbook saved to your Home Screen first — tap Share, then Add to Home Screen.</p>';
-  }
+  const userId=state.user.id;
+  const current=()=>state.user?.id===userId && document.getElementById('pushState')===box;
+  const showDevice=async()=>{
+    if(!box || !current()) return;
+    if(typeof pushNeedsInstall==='function' && pushNeedsInstall()){
+      box.innerHTML='<p class="muted-note" style="text-align:left">On iPhone, save Parent Playbook to your Home Screen first — tap Share, then Add to Home Screen.</p>'; return;
+    }
+    if(typeof pushSupported==='function' && !pushSupported()){
+      box.innerHTML='<p class="muted-note" style="text-align:left">This browser does not support reminders. Your choices are saved for supported devices.</p>'; return;
+    }
+    const on=await pushIsOn();
+    if(!current()) return;
+    box.innerHTML=on
+      ? '<p class="muted-note" style="text-align:left">This device is registered for reminders. Delivery follows your choices above.</p>'
+      : '<p class="muted-note" style="text-align:left">Reminders are not enabled on this device.</p><button class="btn ghost" id="pushEnableDevice">Enable reminders on this device</button>';
+    const enable=box.querySelector('#pushEnableDevice');
+    if(enable) enable.onclick=async()=>{
+      enable.disabled=true;
+      try{ await enablePush(); if(current()) await showDevice(); }
+      catch(e){ console.error(e); toast('Could not enable reminders — try again'); }
+      finally{ if(enable.isConnected) enable.disabled=false; }
+    };
+  };
+  showDevice().catch(e=>{ console.error(e); if(current()) box.textContent='Could not check this device. Reopen settings to retry.'; });
   const save=async(key,val,btn)=>{
-    const row={ guardian_id:state.user.id, weekly:prefs.weekly, game_day:prefs.game_day,
+    if(!current()) return false;
+    const row={ guardian_id:userId, weekly:prefs.weekly, game_day:prefs.game_day,
                 updated_at:new Date().toISOString() };
     row[key]=val;
     const { error }=await sb.from('notification_prefs').upsert(row,{ onConflict:'guardian_id' });
     if(error){ console.error(error); reportError(error,'account:notifPref'); toast('Could not save'); return false; }
+    if(!current()) return false;
     prefs[key]=val;
     btn.classList.toggle('on',val); btn.setAttribute('aria-checked',String(val));
     return true;
@@ -209,13 +233,16 @@ function bindNotifPrefs(prefs){
     btn.onclick=async()=>{
       const turningOn=!btn.classList.contains('on');
       btn.disabled=true;
-      if(turningOn){
-        if(typeof pushNeedsInstall==='function' && pushNeedsInstall()){ showIosPushHelp(); btn.disabled=false; return; }
-        const already=await pushIsOn();
-        if(!already){ const ok=await enablePush(); if(!ok){ btn.disabled=false; return; } }
-      }
-      await save(key,turningOn,btn);
-      btn.disabled=false;
+      try{
+        if(turningOn){
+          if(typeof pushNeedsInstall==='function' && pushNeedsInstall()){ showIosPushHelp(); return; }
+          const already=await pushIsOn();
+          if(!already){ const ok=await enablePush(); if(!ok) return; }
+        }
+        await save(key,turningOn,btn);
+        if(current()) await showDevice();
+      }catch(e){ console.error(e); toast('Could not save reminders — try again'); }
+      finally{ btn.disabled=false; }
     };
   };
   wire('prefWeekly','weekly'); wire('prefGame','game_day');

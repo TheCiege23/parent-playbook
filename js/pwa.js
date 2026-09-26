@@ -43,9 +43,11 @@ function subMatchesKey(sub, keyBytes){
 async function pushIsOn(){
   try{
     if(!pushSupported() || Notification.permission!=='granted') return false;
-    const reg=await navigator.serviceWorker.ready;
-    const sub=await reg.pushManager.getSubscription();
-    return !!(sub && subMatchesKey(sub, urlB64ToUint8Array(VAPID_PUBLIC)));
+    const reg=await navigator.serviceWorker.getRegistration();
+    const sub=reg && await reg.pushManager.getSubscription();
+    if(!sub || !subMatchesKey(sub, urlB64ToUint8Array(VAPID_PUBLIC)) || !state.user) return false;
+    const {data,error}=await sb.from('push_subscriptions').select('id').eq('user_id',state.user.id).eq('endpoint',sub.endpoint);
+    return !error && !!data?.length;
   }catch(e){ return false; }
 }
 

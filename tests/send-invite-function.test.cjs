@@ -230,7 +230,8 @@ test('a coach invite is for one child and says what a coach can and cannot see',
   const text = htmlText(sent.html);
   assert.match(text, /You'd get Team Connect access — athlete stats and training updates only/);
   assert.match(text, /Growth, scan measurements and training updates/);
-  assert.match(text, /No games, journey, photos or weekly plan/);
+  assert.match(text, /No full Journey or weekly plan/);
+  assert.match(text, /Selected highlights and Story contributions require separate parent permission/);
   assert.doesNotMatch(text, /every child|whole family/);
 });
 

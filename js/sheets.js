@@ -226,7 +226,7 @@ function openInvite(){
   const bg=sheet(H`<h3>Invite someone to help</h3>
     <p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Share a private link with a co-parent, grandparent, or coach. Family and co-parent invites include ${multi?'every child in this household':nm}; coach access stays tied to the child you choose.</p>
     <div class="teach" style="margin-top:12px"><div class="ic">🎓</div><div><h4>You stay in control</h4>
-      <p>Choose their access level. Family view can see the plan and progress; co-parent can also edit; Team Connect is for a coach or trainer you already work with — stats only, no games, journey or photos. You can revoke any invite anytime.</p></div></div>
+      <p>Family view can see the plan and Journey; co-parents can also edit. Team Connect starts with stats only. Sharing selected highlights or accepting a coach's Story contribution needs separate parent permission. You can revoke access anytime.</p></div></div>
 
     ${multi?H`<div class="field" id="kidScope" hidden><label>Which child is the coach helping?</label>
       <div id="kidPick" style="display:flex;flex-direction:column;gap:8px">
@@ -245,44 +245,49 @@ function openInvite(){
 
     <div class="field"><label>Access level</label>
       <div class="chipgrid" id="role" style="grid-template-columns:1fr 1fr">
-        <div class="chip on" role="button" tabindex="0" data-r="family_view">Family view</div>
-        <div class="chip" role="button" tabindex="0" data-r="co_parent">Co-parent (edit)</div>
-        <div class="chip" role="button" tabindex="0" data-r="coach">Team Connect (coach)</div>
+        <div class="chip on" role="button" tabindex="0" aria-pressed="true" data-r="family_view">Family view</div>
+        <div class="chip" role="button" tabindex="0" aria-pressed="false" data-r="co_parent">Co-parent (edit)</div>
+        <div class="chip" role="button" tabindex="0" aria-pressed="false" data-r="coach">Team Connect (coach)</div>
       </div></div>
 
     <div class="field"><label>How should it reach them?</label>
       <div class="chipgrid" id="chan" style="grid-template-columns:1fr 1fr 1fr">
-        <div class="chip on" role="button" tabindex="0" data-c="text">Text</div>
-        <div class="chip" role="button" tabindex="0" data-c="email">Email</div>
-        <div class="chip" role="button" tabindex="0" data-c="link">Just a link</div>
+        <div class="chip on" role="button" tabindex="0" aria-pressed="true" data-c="text">Text</div>
+        <div class="chip" role="button" tabindex="0" aria-pressed="false" data-c="email">Email</div>
+        <div class="chip" role="button" tabindex="0" aria-pressed="false" data-c="link">Just a link</div>
       </div></div>
 
-    <div class="field" id="fPhone"><label>Their mobile number</label>
+    <div class="field" id="fPhone"><label for="invPhone">Their mobile number</label>
       <input id="invPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="(201) 555-0134"/>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">US numbers only for now — ten digits is
         enough. Outside the US, type it with a + and the country code.</p></div>
 
-    <div class="field" id="fEmail" hidden><label>Their email</label>
+    <div class="field" id="fEmail" hidden><label for="invEmail">Their email</label>
       <input id="invEmail" type="email" autocomplete="off" placeholder="grandma@email.com"/>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">We'll send it for you.</p></div>
 
     <div id="linkout"></div>
-    <div class="err" id="inverr"></div>
-    <button class="btn" id="gen">Create invite</button>`);
+    <div class="err" id="inverr" role="alert"></div>
+    <button class="btn" id="gen">Create invite</button>
+    <button class="btn ghost" id="inviteClose" style="margin-top:10px">Close</button>`);
 
   let role='family_view', chan='text';
   bg.querySelectorAll('#role .chip').forEach(c=>c.onclick=()=>{
     role=c.dataset.r;
-    bg.querySelectorAll('#role .chip').forEach(x=>x.classList.toggle('on',x===c));
+    bg.querySelectorAll('#role .chip').forEach(x=>{ x.classList.toggle('on',x===c); x.setAttribute('aria-pressed',String(x===c)); });
     const coach=role==='coach';
     const kp=bg.querySelector('#kidScope'), fs=bg.querySelector('#familyScope');
     if(kp) kp.hidden=!coach;
     if(fs) fs.hidden=coach;
   });
   bg.querySelectorAll('#chan .chip').forEach(c=>c.onclick=()=>{
-    chan=c.dataset.c; bg.querySelectorAll('#chan .chip').forEach(x=>x.classList.toggle('on',x===c));
+    chan=c.dataset.c; bg.querySelectorAll('#chan .chip').forEach(x=>{ x.classList.toggle('on',x===c); x.setAttribute('aria-pressed',String(x===c)); });
     bg.querySelector('#fPhone').hidden = chan!=='text';
     bg.querySelector('#fEmail').hidden = chan!=='email';
+  });
+  bg.querySelector('#inviteClose').onclick=()=>bg.remove();
+  bg.querySelectorAll('#role .chip,#chan .chip').forEach(c=>c.onkeydown=e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); c.click(); }
   });
   // The row is the hit target, not just the box — same idiom as every other pick-list
   // in this app, and a lot easier to tap accurately than an 18px checkbox on a phone.
@@ -342,9 +347,11 @@ function openInvite(){
         if(ce) throw ce;
         code=c;
       }catch(err){
-        // Not fatal: an invite with no code still works exactly as it did last week. Say
-        // so rather than pretending there is a code the recipient will be asked for.
         console.error(err); reportError(err,'invite:code');
+        const {error:revokeError}=await sb.from('athlete_invites').update({revoked_at:new Date().toISOString()}).eq('id',data.id);
+        if(revokeError) reportError(revokeError,'invite:unissued-revoke');
+        results.push({name:kid.first_name,ok:false,why:'Could not secure the invite with a code. Try again; no message was sent.'});
+        continue;
       }
 
       const link=inviteLink(data.token);
@@ -422,8 +429,11 @@ function openInvite(){
 
     btn.textContent = ok.length>1 ? 'Copy the messages' : 'Copy the message';
     btn.disabled=false;
-    btn.onclick=()=>{ navigator.clipboard?.writeText(share);
-      toast('Copied — paste it into a text'); };
+    btn.onclick=async()=>{
+      try{ if(!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+        await navigator.clipboard.writeText(share); toast('Copied — paste it into a message');
+      }catch(e){ errEl.textContent='Could not copy automatically. Select the link and code above to copy them.'; }
+    };
   };
 }
 

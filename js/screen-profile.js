@@ -99,7 +99,7 @@ async function screenProfile(){
 
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="sec-title">Who can see ${esc(a.first_name)}</div>
-        ${canEdit?'<button class="btn sm ghost" id="invite">＋ Invite</button>':''}
+        ${canEdit?'<button class="btn sm ghost" id="profileInvite">＋ Invite</button>':''}
       </div>
       <div class="card app-pad">
         <div class="grow"><div class="gi">👤</div><div class="gt"><b>You</b><span>${isOwner?'Owner · full control':esc(myRole)+' access'}</span></div></div>
@@ -112,9 +112,9 @@ async function screenProfile(){
       </div>
 
       <div class="card app-pad" style="margin-top:14px">
-        ${canEdit?H`<div class="navrow" id="addChild"><div class="gi">👧</div>
+        ${canEdit?H`<div class="navrow" id="addChild" role="button" tabindex="0"><div class="gi">👧</div>
           <div class="gt"><b>Add another athlete</b><span>Different sport, different age, separate plan</span></div><i>›</i></div>`:''}
-        <div class="navrow" id="toAccount"><div class="gi">⚙️</div>
+        <div class="navrow" id="toAccount" role="button" tabindex="0"><div class="gi">⚙️</div>
           <div class="gt"><b>Account &amp; settings</b><span>Household, notifications, your data</span></div><i>›</i></div>
       </div>
 
@@ -149,9 +149,12 @@ async function screenProfile(){
   { const es=$("#editSched"); if(es&&_primary) es.onclick=()=>openPracticeSchedule(_primary.sport_key,
       { practiceDays:_primary.practice_days||[], gameDay:_primary.game_day,
         seasonStart:_primary.season_start, seasonEnd:_primary.season_end }, ()=>renderApp('profile')); }
-  { const iv=$("#invite"); if(iv) iv.onclick=openInvite; }
+  { const iv=$("#profileInvite"); if(iv) iv.onclick=openInvite; }
   { const ac=$("#addChild"); if(ac) ac.onclick=startAddChild; }
   { const ta=$("#toAccount"); if(ta) ta.onclick=()=>renderApp('account'); }
+  ['addChild','toAccount'].forEach(id=>{ const el=$('#'+id); if(el) el.onkeydown=e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); }
+  }; });
   { const pe=$("#pexpEdit"); if(pe&&_primary&&canEdit) pe.querySelectorAll('.chip').forEach(c=>c.onclick=async()=>{
       const v=c.dataset.e; pe.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
       const { error }=await sb.from('athlete_sports').update({ parent_experience:v||null }).eq('athlete_id',a.id).eq('sport_key',_primary.sport_key);

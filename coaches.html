@@ -16,12 +16,14 @@
        -webkit-text-size-adjust:100%}
   .wrap{max-width:680px;margin:0 auto;padding:0 20px 90px}
   a{color:var(--green)}
-  header.top{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
+  header.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:20px 0}
   .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
   .brand .mk{width:28px;height:28px;border-radius:8px;background:var(--green);color:#fff;
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
   .brand b{font-size:15px}
   .signin{font-size:13.5px;color:var(--green);text-decoration:none;font-weight:600}
+  .brand,.signin{min-height:44px;display:flex;align-items:center}
+  a:focus-visible{outline:3px solid var(--amber);outline-offset:4px}
 
   .hero{background:var(--green-d);color:#F3F7F4;border-radius:22px;padding:44px 30px;margin:8px 0 34px}
   .hero .eyebrow{font:600 11px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:#8FD9C4;margin:0 0 14px}

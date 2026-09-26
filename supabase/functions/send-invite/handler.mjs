@@ -155,7 +155,7 @@ export function createSendInviteHandler({ callerClient, db, fetch: fetchImpl = g
           : (invite.role === 'coach' ? 'Age, sport, position and current stats' : 'Games, photos and milestones')),
         access_second: escapeHtml(familyWide ? 'Each child\'s weekly plan and progress'
           : (invite.role === 'coach' ? 'Growth, scan measurements and training updates' : `${athleteFirst}'s weekly plan and progress`)),
-        access_limit: escapeHtml(invite.role === 'coach' ? 'No games, journey, photos or weekly plan'
+        access_limit: escapeHtml(invite.role === 'coach' ? 'No full Journey or weekly plan. Selected highlights and Story contributions require separate parent permission.'
           : (invite.role === 'co_parent' ? 'No billing or account changes' : 'No editing or account changes')),
         invite_url: inviteUrl, // built here from the stored token; escaping would break the href
         expires_human: escapeHtml(expires),
