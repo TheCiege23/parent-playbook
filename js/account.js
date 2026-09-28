@@ -126,8 +126,8 @@ async function screenAccount(){
 
       <div class="sec-title">Team &amp; organization</div>
       <div class="card app-pad">
-        <div class="navrow" id="joinTeam" role="button" tabindex="0"><div class="gi">🔑</div>
-          <div class="gt"><b>Join with a code</b><span>Add your child to a team or organization's roster</span></div><i>›</i></div>
+        ${state.canEdit?H`<div class="navrow" id="joinTeam" role="button" tabindex="0"><div class="gi">🔑</div>
+          <div class="gt"><b>Join ${esc(a.first_name)} with a code</b><span>Add this child to a team or organization's roster</span></div><i>›</i></div>`:''}
         ${state.canEdit?H`<div class="navrow" id="manageRosters" role="button" tabindex="0"><div class="gi">🛡️</div>
           <div class="gt"><b>${esc(a.first_name)}'s roster sharing</b><span>See which teams can view stats and measurements, or leave a roster</span></div><i>›</i></div>`:''}
         <div class="navrow" id="myOrg" role="button" tabindex="0"><div class="gi">🗂️</div>

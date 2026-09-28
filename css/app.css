@@ -40,7 +40,7 @@
 
   /* fields */
   .field{margin-bottom:14px}
-  .field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .field label,.field-label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
   .field input,.field select,.field textarea{
     width:100%;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(20,83,66,.16)}
@@ -59,7 +59,7 @@
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
     padding:5px 10px;border-radius:999px;background:var(--soft);color:var(--muted)}
   .chip{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;font-size:14px;
-    font-weight:500;color:var(--ink);text-align:center;transition:.12s}
+    font-family:inherit;font-weight:500;color:var(--ink);text-align:center;transition:.12s;cursor:pointer}
   .chip.on{border-color:var(--green);background:#DFF0E8;color:var(--green-d);font-weight:600}
   .chipgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .chipgrid.two{grid-template-columns:1fr 1fr}

@@ -19,39 +19,49 @@ function orgCode(){
 
 // ---- a parent joining an existing roster (their own child, any time — not just at signup) ----
 async function openJoinTeam(){
-  if(!state.athletes.length){ toast('Add a child first'); return; }
-  const athletes=state.athletes;
+  const athlete=state.active, guardianId=state.user?.id;
+  if(!athlete){ toast('Add a child first'); return; }
+  if(!guardianId||state.canEdit===false){ toast('Only a parent or co-parent can join a roster for this child'); return; }
   const bg=sheet(H`<h3>Join a team or organization</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Enter the code you were given. This adds
-      your child to that roster — stats and measurements only, the same as Team Connect. Never games,
+      <b>${esc(athlete.first_name)}</b> to that roster — stats and measurements only, the same as Team Connect. Never games,
       journey, or photos.</p>
-    ${athletes.length>1?H`<div class="field"><label for="jtAthlete">Which child?</label>
-      <select id="jtAthlete">${athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.first_name)}</option>`).join('')}</select></div>`:''}
     <div class="field"><label for="jtCode">Team code</label><input id="jtCode" placeholder="e.g. BEARS26" autocapitalize="characters"/></div>
-    <div class="err" id="jtErr"></div>
+    <div class="err" id="jtErr" role="alert"></div>
     <button class="btn amber" id="jtGo">Join</button>`);
+  const current=()=>bg.isConnected&&state.active?.id===athlete.id&&state.user?.id===guardianId&&state.canEdit!==false;
   bg.querySelector('#jtGo').onclick=async e=>{
-    const athleteId=athletes.length>1?bg.querySelector('#jtAthlete').value:athletes[0].id;
+    if(!current()) return;
     const code=(bg.querySelector('#jtCode').value||'').trim();
     const err=bg.querySelector('#jtErr'); err.textContent='';
     if(!code){ err.textContent='Enter the code you were given.'; return; }
-    e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
-    const reset=()=>{ e.target.innerHTML='Join'; e.target.disabled=false; };
-    let data,error;
-    try{ ({data,error}=await sb.rpc('team_by_code',{ p_code:code })); }
-    catch(ex){ console.error(ex); err.textContent='Could not check that code — try again.'; reset(); return; }
-    if(error){ console.error(error); err.textContent='Could not check that code — try again.'; reset(); return; }
-    const t=(data||[])[0];
-    if(!t){ err.textContent="We don't recognise that code. Check it with whoever gave it to you."; reset(); return; }
-    // Guard against a double-join: season is nullable, so the DB's unique constraint
-    // (athlete_id, team_id, season) doesn't catch two null-season rows on its own.
-    const { data:existing }=await sb.from('team_memberships').select('id').eq('athlete_id',athleteId).eq('team_id',t.id).limit(1);
-    if(existing && existing.length){ err.textContent='Already on that roster.'; reset(); return; }
-    const { error:ie }=await sb.from('team_memberships').insert({ athlete_id:athleteId, team_id:t.id });
-    if(ie){ console.error(ie); err.textContent='Could not join — try again.'; reset(); return; }
-    try{ await sb.rpc('team_code_used',{ p_code:code }); }catch(ex){ console.error(ex); }
-    logUsageEvent('team_joined');
-    bg.remove(); toast('Joined '+(t.name||'the roster'));
+    const button=e.currentTarget;
+    button.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; button.disabled=true;
+    try{
+      const {data,error}=await sb.rpc('team_by_code',{ p_code:code });
+      if(error) throw error;
+      if(!current()) return;
+      const team=(data||[])[0];
+      if(!team){ err.textContent="We don't recognise that code. Check it with whoever gave it to you."; return; }
+      // Season is nullable, so the DB unique constraint permits duplicate null-season rows.
+      const {data:existing,error:readError}=await sb.from('team_memberships').select('id')
+        .eq('athlete_id',athlete.id).eq('team_id',team.id).limit(1);
+      if(readError) throw readError;
+      if(!current()) return;
+      if(existing?.length){ err.textContent='Already on that roster.'; return; }
+      const {error:insertError}=await sb.from('team_memberships').insert({athlete_id:athlete.id,team_id:team.id});
+      if(insertError) throw insertError;
+      if(!current()) return;
+      try{ await sb.rpc('team_code_used',{p_code:code}); }catch(ex){ console.error(ex); }
+      if(!current()) return;
+      logUsageEvent('team_joined');
+      bg.remove(); toast('Joined '+(team.name||'the roster'));
+    }catch(error){
+      console.error(error);
+      if(current()) err.textContent='Could not join this roster. Check your connection and try again.';
+    }finally{
+      if(current()){ button.textContent='Join'; button.disabled=false; }
+    }
   };
 }
 

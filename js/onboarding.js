@@ -315,7 +315,7 @@ function obSchedule(){
   <p>We build the home plan <b>around</b> practice — never on top of it.</p></div>
   <div class="teach"><div class="ic">🎓</div><div><h4>This is the safety setting</h4>
     <p>Adding home training on practice days is the most common way young athletes get overused and burn out. The more the team trains, the less we add — and if the week is already full, we add nothing at all.</p></div></div>
-  <div class="field"><label>Practice days</label>${schedChips(ob.practiceDays,'pd')}
+  <div class="field"><div class="field-label">Practice days</div>${schedChips(ob.practiceDays,'pd')}
     <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply. Not sure yet? Skip it — you can set this any time.</p></div>
   <div class="field"><label for="gd">Usual game day (optional)</label>
     <select id="gd"><option value="">— No regular game day —</option>
@@ -334,7 +334,8 @@ function obScheduleBind(){
   $("#pd").querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     const i=+c.dataset.d;
     ob.practiceDays = ob.practiceDays.includes(i) ? ob.practiceDays.filter(x=>x!==i) : [...ob.practiceDays,i];
-    c.classList.toggle('on');
+    c.classList.toggle('on',ob.practiceDays.includes(i));
+    c.setAttribute('aria-pressed',String(ob.practiceDays.includes(i)));
   });
   $("#gd").onchange=()=>{ const v=$("#gd").value; ob.gameDay = v===''?null:parseInt(v,10); };
   $("#ss").onchange=()=>{ ob.seasonStart = $("#ss").value||null; };

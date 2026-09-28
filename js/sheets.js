@@ -790,8 +790,8 @@ function confirmRemoveSport(row, name){
 
 // ---- practice schedule: the week is planned AROUND these days ----
 function schedChips(sel,id){
-  return `<div class="chipgrid" id="${id}" style="grid-template-columns:repeat(4,1fr)">
-    ${DAY_LABELS.map((d,i)=>`<div class="chip ${sel.includes(i)?'on':''}" role="button" tabindex="0" data-d="${i}">${d}</div>`).join('')}</div>`;
+  return `<div class="chipgrid" id="${id}" role="group" aria-label="Practice days" style="grid-template-columns:repeat(4,1fr)">
+    ${DAY_LABELS.map((d,i)=>`<button type="button" class="chip ${sel.includes(i)?'on':''}" aria-pressed="${sel.includes(i)}" data-d="${i}">${d}</button>`).join('')}</div>`;
 }
 // A parent's one change to this week: take a home session off, move it to a rest day, or swap it for another
 // like it. applyWeekChange() in js/program.js decides what the plan does with it; this only offers what
@@ -843,16 +843,16 @@ function openPracticeSchedule(sportKey, current, onSaved){
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">We plan the week <b>around</b> practice, not on top of it. Change it any time the season does.</p>
     <div class="teach" style="margin-bottom:14px"><div class="ic">🎓</div><div><h4>Why this matters most</h4>
       <p>Stacking home training onto practice days is the main way young athletes get overused. The more the team trains, the less we add — and if the week is already full, we add nothing.</p></div></div>
-    <div class="field"><label>Practice days</label>${schedChips(picked,'pd')}
+    <div class="field"><div class="field-label">Practice days</div>${schedChips(picked,'pd')}
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply. None? Leave them all off.</p></div>
-    <div class="field"><label>Usual game day (optional)</label>
+    <div class="field"><label for="gd">Usual game day (optional)</label>
       <select id="gd"><option value="">— No regular game day —</option>
         ${DAY_LABELS.map((d,i)=>`<option value="${i}" ${gameDay===i?'selected':''}>${d}</option>`).join('')}
       </select></div>
     <div class="row2">
-      <div class="field"><label>First game (approx.)</label>
+      <div class="field"><label for="ss">First game (approx.)</label>
         <input id="ss" type="date" value="${esc(current?.seasonStart||'')}"/></div>
-      <div class="field"><label>Last game (optional)</label>
+      <div class="field"><label for="se">Last game (optional)</label>
         <input id="se" type="date" value="${esc(current?.seasonEnd||'')}"/></div>
     </div>
     <p style="font-size:11.5px;color:var(--muted);margin:-4px 2px 14px">
@@ -862,7 +862,8 @@ function openPracticeSchedule(sportKey, current, onSaved){
   bg.querySelectorAll('#pd .chip').forEach(c=>c.onclick=()=>{
     const i=+c.dataset.d;
     picked=picked.includes(i)?picked.filter(x=>x!==i):[...picked,i];
-    c.classList.toggle('on');
+    c.classList.toggle('on',picked.includes(i));
+    c.setAttribute('aria-pressed',String(picked.includes(i)));
   });
   bg.querySelector('#save').onclick=async(e)=>{
     const errEl=bg.querySelector('#serr'); errEl.textContent='';
