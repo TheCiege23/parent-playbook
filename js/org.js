@@ -25,9 +25,9 @@ async function openJoinTeam(){
     <p style="color:var(--muted);font-size:13px;margin:6px 0 14px">Enter the code you were given. This adds
       your child to that roster — stats and measurements only, the same as Team Connect. Never games,
       journey, or photos.</p>
-    ${athletes.length>1?H`<div class="field"><label>Which child?</label>
+    ${athletes.length>1?H`<div class="field"><label for="jtAthlete">Which child?</label>
       <select id="jtAthlete">${athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.first_name)}</option>`).join('')}</select></div>`:''}
-    <div class="field"><label>Team code</label><input id="jtCode" placeholder="e.g. BEARS26" autocapitalize="characters"/></div>
+    <div class="field"><label for="jtCode">Team code</label><input id="jtCode" placeholder="e.g. BEARS26" autocapitalize="characters"/></div>
     <div class="err" id="jtErr"></div>
     <button class="btn amber" id="jtGo">Join</button>`);
   bg.querySelector('#jtGo').onclick=async e=>{
@@ -53,6 +53,73 @@ async function openJoinTeam(){
     logUsageEvent('team_joined');
     bg.remove(); toast('Joined '+(t.name||'the roster'));
   };
+}
+
+// Parents need an exit from roster-wide sharing after joining with a code. The
+// database's team_memberships delete policy limits this to athlete editors.
+function openAthleteRosterMemberships(){
+  const athlete=state.active, guardianId=state.user?.id;
+  if(!athlete || !guardianId || state.canEdit===false) return;
+  const bg=sheet(H`<h3>${esc(athlete.first_name)}'s roster sharing</h3>
+    <p class="muted-note" style="text-align:left">Teams on this list can view ${esc(athlete.first_name)}'s stats and measurements.</p>
+    <div id="rosterSharingList" role="status" aria-live="polite">Loading rosters…</div>
+    <button class="btn ghost" id="rosterSharingClose" style="margin-top:14px">Close</button>`);
+  const list=bg.querySelector('#rosterSharingList');
+  const current=()=>bg.isConnected&&state.active?.id===athlete.id&&state.user?.id===guardianId&&state.canEdit!==false;
+  bg.querySelector('#rosterSharingClose').onclick=()=>bg.remove();
+  const load=async()=>{
+    if(!current()) return;
+    list.textContent='Loading rosters…';
+    let rows;
+    try{
+      const {data,error}=await sb.from('team_memberships').select('id,team_id,teams(name)').eq('athlete_id',athlete.id);
+      if(error) throw error;
+      rows=[...new Map((data||[]).map(row=>[row.team_id,row])).values()];
+    }catch(error){
+      console.error(error);
+      if(!current()) return;
+      list.innerHTML='<p class="err">Could not load roster sharing. Check your connection and try again.</p><button class="btn ghost" id="rosterSharingRetry">Retry</button>';
+      list.querySelector('#rosterSharingRetry').onclick=load;
+      return;
+    }
+    if(!current()) return;
+    if(!rows.length){ list.innerHTML='<p class="empty">This athlete is not on a team roster.</p>'; return; }
+    list.innerHTML=rows.map((row,index)=>H`<div class="mrow" style="align-items:center;gap:12px">
+      <div><b>${esc(row.teams?.name||'Team roster')}</b><div class="muted-note" style="text-align:left;margin-top:2px">Stats and measurements shared</div></div>
+      <button class="btn sm ghost" data-leave-roster="${index}" aria-label="Leave ${esc(row.teams?.name||'team roster')}">Leave</button>
+    </div>`).join('');
+    list.querySelectorAll('[data-leave-roster]').forEach(button=>button.onclick=()=>{
+      const row=rows[Number(button.dataset.leaveRoster)];
+      if(!row||!current()) return;
+      const name=row.teams?.name||'this roster';
+      list.innerHTML=H`<p>Leave <b>${esc(name)}</b>?</p>
+        <p class="muted-note" style="text-align:left">This stops the roster's access to ${esc(athlete.first_name)}'s stats and measurements. It cannot recall information someone already copied outside Parent Playbook.</p>
+        <div class="err" id="rosterLeaveError" role="alert"></div>
+        <button class="btn danger" id="rosterLeaveConfirm">Leave roster</button>
+        <button class="btn ghost" id="rosterLeaveKeep" style="margin-top:10px">Keep sharing</button>`;
+      list.querySelector('#rosterLeaveKeep').onclick=load;
+      list.querySelector('#rosterLeaveConfirm').onclick=async event=>{
+        if(!current()) return;
+        const confirm=event.currentTarget;
+        confirm.disabled=true; confirm.textContent='Leaving…';
+        try{
+          // Remove every duplicate membership for this athlete and team so a
+          // legacy null-season duplicate cannot leave access in place.
+          const {data:removed,error}=await sb.from('team_memberships').delete()
+            .eq('athlete_id',athlete.id).eq('team_id',row.team_id).select('id');
+          if(error) throw error;
+          if(!removed?.length) throw new Error('No roster membership was removed');
+          if(current()){ toast('Left '+name); await load(); }
+        }catch(error){
+          console.error(error);
+          if(!current()) return;
+          list.querySelector('#rosterLeaveError').textContent='Could not leave this roster. Try again.';
+          confirm.disabled=false; confirm.textContent='Leave roster';
+        }
+      };
+    });
+  };
+  load();
 }
 
 // ---- entry point from Account: your own roster(s), or start one ----
