@@ -33,9 +33,9 @@ function openAddMilestone(onDate){
   const today=onDate||todayISO();
   const bg=sheet(H`<h3>Add a milestone</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">A moment worth remembering — a first, a personal best, a big step.</p>
-    <div class="field"><label>Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
-    <div class="field"><label>Title</label><input id="mt" placeholder="e.g. First goal of the season"/></div>
-    <div class="field"><label>Note (optional)</label><textarea id="mn" rows="2" placeholder="What made it special?"></textarea></div>
+    <div class="field"><label for="md">Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
+    <div class="field"><label for="mt">Title</label><input id="mt" placeholder="e.g. First goal of the season"/></div>
+    <div class="field"><label for="mn">Note (optional)</label><textarea id="mn" rows="2" placeholder="What made it special?"></textarea></div>
     <div class="err" id="merr"></div>
     <button class="btn amber" id="save">Save milestone</button>`);
   bg.querySelector('#save').onclick=async(e)=>{
@@ -63,12 +63,12 @@ function openAddMedia(games, preselect){
   const gopts=(games||[]).map(g=>`<option value="${g.id}" ${g.id===preselect?'selected':''}>${esc(fmtDate(g.game_date))}${g.opponent?' vs '+esc(g.opponent):''}</option>`).join('');
   const bg=sheet(H`<h3>Add photos or video</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">From a game or practice. They stay private to your household.</p>
-    <div class="field"><label>Choose files</label><input id="mf" type="file" accept="image/*,video/*" multiple/>
+    <div class="field"><label for="mf">Choose files</label><input id="mf" type="file" accept="image/*,video/*" multiple/>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Up to 100 MB each — short clips work best.</p></div>
-    <div class="field"><label>Caption (optional)</label><input id="mc" placeholder="e.g. Championship game, 2026"/></div>
+    <div class="field"><label for="mc">Caption (optional)</label><input id="mc" placeholder="e.g. Championship game, 2026"/></div>
     <div class="row2">
-      <div class="field"><label>Taken on</label><input id="md" type="date" value="${today}" max="${today}"/></div>
-      ${gopts?H`<div class="field"><label>Attach to a game</label><select id="mg"><option value="">— None —</option>${gopts}</select></div>`:''}
+      <div class="field"><label for="md">Taken on</label><input id="md" type="date" value="${today}" max="${today}"/></div>
+      ${gopts?H`<div class="field"><label for="mg">Attach to a game</label><select id="mg"><option value="">— None —</option>${gopts}</select></div>`:''}
     </div>
     <div class="err" id="merr"></div>
     <button class="btn" id="save">Upload</button>`);
@@ -289,12 +289,8 @@ function openInvite(){
   bg.querySelectorAll('#role .chip,#chan .chip').forEach(c=>c.onkeydown=e=>{
     if(e.key==='Enter'||e.key===' '){ e.preventDefault(); c.click(); }
   });
-  // The row is the hit target, not just the box — same idiom as every other pick-list
-  // in this app, and a lot easier to tap accurately than an 18px checkbox on a phone.
-  bg.querySelectorAll('.kidrow').forEach(row=>{
-    const box=row.querySelector('input[type=checkbox]');
-    row.onclick=e=>{ if(e.target!==box) box.checked=!box.checked; };
-  });
+  // Each row is a label, so the browser already toggles its checkbox when the
+  // name or avatar is tapped. An extra click handler would toggle it twice.
 
   bg.querySelector('#gen').onclick=async(e)=>{
     const btn=e.target; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
@@ -501,12 +497,12 @@ function openAddMeasure(presetKey){
   const preset=presetKey?metrics.find(m=>m.key===presetKey):null;
   const bg=sheet(H`<h3>${preset?'Record '+esc(preset.name.toLowerCase()):'Record a measurement'}</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Keep conditions the same each time so the trend is honest.</p>
-    <div class="field"><label>What did you measure?</label>
+    <div class="field"><label for="mk">What did you measure?</label>
       <select id="mk">${metrics.map(m=>`<option value="${m.key}"${m.key===presetKey?' selected':''} data-u="${esc(m.unit||'')}">${esc(m.name)}${m.unit?' ('+esc(m.unit)+')':''}</option>`).join('')}</select>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap to change what you're recording — height, weight, sprint times and more.</p></div>
     <div class="row2">
-      <div class="field"><label>Value</label><input id="mv" type="number" step="0.01" inputmode="decimal" placeholder="0"/></div>
-      <div class="field"><label>Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
+      <div class="field"><label for="mv">Value</label><input id="mv" type="number" step="0.01" inputmode="decimal" placeholder="0"/></div>
+      <div class="field"><label for="md">Date</label><input id="md" type="date" value="${today}" max="${today}"/></div>
     </div>
     <div class="err" id="xerr"></div>
     <button class="btn" id="save">Save measurement</button>`);
@@ -685,7 +681,7 @@ function confirmDeleteAccount(){
       There is no undo and no backup we can restore from.</p>
     ${adultTrainingOn()?`<p style="color:var(--muted);font-size:13px;margin:0 0 14px;line-height:1.55">
       Only want to stop using Your training? Delete your training record at the foot of Your training instead, and keep your account.</p>`:''}
-    <div class="field"><label>Type DELETE to confirm</label><input id="delWord" autocapitalize="characters" placeholder="DELETE"/></div>
+    <div class="field"><label for="delWord">Type DELETE to confirm</label><input id="delWord" autocapitalize="characters" placeholder="DELETE"/></div>
     <div class="err" id="delErr"></div>
     <button class="btn danger" id="delGo" style="margin-bottom:10px">Permanently delete everything</button>
     <button class="btn ghost" id="delNo">Keep my account</button>`);

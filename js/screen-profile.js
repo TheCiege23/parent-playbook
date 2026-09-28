@@ -9,12 +9,13 @@ async function screenProfile(){
   logUsageEvent('view_profile');
   const a=state.active; const age=ageFrom(a.birthdate);
   const householdIds=(state.athletes||[]).filter(x=>x.family_id===a.family_id).map(x=>x.id);
-  const [{data:sports},{data:access},{data:invites},{data:doneRows}] = await Promise.all([
+  const [{data:sports},{data:access},{data:invites},{data:doneRows},{data:membership}] = await Promise.all([
     sb.from('athlete_sports').select('*').eq('athlete_id',a.id),
     sb.from('athlete_access').select('*').eq('athlete_id',a.id).is('revoked_at',null),
     sb.from('athlete_invites').select('*').in('athlete_id',householdIds.length?householdIds:[a.id]).is('accepted_at',null).is('revoked_at',null),
     sb.from('sessions').select('done_on,title').eq('athlete_id',a.id)
       .gte('done_on',isoDay(mondayOfThisWeek())).lte('done_on',dateForDayIndex(6)),
+    sb.from('family_members').select('role').eq('family_id',a.family_id).eq('guardian_id',state.user.id).limit(1),
   ]);
   const _primary=(sports||[]).find(s=>s.is_primary)||(sports||[])[0];
   state.activeSportKey=_primary?.sport_key||state.activeSportKey||'general'; setAppBg();
@@ -22,6 +23,7 @@ async function screenProfile(){
   const myRole=state.role||(myAccess?myAccess.role:'owner');
   const isOwner=(myRole==='owner');
   const canEdit=state.canEdit!==false;
+  const canManageHousehold=!!(membership||[]).some(m=>m.role==='owner'||m.role==='co_parent');
   const sportName=state.ref?.sports.find(x=>x.key===_primary?.sport_key)?.name||'';
   const seasonLabel=(typeof seasonMeta==='function'&&_primary?.season_state)
     ? (seasonMeta(_primary.season_state)||{}).label : null;
@@ -113,7 +115,7 @@ async function screenProfile(){
       </div>
 
       <div class="card app-pad" style="margin-top:14px">
-        ${canEdit?H`<div class="navrow" id="addChild" role="button" tabindex="0"><div class="gi">👧</div>
+        ${canManageHousehold?H`<div class="navrow" id="addChild" role="button" tabindex="0"><div class="gi">👧</div>
           <div class="gt"><b>Add another athlete</b><span>Different sport, different age, separate plan</span></div><i>›</i></div>`:''}
         <div class="navrow" id="toAccount" role="button" tabindex="0"><div class="gi">⚙️</div>
           <div class="gt"><b>Account &amp; settings</b><span>Household, notifications, your data</span></div><i>›</i></div>

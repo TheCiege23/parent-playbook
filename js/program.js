@@ -1472,6 +1472,7 @@ function mondayOf(d){
 
 async function markSessionDone(ctx, btn){
   if(!ctx||!ctx.date) return;
+  if(ctx.date>todayISO()){ toast('You can mark this done on that day.'); return; }
   // The same two functions are now called from a sheet button, today's card, AND the
   // round tick on a day row. Restore whatever label was actually there on failure —
   // hardcoding "Mark done" turned a failed tick into a button reading "Mark done".

@@ -1,5 +1,5 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v146';
+const CACHE = 'pp-v147';
 // /privacy, /terms, /datadeletion, /coaches and /organizations are standalone pages, not
 // part of the SPA. Precached so an offline navigation to them serves the real page
 // instead of the index.html fallback.

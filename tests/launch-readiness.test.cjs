@@ -6,7 +6,7 @@ test('Profile binds the real invitation button while the hidden landing invite s
   const elements=new Map(),empty={querySelectorAll:()=>[]};
   const get=s=>{if(!elements.has(s))elements.set(s,{...empty});return elements.get(s);};
   const ctx={console,state:{user:{id:'owner'},active:{id:'kid',first_name:'QA',family_id:'family'},athletes:[],ref:{sports:[]},canEdit:true},
-    sb:{from:()=>{const q={select:()=>q,eq:()=>q,is:()=>q,in:()=>q,gte:()=>q,lte:()=>q,then:resolve=>resolve({data:[],error:null})};return q;}},
+    sb:{from:()=>{const q={select:()=>q,eq:()=>q,is:()=>q,in:()=>q,gte:()=>q,lte:()=>q,limit:()=>q,then:resolve=>resolve({data:[],error:null})};return q;}},
     $:get,H:(s,...v)=>s.reduce((out,x,i)=>out+x+(v[i]??''),''),esc:String,ageFrom:()=>12,
     isoDay:()=> '2026-09-21',mondayOfThisWeek:()=>new Date(),dateForDayIndex:()=> '2026-09-27',
     logUsageEvent(){},setAppBg(){},topBar:()=>'',playbookPath:()=>'',bindTop(){},bindPlaybookPath(){},

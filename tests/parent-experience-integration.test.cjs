@@ -32,12 +32,13 @@ test('Journey uses the resolved household role and Growth has a valid goals sect
   assert.match(growth,/\$\{maturityOffsetPrompt\(mat,a\)\}[\s\S]*\$\{growthPrompt\(mat\)\}[\s\S]*<div class="section-head">/);
 });
 
-test('co-parents can change the athlete plan while family viewers do not see edit controls',()=>{
+test('co-parents can change the athlete plan while household actions require membership',()=>{
   const profile=read('js/screen-profile.js'), account=read('js/account.js');
   assert.match(profile,/const canEdit=state\.canEdit!==false/);
   assert.match(profile,/\$\{canEdit\?'<button class="btn sm ghost" id="editSched">Edit<\/button>'/);
   assert.match(profile,/x\.role==='co_parent'\|\|x\.role==='owner'\?'edit':'view'/);
-  assert.match(account,/\$\{state\.canEdit\?H`<div class="navrow danger" id="delAthlete"/);
+  assert.match(profile,/\$\{canManageHousehold\?H`<div class="navrow" id="addChild"/);
+  assert.match(account,/\$\{canManageHousehold\?H`<div class="navrow danger" id="delAthlete"/);
   assert.match(account,/if\(state\.canEdit\) fillScanConsents\(\)/);
 });
 

@@ -62,27 +62,27 @@ function edRender(){
     <p style="color:var(--muted);font-size:13px;margin:0 0 16px">Changes apply to the weekly plan right away. Games, milestones, photos and measurements are never affected.</p>
 
     <div class="sec-title">The athlete</div>
-    <div class="field"><label>First name</label><input id="edFirst" value="${esc(ed.first)}" placeholder="Marcus"/></div>
-    <div class="field"><label>Nickname (optional)</label><input id="edNick" value="${esc(ed.nick)}" placeholder="What you actually call them"/></div>
-    <div class="field"><label>Birthdate</label>
+    <div class="field"><label for="edFirst">First name</label><input id="edFirst" value="${esc(ed.first)}" placeholder="Marcus"/></div>
+    <div class="field"><label for="edNick">Nickname (optional)</label><input id="edNick" value="${esc(ed.nick)}" placeholder="What you actually call them"/></div>
+    <div class="field"><label for="edBd">Birthdate</label>
       <input id="edBd" type="date" value="${esc(ed.bd)}" max="${todayISO()}"/>
       <div id="edBand">${edBandNote(ed.bd)}</div></div>
     <div class="field"><label>Sex at birth (optional)</label>
       <div class="chipgrid two" id="edSex">
-        ${['male','female'].map(x=>`<div class="chip ${ed.sex===x?'on':''}" role="button" tabindex="0" data-x="${x}">${x[0].toUpperCase()+x.slice(1)}</div>`).join('')}
+        ${['male','female'].map(x=>`<div class="chip ${ed.sex===x?'on':''}" role="button" aria-pressed="${ed.sex===x}" tabindex="0" data-x="${x}">${x[0].toUpperCase()+x.slice(1)}</div>`).join('')}
       </div>
       <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Only used for the growth chart on Growth —
         height percentiles and the adult-height estimate are different for boys and girls. Nothing else reads it.</p></div>
 
     <div class="field"><label>Dominant hand (optional)</label>
       <div class="chipgrid" id="edHand">
-        ${['left','right','both'].map(h=>`<div class="chip ${ed.hand===h?'on':''}" role="button" tabindex="0" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
+        ${['left','right','both'].map(h=>`<div class="chip ${ed.hand===h?'on':''}" role="button" aria-pressed="${ed.hand===h}" tabindex="0" data-h="${h}">${h[0].toUpperCase()+h.slice(1)}</div>`).join('')}
       </div></div>
 
     <div class="sec-title">The sport</div>
     <div class="field"><label>Sport</label>
       <div class="chipgrid" id="edSport">
-        ${sports.map(s=>`<div class="chip ${ed.sport===s.key?'on':''}" role="button" tabindex="0" data-s="${esc(s.key)}">${esc(s.name)}</div>`).join('')}
+        ${sports.map(s=>`<div class="chip ${ed.sport===s.key?'on':''}" role="button" aria-pressed="${ed.sport===s.key}" tabindex="0" data-s="${esc(s.key)}">${esc(s.name)}</div>`).join('')}
       </div>
       ${sportChanged?`<p style="font-size:11.5px;color:#9a4a12;margin:6px 2px 0">Switching sport clears the positions below — pick new ones. Practice days and everything in the Journey stay put.</p>`:''}
     </div>
@@ -91,13 +91,13 @@ function edRender(){
         ${posChips(ed.sport, ed.positions, 'edPos')}
         <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">Tap all that apply — the weekly drills follow these.</p>
       </div>
-      <div class="field"><label>League age cut-off (optional)</label>
+      <div class="field"><label for="edCutoff">League age cut-off (optional)</label>
         <input id="edCutoff" placeholder="MM-DD — e.g. 08-01" value="${esc(ed.cutoff||'')}"/>
         <p style="font-size:11.5px;color:var(--muted);margin:6px 2px 0">The date the league uses to set age groups —
           it's on the registration form. Lets Growth show how ${esc(ed.first||'your athlete')} sits against the
           oldest kids in the same band. Left blank, we don't guess.</p></div>
 
-      <div class="field"><label>Level</label>
+      <div class="field"><label for="edLevel">Level</label>
         <select id="edLevel"><option value="">Select level…</option>
           ${levels.map(l=>`<option ${ed.level===l?'selected':''}>${esc(l)}</option>`).join('')}
         </select></div>`:''}
@@ -116,7 +116,7 @@ function edRender(){
   $("#edBd").onchange=e=>{ ed.bd=e.target.value; const n=$("#edBand"); if(n) n.innerHTML=edBandNote(ed.bd); };
   $("#edHand").querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     ed.hand = ed.hand===c.dataset.h?'':c.dataset.h;
-    $("#edHand").querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.h===ed.hand));
+    $("#edHand").querySelectorAll('.chip').forEach(x=>{ const on=x.dataset.h===ed.hand; x.classList.toggle('on',on); x.setAttribute('aria-pressed',String(on)); });
   });
   $("#edSport").querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     if(ed.sport===c.dataset.s) return;
@@ -127,12 +127,16 @@ function edRender(){
       const code=c.dataset.p;
       ed.positions = ed.positions.includes(code)?ed.positions.filter(x=>x!==code):[...ed.positions,code];
       c.classList.toggle('on');
+      c.setAttribute('aria-pressed',String(ed.positions.includes(code)));
     }); }
   { const g=$("#edSex");
     if(g) g.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
       ed.sex = ed.sex===c.dataset.x ? '' : c.dataset.x;
-      g.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', x.dataset.x===ed.sex));
+      g.querySelectorAll('.chip').forEach(x=>{ const on=x.dataset.x===ed.sex; x.classList.toggle('on',on); x.setAttribute('aria-pressed',String(on)); });
     }); }
+  root.querySelectorAll('#edHand .chip,#edSport .chip,#edPos .chip,#edSex .chip').forEach(c=>c.onkeydown=e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); c.click(); }
+  });
   { const c=$("#edCutoff"); if(c) c.oninput=()=>ed.cutoff=c.value.trim(); }
   { const l=$("#edLevel"); if(l) l.onchange=()=>ed.level=l.value; }
   $("#edSave").onclick=edSave;
@@ -156,13 +160,14 @@ async function edSave(){
   try{
     const { error:ae }=await sb.from('athletes').update({
       first_name:first, nickname:(ed.nick||'').trim()||null,
-      birthdate:ed.bd, dominant_hand:ed.hand||null,
+      birthdate:ed.bd, dominant_hand:ed.hand||null, sex_at_birth:ed.sex||null,
     }).eq('id',state.active.id);
     if(ae) throw ae;
 
     if(ed.sportRowId){
       const { error:se }=await sb.from('athlete_sports').update({
         sport_key:ed.sport, positions:ed.positions, level:ed.level||null,
+        age_cutoff_md:ed.cutoff||null,
       }).eq('id',ed.sportRowId);
       if(se) throw se;
     }

@@ -27,10 +27,11 @@ function screenOrganizationAccount(){
 async function screenAccount(){
   logUsageEvent('view_account');
   const a=state.active;
-  const [{data:fam},{data:adminRows},{data:prefRows}] = await Promise.all([
+  const [{data:fam},{data:adminRows},{data:prefRows},{data:membership}] = await Promise.all([
     sb.from('families').select('id,name').eq('id', a.family_id).limit(1),
     sb.from('app_admins').select('guardian_id').limit(1),   // RLS: a row comes back only if the viewer is an admin
     sb.from('notification_prefs').select('*').eq('guardian_id',state.user.id).limit(1),
+    sb.from('family_members').select('role').eq('family_id',a.family_id).eq('guardian_id',state.user.id).limit(1),
   ]);
   // Invites are the only growth mechanism left, and every one of them says who sent it.
   // With no display_name they all read "A parent wants you to follow…", which is a
@@ -38,6 +39,8 @@ async function screenAccount(){
   const { data:me } = await sb.from('guardians').select('display_name,birthdate').eq('id',state.user.id).maybeSingle();
   const myName=(me&&me.display_name||'').trim();
   const isAdmin=!!(adminRows&&adminRows.length);
+  const canManageHousehold=!!(membership||[]).some(m=>m.role==='owner'||m.role==='co_parent');
+  const isFamilyOwner=!!(membership||[]).some(m=>m.role==='owner');
   const household=(fam&&fam[0])||null;
   // No row means both on — this table records preference, not permission.
   const prefs=(prefRows&&prefRows[0])||{weekly:true,game_day:true};
@@ -145,11 +148,11 @@ async function screenAccount(){
 
       <div class="sec-title">Danger zone</div>
       <div class="card app-pad">
-        ${state.canEdit?H`<div class="navrow danger" id="delAthlete" role="button" tabindex="0"><div class="gi">🗑️</div>
+        ${canManageHousehold?H`<div class="navrow danger" id="delAthlete" role="button" tabindex="0"><div class="gi">🗑️</div>
           <div class="gt"><b>Delete ${esc(a.first_name)}'s profile</b><span>Removes them and everything in their journey, for everyone</span></div><i>›</i></div>
         `:''}
         <div class="navrow danger" id="delAccount" role="button" tabindex="0"><div class="gi">⚠️</div>
-          <div class="gt"><b>Delete my account</b><span>${state.canEdit?'Your account and the family data you own':'Removes your sign-in and access to this family'}</span></div><i>›</i></div>
+          <div class="gt"><b>Delete my account</b><span>${isFamilyOwner?'Your account and the family data you own':'Removes your sign-in and access to this family'}</span></div><i>›</i></div>
       </div>
       <p class="muted-note">Deleting can't be undone. Export first if you want a copy.</p>
 
@@ -295,7 +298,7 @@ function openSeasonState(sportRow, onSaved){
 function openEditMyName(current){
   const bg=sheet(H`<h3>What should we call you?</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">This is the name on invites you send. Without it they read "A parent wants you to follow…", which is a stranger asking a grandparent for an account.</p>
-    <div class="field"><label>Your name</label>
+    <div class="field"><label for="gname">Your name</label>
       <input id="gname" value="${esc(current||'')}" maxlength="60" placeholder="e.g. Chris"/></div>
     <div class="err" id="gnerr"></div>
     <button class="btn" id="gnSave">Save</button>`);
@@ -314,7 +317,7 @@ function openEditMyName(current){
 function openRenameHousehold(household){
   const bg=sheet(H`<h3>Rename your household</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">Only you and the people you invite ever see this.</p>
-    <div class="field"><label>Household name</label>
+    <div class="field"><label for="fname">Household name</label>
       <input id="fname" value="${esc(household.name||'')}" maxlength="60" placeholder="The Johnson Family"/></div>
     <div class="err" id="fnerr"></div>
     <button class="btn" id="fnSave">Save</button>`);
@@ -333,9 +336,9 @@ function openRenameHousehold(household){
 function openChangePassword(){
   const bg=sheet(H`<h3>Change your password</h3>
     <p style="color:var(--muted);font-size:13px;margin:6px 0 12px">You'll stay signed in on this device.</p>
-    <div class="field"><label>New password</label>
+    <div class="field"><label for="pw1">New password</label>
       <input id="pw1" type="password" autocomplete="new-password" placeholder="At least 8 characters"/></div>
-    <div class="field"><label>Type it again</label>
+    <div class="field"><label for="pw2">Type it again</label>
       <input id="pw2" type="password" autocomplete="new-password" placeholder="Confirm"/></div>
     <div class="err" id="pwerr"></div>
     <button class="btn" id="pwSave">Update password</button>`);

@@ -259,7 +259,8 @@ async function screenWeek(){
         const isToday=idx===todayIdx;
         // Family view gets a small dot, never a checkbox — a control that looks
         // tappable and then refuses is worse than no control at all.
-        const tickable=w.t!=='rest'&&w.t!=='moved'&&!!w.act&&state.canEdit!==false;
+        const tickable=w.t!=='rest'&&w.t!=='moved'&&!!w.act&&state.canEdit!==false
+          &&(dateForDayIndex(idx)<=todayISO()||isDone);
         const cls=['day', isDone?'is-done':'', isMoved?'is-moved':'', isToday?'is-today':''].filter(Boolean).join(' ');
         return H`
         <div class="${cls}" data-day="${idx}">
