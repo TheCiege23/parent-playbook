@@ -227,7 +227,7 @@ test('Stripe sends the app to app-return, and app-return hands back only known r
 test('Universal Links and App Links claim only the app root, and the site serves both files', () => {
   const aasa = JSON.parse(read('.well-known/apple-app-site-association'));
   const detail = aasa.applinks.details[0];
-  assert.match(detail.appIDs[0], /\.com\.brownpig\.parentplaybook$/);
+  assert.equal(detail.appIDs[0], 'U52ZD3QY7V.com.playbookbp.app');
   assert.deepEqual(detail.components.map(c => c['/']), ['/']);
   const links = JSON.parse(read('.well-known/assetlinks.json'));
   assert.equal(links[0].target.package_name, 'com.brownpig.parentplaybook');

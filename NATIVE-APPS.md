@@ -8,7 +8,8 @@ build step, and `package.json` exists only for the app shells.
 
 | Piece | What it does |
 |---|---|
-| `capacitor.config.json` | App ID `com.brownpig.parentplaybook`, name, splash and push options |
+| `capacitor.config.json` | Name, splash and push options. Its `appId` (`com.brownpig.parentplaybook`) is the Android package; the iOS bundle ID is `com.playbookbp.app`, set in the Xcode project |
+| `codemagic.yaml` | Cloud iOS build: builds `www/`, signs, and uploads to TestFlight. See step 5 |
 | `tools/native/build-www.mjs` | Builds `www/` (gitignored): the app's files plus npm-pinned copies of Supabase, three.js, the HEIC decoder and MediaPipe, with every CDN URL rewritten to the local copy. It fails if any CDN code is left. |
 | `js/native.js` | Runs in both places. It does nothing on the website. In the app it handles links, push, downloads (share sheet), Stripe in a browser sheet, and incoming Universal Links / App Links. |
 | `ios/`, `android/` | The native projects. Edit freely. `cap sync` only replaces `public/` and generated config inside them. |
@@ -22,12 +23,12 @@ build step, and `package.json` exists only for the app shells.
 
 ### 1. Apple Developer (Brown Pig LLC)
 
-1. **Certificates, IDs & Profiles → Identifiers → +** → App ID `com.brownpig.parentplaybook`. Turn on
+1. **Certificates, IDs & Profiles → Identifiers → +** → App ID `com.playbookbp.app` (registered 6 Oct 2026). Turn on
    **Push Notifications** and **Associated Domains**.
 2. **Keys → +** → enable **Apple Push Notifications service (APNs)**. Download the `.p8` file (you only
    get one download) and note its **Key ID**.
 3. Note your **Team ID** (top right of the developer site, 10 characters).
-4. In `.well-known/apple-app-site-association`, replace `APPLE_TEAM_ID` with that Team ID.
+4. `.well-known/apple-app-site-association` already carries Team ID `U52ZD3QY7V` and `com.playbookbp.app`.
 5. **App Store Connect → Apps → +** → New App: iOS, name "Parent Playbook", bundle ID above, SKU
    `parentplaybook-ios`.
 
@@ -63,7 +64,7 @@ curl -s  https://playbookbp.com/.well-known/assetlinks.json
 | `APNS_KEY_ID` | Key ID from step 1.2 |
 | `APNS_TEAM_ID` | Team ID from step 1.3 |
 | `APNS_PRIVATE_KEY` | Full contents of the `.p8` file |
-| `APNS_BUNDLE_ID` | `com.brownpig.parentplaybook` |
+| `APNS_BUNDLE_ID` | `com.playbookbp.app` |
 | `APNS_ENV` | `production` (TestFlight and the App Store). Use `sandbox` only while testing an Xcode debug build. |
 | `FCM_SERVICE_ACCOUNT` | The whole service-account JSON from step 2.3 |
 
@@ -80,10 +81,26 @@ password". Their links now go straight to `playbookbp.com/?token_hash=…` inste
 redirect. A phone only opens the app for a link to playbookbp.com itself. The web app verifies the
 token too, so the website keeps working with the new templates.
 
-### 5. A Mac (or a cloud build)
+### 5. Codemagic (iOS builds without a Mac)
 
-iOS builds need Xcode on a Mac. If you don't have one, Codemagic or Ionic Appflow build Capacitor
-projects in the cloud. Android builds work anywhere with Android Studio.
+iOS builds need Xcode, so they run on Codemagic's Macs. `codemagic.yaml` is the whole build.
+Android builds work anywhere with Android Studio.
+
+1. **App Store Connect → Users and Access → Integrations → App Store Connect API → +**. Name it
+   "Codemagic", access **App Manager**. Download the `.p8` (one download only) and note the
+   **Issuer ID** and **Key ID**.
+2. **codemagic.io** → sign up with GitHub → **Add application** → `TheCiege23/parent-playbook`,
+   type **Capacitor**, and pick "codemagic.yaml" as the configuration.
+3. **Team settings → Integrations → Developer Portal → Connect**: give the Issuer ID, Key ID and
+   `.p8`, and save the key under the name **Parent Playbook ASC**. The name must match
+   `integrations.app_store_connect` in `codemagic.yaml`.
+4. **Code signing identities → iOS certificates → Generate certificate** (Apple Distribution).
+   Codemagic then creates the App Store profile for `com.playbookbp.app` on each build. The App ID
+   must have **Push Notifications** and **Associated Domains** turned on, because the entitlements
+   ask for both.
+5. **Start new build** → branch → workflow **iOS → TestFlight**. It takes about 15 minutes. The
+   build then shows up in App Store Connect → TestFlight after Apple's processing (another 5–30
+   minutes), and you pick it under **Build** on the version page.
 
 ## Building
 

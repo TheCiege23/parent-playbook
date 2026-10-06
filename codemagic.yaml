@@ -1,0 +1,47 @@
+# Cloud iOS build for the App Store (codemagic.io). There's no Mac in the loop: Codemagic builds www/,
+# signs with a distribution certificate and an App Store profile it manages through the App Store
+# Connect API key, and uploads the .ipa to TestFlight. Setup and the first run: NATIVE-APPS.md, step 5.
+#
+# Runs only when started by hand from the Codemagic dashboard. No push or tag triggers.
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      # The App Store Connect API key's name as saved under Codemagic → Team settings → Integrations.
+      app_store_connect: Parent Playbook ASC
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.playbookbp.app
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Build the app bundle and sync iOS
+        script: |
+          npm run native:www
+          npx cap sync ios
+      - name: Production push entitlement
+        # App.entitlements says development so an Xcode debug build on a phone gets sandbox pushes.
+        # An App Store profile only carries production, and the archive fails if they differ.
+        script: /usr/libexec/PlistBuddy -c "Set :aps-environment production" ios/App/App/App.entitlements
+      - name: Code signing
+        script: xcode-project use-profiles
+      - name: Build the .ipa
+        # Codemagic's BUILD_NUMBER rises on every run of this workflow, so each upload gets a fresh
+        # CFBundleVersion without editing the project. MARKETING_VERSION (1.0) still lives in Xcode.
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App" \
+            --archive-xcargs "CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

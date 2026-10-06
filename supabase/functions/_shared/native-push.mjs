@@ -18,7 +18,7 @@
 //   APNS_KEY_ID        the 10-character Key ID of the .p8 key (Apple Developer → Keys)
 //   APNS_TEAM_ID       the 10-character Team ID
 //   APNS_PRIVATE_KEY   the .p8 file's contents, PEM, newlines intact or as \n
-//   APNS_BUNDLE_ID     com.brownpig.parentplaybook
+//   APNS_BUNDLE_ID     com.playbookbp.app
 //   APNS_ENV           'production' (TestFlight and the App Store) or 'sandbox' (Xcode debug builds)
 //   FCM_SERVICE_ACCOUNT the Firebase service-account JSON (Project settings → Service accounts)
 

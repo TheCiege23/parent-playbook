@@ -38,7 +38,7 @@ test('iOS: an ES256 provider token Apple can verify, sent to the production host
   const key = await pkcs8Pem({ name: 'ECDSA', namedCurve: 'P-256' }, ['sign', 'verify']);
   const fetch = fakeFetch(() => ({ status: 200 }));
   const native = createNativePush({
-    config: { apns: { keyId: 'ABC123DEFG', teamId: 'TEAM123456', privateKey: key.pem.replace(/\n/g, '\\n'), bundleId: 'com.brownpig.parentplaybook', environment: 'production' } },
+    config: { apns: { keyId: 'ABC123DEFG', teamId: 'TEAM123456', privateKey: key.pem.replace(/\n/g, '\\n'), bundleId: 'com.playbookbp.app', environment: 'production' } },
     fetch, now: () => Date.parse('2026-10-06T12:00:00Z'), subtle,
   });
   assert.deepEqual(native.configured, { ios: true, android: false });
@@ -46,7 +46,7 @@ test('iOS: an ES256 provider token Apple can verify, sent to the production host
 
   const [{ url, init }] = fetch.calls;
   assert.equal(url, 'https://api.push.apple.com/3/device/devicetoken01');
-  assert.equal(init.headers['apns-topic'], 'com.brownpig.parentplaybook');
+  assert.equal(init.headers['apns-topic'], 'com.playbookbp.app');
   assert.equal(init.headers['apns-push-type'], 'alert');
   assert.deepEqual(JSON.parse(init.body), { aps: { alert: { title: 'Week ready', body: 'Sam’s week is ready' }, sound: 'default' }, url: '/#week' });
 
