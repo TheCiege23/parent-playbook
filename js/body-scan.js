@@ -1050,10 +1050,13 @@ async function bsSaveEvidence(result,record,btn){
     const name='device-session-'+evidence.build.serviceWorkerCache+'-'
       +evidence.recordedAt.slice(0,19).replace(/[:T-]/g,'')+'.json';
     const blob=new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=name;
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    if(typeof saveFile==='function') await saveFile(blob,name);
+    else{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=name;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
     toast('Session evidence saved');
   }catch(error){
     console.error(error); reportError(error,'scan:deviceEvidence');

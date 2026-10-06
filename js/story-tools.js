@@ -140,7 +140,7 @@ async function openStoryReel(media){
         await storyWaitForClip(active,c.end,c.end-c.start,draw,current);if(recorder.state==='recording')recorder.pause();
       }
       recorder.stop();await stopped;if(!current())throw Error('Rendering cancelled.');const blob=new Blob(chunks,{type:mime});if(!blob.size)throw Error('No video was recorded.');
-      const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='highlight-reel.'+(mime.includes('mp4')?'mp4':'webm');link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status.textContent='Reel saved. Review it before sharing.';
+      const reelName='highlight-reel.'+(mime.includes('mp4')?'mp4':'webm');if(typeof saveFile==='function')await saveFile(blob,reelName);else{const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=reelName;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}status.textContent='Reel saved. Review it before sharing.';
     }catch(e){console.error(e);status.textContent=e.message||'Could not render.';}
     finally{active?.pause();if(recorder&&recorder.state!=='inactive'){recorder.stop();try{await stopped;}catch{}}stream?.getTracks().forEach(t=>t.stop());if(audio)await audio.close();for(const video of loaded){video.pause();video.removeAttribute('src');video.load();}controls.forEach(input=>input.disabled=false);button.disabled=false;}
   };

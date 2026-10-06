@@ -136,7 +136,14 @@ function authRedirectUrl(){
   const t=inviteTokenFromUrl();  if(t)  p.push('invite='+encodeURIComponent(t));
   const tm=teamCodeFromUrl();    if(tm) p.push('team='+encodeURIComponent(tm));
   if(location.hash==='#account' || /[?&]account=1(?:&|$)/.test(location.search||'')) p.push('login=1','account=1');
-  return location.origin+location.pathname+(p.length?('?'+p.join('&')):'');
+  // Also kept on this device: an email sign-in link built from {{ .SiteURL }} and the token hash
+  // (emails/confirm-email.html) does not carry these, and boot() puts them back after verifying it.
+  try{ localStorage.setItem('pp_auth_return', JSON.stringify({ q:p.join('&'), at:Date.now() })); }catch(e){}
+  // In the iOS / Android app location.origin is capacitor://localhost or https://localhost, which
+  // no email client can open. The link must point at the website, where it opens the app.
+  const origin = typeof publicOrigin==='function' ? publicOrigin() : location.origin;
+  const path = typeof isNativeApp==='function' && isNativeApp() ? '/' : location.pathname;
+  return origin+path+(p.length?('?'+p.join('&')):'');
 }
 function renderAuth(mode='login', prefill=''){
   const organizationEntry = location.hash==='#account' || /[?&]account=1(?:&|$)/.test(location.search||'');
@@ -316,7 +323,7 @@ function renderForgot(prefill=''){
     if(!email){ errEl.textContent="Enter your email."; return; }
     if(!validEmail(email)){ errEl.textContent="That email doesn't look right — check it for typos."; return; }
     const btn=$("#send"); const label=btn.textContent; btn.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; btn.disabled=true;
-    const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:location.origin+location.pathname });
+    const { error }=await sb.auth.resetPasswordForEmail(email,{ redirectTo:(typeof publicOrigin==='function'?publicOrigin():location.origin)+(typeof isNativeApp==='function'&&isNativeApp()?'/':location.pathname) });
     // resetPasswordForEmail returns success whether or not the account exists (no
     // enumeration), so any error here is a real config/rate problem — surface it.
     if(error){ console.error(error); errEl.textContent=friendlyAuthErr(error.message); btn.innerHTML=label; btn.disabled=false; return; }

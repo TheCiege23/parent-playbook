@@ -1,6 +1,6 @@
 # Parent Playbook
 
-A private weekly playbook for sports parents — weekly plans, at‑home activities, an athlete journey (games, milestones, photos), and age‑appropriate parent guidance. Installable progressive web app (add to home screen, no app store). No build step.
+A private weekly playbook for sports parents — weekly plans, at‑home activities, an athlete journey (games, milestones, photos), and age‑appropriate parent guidance. Installable progressive web app, plus iOS and Android apps for the App Store and Google Play built from the same files with Capacitor (see **[NATIVE-APPS.md](./NATIVE-APPS.md)**). The website has no build step.
 
 - **Live:** https://playbookbp.com
 - **Backend:** Supabase (auth, database, storage)

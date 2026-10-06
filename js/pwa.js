@@ -1,6 +1,10 @@
 // Definitions only — init.js calls these. (ARCHITECTURE.md golden rule: no load-time
 // code in feature modules, because browsers don't hoist across separate <script> tags.)
+// Not in the App Store / Play Store builds: their files are already on the phone, and a service
+// worker caching them would serve last version's code after an app update.
+const ppNative = () => typeof isNativeApp==='function' && isNativeApp();
 function registerServiceWorker(){
+  if(ppNative()) return;
   if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 }
 
@@ -10,7 +14,7 @@ function registerServiceWorker(){
 // fails with a 403 that looks like nothing at all from the parent's side.
 const VAPID_PUBLIC = 'BKNftzPUHSgXaRl_K0lBrF5jhJuamG59JlskkQOMMwwslHx-rt2pjNMVsuQ8xqDCktqa6p9LvKezhC0qFMykeB0';
 function urlB64ToUint8Array(b){ const pad='='.repeat((4-b.length%4)%4); const s=(b+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(s); const out=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
-function pushSupported(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+function pushSupported(){ if(ppNative()) return true; return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
 // Apple only delivers web push to a page installed to the Home Screen. In a normal Safari
 // tab PushManager is simply absent, so pushSupported() is false — and telling an iPhone
 // owner "not supported on this device" is both untrue and a dead end. It IS supported;
@@ -22,7 +26,7 @@ function isIOSDevice(){
 function isInstalled(){
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
 }
-function pushNeedsInstall(){ return isIOSDevice() && !isInstalled(); }
+function pushNeedsInstall(){ return !ppNative() && isIOSDevice() && !isInstalled(); }
 // Does an existing subscription belong to the key we are currently signing with?
 // A PushSubscription is bound to the applicationServerKey it was created with, forever.
 // Rotate VAPID keys and every existing subscription becomes undeliverable — but it is
@@ -41,6 +45,7 @@ function subMatchesKey(sub, keyBytes){
 
 // True if this device currently has a live subscription on the current key.
 async function pushIsOn(){
+  if(ppNative()) return nativePushIsOn();
   try{
     if(!pushSupported() || Notification.permission!=='granted') return false;
     const reg=await navigator.serviceWorker.getRegistration();
@@ -82,6 +87,7 @@ function showIosPushHelp(){
 // getRegistration() rather than .ready: ready never resolves when nothing is registered,
 // which would hang a logout on a browser that had never installed the worker.
 async function releasePushOnThisDevice(){
+  if(ppNative()) return nativePushRelease();
   try{
     if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     const reg = await navigator.serviceWorker.getRegistration();
@@ -96,6 +102,7 @@ async function releasePushOnThisDevice(){
 }
 
 async function enablePush(){
+  if(ppNative()) return nativePushEnable();
   if(pushNeedsInstall()){ showIosPushHelp(); return false; }
   if(!pushSupported()){ toast('Notifications aren’t supported on this device'); return false; }
   try{
@@ -151,6 +158,7 @@ function handleStripeReturn(){
 
 // ---- Add to Home Screen (install without an app store) ----
 function initInstallBanner(){
+  if(ppNative()) return;
   var KEY='pp_a2hs_dismissed';
   var el=document.getElementById('a2hs'); if(!el) return;
   var go=document.getElementById('a2hsGo'), x=document.getElementById('a2hsX'),

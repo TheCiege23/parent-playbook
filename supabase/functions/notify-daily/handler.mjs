@@ -30,7 +30,7 @@ export function dailyMessage(names) {
 
 const unique = values => [...new Set(values)];
 
-export function createNotifyDailyHandler({ db, push, env = {}, now = () => new Date() } = {}) {
+export function createNotifyDailyHandler({ db, push, native = null, env = {}, now = () => new Date() } = {}) {
   if (!db || !push) throw new TypeError('createNotifyDailyHandler needs db and push');
 
   return async function handle(req) {
@@ -83,7 +83,7 @@ export function createNotifyDailyHandler({ db, push, env = {}, now = () => new D
 
       const capped = await overCap(db, unique(subscriptions.map(s => s.user_id)), at);
       const tally = await deliver({
-        db, push, subscriptions, dry, url: '/#week', kind: 'daily', vapid,
+        db, push, native, subscriptions, dry, url: '/#week', kind: 'daily', vapid,
         skip: id => (capped.has(id) ? 'capped' : declined.has(id) ? 'opted_out' : null),
         message: id => dailyMessage(names.get(id) || []),
       });

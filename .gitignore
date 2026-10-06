@@ -37,3 +37,10 @@ __pycache__/
 
 # Generated company SDK handoff packages; source remains in js/ and tools/.
 tools/sdk-releases/
+
+# Native app shells (Capacitor). www/ is generated from the web app by tools/native/build-www.mjs
+# on every sync; the platform projects keep their own build output out via their own .gitignore.
+www/
+*.p8
+*.jks
+*.keystore

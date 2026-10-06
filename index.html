@@ -79,9 +79,9 @@
    This is a synchronous guess made before first paint; js/landing.js does the real
    thing. Kept inline and tiny on purpose — it runs before any stylesheet paints. */
 (function(){try{
-  var m=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
+  var m=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
   var h=location.hash||'',s=location.search||'';
-  var link=/^#(app|week|growth|scan|insights|journey|profile|account|activity|adult)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
+  var link=/^#(app|week|growth|scan|insights|journey|profile|account|activity|adult)$/.test(h)||h.indexOf('type=recovery')!==-1||h.indexOf('access_token=')!==-1||s.indexOf('token_hash=')!==-1||s.indexOf('invite=')!==-1||s.indexOf('source=pwa')!==-1;
   var sess=false;
   for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
     if(k&&k.indexOf('sb-')===0&&k.indexOf('-auth-token')!==-1&&localStorage.getItem(k)){sess=true;break;}}
@@ -584,6 +584,7 @@
      privacy settings for this app are applied, so the order is not cosmetic.
      The loader carries the DSN in its URL and buffers errors thrown during boot.
      If it fails to load, sentryOnLoad is simply never called and the app is unaffected. -->
+<script src="/js/native.js"></script>
 <script src="/js/dates.js"></script>
 <script src="/js/device-evidence.js"></script>
 <script src="/js/monitoring.js"></script>

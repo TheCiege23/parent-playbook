@@ -7,6 +7,8 @@
 // booking id is answered exactly like someone else's booking. Unexpected failures answer a plain 500 rather
 // than echoing a Stripe or database message to the browser.
 
+import { stripeReturnBase } from '../_shared/stripe-return.mjs';
+
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -28,6 +30,7 @@ export function createStripeCheckoutHandler({ callerClient, db, stripe, appUrl =
       if (!user) return json({ error: 'unauthorized' }, 401);
 
       const body = await req.json().catch(() => ({}));
+      const back = stripeReturnBase(appUrl, body);
       const bookingId = body?.booking_id;
       if (typeof bookingId !== 'string' || !UUID.test(bookingId)) return json({ error: 'Booking not found' }, 404);
 
@@ -51,8 +54,8 @@ export function createStripeCheckoutHandler({ callerClient, db, stripe, appUrl =
         mode: 'payment',
         line_items: [{ price_data: { currency: booking.currency || 'usd', product_data: { name: title }, unit_amount: amount }, quantity: 1 }],
         payment_intent_data: { application_fee_amount: fee, transfer_data: { destination: trainer.stripe_account_id } },
-        success_url: appUrl + '/?paid=' + bookingId,
-        cancel_url: appUrl + '/?paycancel=' + bookingId,
+        success_url: back + '?paid=' + bookingId,
+        cancel_url: back + '?paycancel=' + bookingId,
         metadata: { booking_id: bookingId },
       });
       return json({ url: session.url });

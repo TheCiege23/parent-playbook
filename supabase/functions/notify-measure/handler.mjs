@@ -36,7 +36,7 @@ export function measureMessage(names) {
 
 const unique = values => [...new Set(values)];
 
-export function createNotifyMeasureHandler({ db, push, env = {}, now = () => new Date() } = {}) {
+export function createNotifyMeasureHandler({ db, push, native = null, env = {}, now = () => new Date() } = {}) {
   if (!db || !push) throw new TypeError('createNotifyMeasureHandler needs db and push');
 
   return async function handle(req) {
@@ -91,7 +91,7 @@ export function createNotifyMeasureHandler({ db, push, env = {}, now = () => new
       // Headroom rather than the plain cap. An unreadable log yields nothing: it fails open like the cap.
       const counts = (await weeklyCounts(db, unique(subscriptions.map(s => s.user_id)), at)) || {};
       const tally = await deliver({
-        db, push, subscriptions, dry, url: '/#growth', kind: 'measure', vapid,
+        db, push, native, subscriptions, dry, url: '/#growth', kind: 'measure', vapid,
         skip: id => ((counts[id] || 0) >= CAP_HEADROOM ? 'yielded' : declined.has(id) ? 'opted_out' : null),
         message: id => measureMessage(names.get(id) || []),
       });

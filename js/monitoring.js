@@ -31,7 +31,10 @@
 (function initMonitoring(){
   // Don't report from local development — it's noise, and it burns quota.
   const host = location.hostname;
-  const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
+  // The iOS and Android apps serve their bundled files from capacitor://localhost and
+  // https://localhost. That is production, not a laptop.
+  const isNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  const isLocal = !isNative && (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local'));
 
   const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/gi;
   const TOKEN = /(bearer\s+|apikey=|access_token=|refresh_token=)[\w.\-]+/gi;

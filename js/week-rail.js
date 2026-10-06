@@ -147,10 +147,12 @@ function downloadGameIcs(a, day, isoDate){
     'SUMMARY:' + esc2(title),
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
+  const icsName = (a.first_name || 'game') + '-' + isoDate + '.ics';
+  if (typeof saveFile === 'function') return saveFile(new Blob([ics], { type: 'text/calendar' }), icsName);
   const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = (a.first_name || 'game') + '-' + isoDate + '.ics';
+  link.download = icsName;
   document.body.appendChild(link);
   link.click();
   link.remove();

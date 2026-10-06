@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["U52ZD3QY7V.com.playbookbp.app"],
+        "components": [
+          { "/": "/", "comment": "Only the app's own URL. Invites (?invite=), team codes (?team=) and email sign-in links (?token_hash=) all land here; /privacy, /terms, /app-return and every other page stay in the browser." }
+        ]
+      }
+    ]
+  }
+}

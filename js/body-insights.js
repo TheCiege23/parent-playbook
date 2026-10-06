@@ -171,8 +171,7 @@ async function screenBodyInsights(){
     host.querySelector('#biCSV').onclick=()=>assessmentDownload(assessmentCSV(rows),'text/csv;charset=utf-8','body-insights-'+athlete.id+'.csv');
     host.querySelector('#biExport').onclick=()=>{
       const payload={schema_version:1,exported_at:new Date().toISOString(),athlete:{id:athlete.id,first_name:athlete.first_name},scope:'All recorded measurements for this athlete; not limited to the selected date.',body_output_dictionary:{version:BODY_OUTPUT_VERSION,definitions:BODY_OUTPUTS,scope:'Current app definitions; historical records retain their own recorded versions.'},measurements:rows};
-      const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-      const a=document.createElement('a');a.href=url;a.download='body-insights-'+athlete.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      assessmentDownload(JSON.stringify(payload,null,2),'application/json','body-insights-'+athlete.id+'.json');
     };
   };
   draw();

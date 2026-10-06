@@ -1059,3 +1059,13 @@
 .story-tools-footer{margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
 .story-tools [role=status],.story-tools [role=alert]{overflow-wrap:anywhere}
 @media(max-width:560px){.sheet.story-sheet{padding:18px}.story-hero{padding:22px}.story-clips,.story-awards{grid-template-columns:1fr}.story-links{gap:16px;font-size:13px}}
+
+/* App Store / Play Store builds (js/native.js adds html.native-app). The app draws edge to edge
+   (capacitor.config.json ios.contentInset "never"; Android is edge-to-edge by default), so the
+   status bar area is ours to keep clear. The installed web app never needed this: iOS keeps its
+   "default" status bar above the page. Capacitor also sets --safe-area-inset-* on Android
+   WebViews that do not report env() yet. */
+html.native-app{--pp-top-inset:max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))}
+html.native-app body{padding-top:var(--pp-top-inset)}
+html.native-app .roview{top:var(--pp-top-inset)}
+html.native-app .mv{padding-top:var(--pp-top-inset)}

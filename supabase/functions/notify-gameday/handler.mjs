@@ -32,7 +32,7 @@ export function inSeason(sport, dayIso) {
 
 const unique = values => [...new Set(values)];
 
-export function createNotifyGamedayHandler({ db, push, env = {}, now = () => new Date() } = {}) {
+export function createNotifyGamedayHandler({ db, push, native = null, env = {}, now = () => new Date() } = {}) {
   if (!db || !push) throw new TypeError('createNotifyGamedayHandler needs db and push');
 
   return async function handle(req) {
@@ -87,7 +87,7 @@ export function createNotifyGamedayHandler({ db, push, env = {}, now = () => new
 
       const capped = await overCap(db, unique(subscriptions.map(s => s.user_id)), at);
       const tally = await deliver({
-        db, push, subscriptions, dry, url: '/#week', kind: 'game_day', vapid,
+        db, push, native, subscriptions, dry, url: '/#week', kind: 'game_day', vapid,
         skip: id => (capped.has(id) ? 'capped' : declined.has(id) ? 'opted_out' : null),
         message: id => gamedayMessage(names.get(id) || []),
       });

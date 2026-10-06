@@ -12,6 +12,8 @@
 // click or a retry does not leave a second customer; and a failed save of the subscription row stops before
 // Checkout opens. Otherwise a guardian could pay for a subscription whose webhook has no row to update.
 
+import { stripeReturnBase } from '../_shared/stripe-return.mjs';
+
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -33,6 +35,7 @@ export function createStripeSubscribeHandler({ callerClient, db, stripe, prices 
       const caller = callerClient(req.headers.get('Authorization') || '');
       const { data: { user } } = await caller.auth.getUser();
       if (!user) return json({ error: 'unauthorized' }, 401);
+      const back = stripeReturnBase(appUrl, await req.json().catch(() => ({})));
 
       const { data: sub, error: subError } = await db.from('subscriptions').select('*').eq('guardian_id', user.id).maybeSingle();
       if (subError) return json({ error: 'Could not start the subscription' }, 500);
@@ -65,8 +68,8 @@ export function createStripeSubscribeHandler({ callerClient, db, stripe, prices 
         line_items: [{ price: priceId, quantity: 1 }],
         subscription_data: { metadata: { guardian_id: user.id } },
         metadata: { guardian_id: user.id },
-        success_url: appUrl + '/?premium=success',
-        cancel_url: appUrl + '/?premium=cancel',
+        success_url: back + '?premium=success',
+        cancel_url: back + '?premium=cancel',
       });
       return json({ url: session.url });
     } catch {

@@ -10,6 +10,8 @@
 //   - a 404 or 410 from the push service means the browser threw the subscription away, so it is deleted;
 //     anything else is reported, because a total delivery failure must not look like "nobody subscribed".
 
+import { sendPush } from './native-push.mjs';
+
 export const WEEKLY_CAP = 4;
 export const QUIET_FROM = 21;
 export const QUIET_TO = 7;
@@ -107,7 +109,7 @@ export async function optedOut(db, guardianIds, column) {
  *   skip(userId)    -> 'capped' | 'opted_out' | 'yielded' | null
  * Sends are logged to notification_log after they succeed; a failed log write never blocks a send.
  */
-export async function deliver({ db, push, subscriptions, message, skip = () => null, dry, url, kind, vapid }) {
+export async function deliver({ db, push, native = null, subscriptions, message, skip = () => null, dry, url, kind, vapid }) {
   const tally = { sent: 0, skipped: 0, reaped: 0, cappedOut: 0, yielded: 0, failures: [], preview: [] };
   if (!dry) push.setVapidDetails(vapid.subject || 'mailto:support@playbookbp.com', vapid.publicKey, vapid.privateKey);
   for (const subscription of subscriptions) {
@@ -120,7 +122,7 @@ export async function deliver({ db, push, subscriptions, message, skip = () => n
     const [title, body] = msg;
     if (dry) { tally.preview.push({ title, body }); tally.sent++; continue; }
     try {
-      await push.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify({ title, body, url }));
+      await sendPush({ push, native }, subscription, { title, body, url });
       tally.sent++;
       await db.from('notification_log').insert({ guardian_id: subscription.user_id, kind });
     } catch (error) {

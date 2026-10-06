@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#0B1F1A" />
+<title>Back to Parent Playbook</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<!--
+  Stripe sends the iOS and Android apps here after Checkout or payout setup (return_to:'app' in
+  supabase/functions/_shared/stripe-return.mjs). The app opened Stripe in an in-app browser sheet;
+  this page hands the result back through the parentplaybook:// scheme, which js/native.js reads.
+  No app code, no Supabase, nothing to load: the result is in the query string and the webhook is
+  what actually records a payment.
+-->
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{min-height:100dvh;background:#0B1F1A;
+    background-image:radial-gradient(circle at 88% -10%,rgba(23,147,111,.45),transparent 42%),linear-gradient(150deg,#0E3B31 0%,#0B1F1A 52%,#04120E 100%);
+    color:#F6F2E9;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;
+    display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{max-width:380px;width:100%;text-align:center}
+  .mark{width:56px;height:56px;border-radius:16px;background:#EFA33B;color:#0B1F1A;margin:0 auto 22px;
+    display:grid;place-items:center;font-weight:900;font-size:26px}
+  h1{font-size:28px;line-height:1.1;letter-spacing:-.02em;margin:0 0 12px}
+  p{font-size:16px;line-height:1.55;color:rgba(246,242,233,.78);margin:0 0 26px}
+  a.btn{display:block;padding:16px 20px;border-radius:14px;background:#EFA33B;color:#04120E;font-weight:800;
+    font-size:17px;text-decoration:none}
+  .fine{font-size:13px;margin-top:18px;color:rgba(246,242,233,.6)}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="mark" aria-hidden="true">P</div>
+  <h1 id="title">All set</h1>
+  <p id="lede">Tap below to go back to Parent Playbook.</p>
+  <a class="btn" id="back" href="parentplaybook://return">Back to the app</a>
+  <p class="fine">Nothing happened? Close this page with <b>Done</b> and you will be right where you left off.</p>
+</main>
+<script>
+(function(){
+  var allowed = ['paid','paycancel','stripe','premium'];
+  var p = new URLSearchParams(location.search), keep = new URLSearchParams();
+  allowed.forEach(function(k){ var v = p.get(k); if(v && /^[\w-]{1,64}$/.test(v)) keep.set(k, v); });
+  var copy = {
+    paid: ['Payment complete', 'Your booking is paid. Tap below to go back to Parent Playbook.'],
+    paycancel: ['Payment canceled', 'Nothing was charged. Tap below to go back to Parent Playbook.'],
+    stripe: ['Payout setup updated', 'Tap below to go back to Parent Playbook.'],
+    premium: [p.get('premium') === 'success' ? 'Welcome to Premium' : 'No change made', 'Tap below to go back to Parent Playbook.']
+  };
+  for (var i = 0; i < allowed.length; i++) {
+    if (keep.has(allowed[i])) {
+      document.getElementById('title').textContent = copy[allowed[i]][0];
+      document.getElementById('lede').textContent = copy[allowed[i]][1];
+      break;
+    }
+  }
+  var target = 'parentplaybook://return' + (keep.toString() ? '?' + keep.toString() : '');
+  document.getElementById('back').href = target;
+})();
+</script>
+</body>
+</html>
