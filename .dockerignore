@@ -6,3 +6,7 @@ supabase
 *.md
 !llms.txt
 .vercel
+ios
+android
+www
+store

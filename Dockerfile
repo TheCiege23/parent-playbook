@@ -18,7 +18,7 @@ FROM caddy:2-alpine
 WORKDIR /srv
 
 # Pages
-COPY index.html 404.html privacy.html terms.html datadeletion.html coaches.html organizations.html friday-demo.html company-persistence-demo.html company-composition-demo.html ./
+COPY index.html 404.html app-return.html privacy.html terms.html datadeletion.html coaches.html organizations.html friday-demo.html company-persistence-demo.html company-composition-demo.html ./
 COPY tools/sdk-demo.html ./company-sdk-demo.html
 
 # Root assets and PWA plumbing
@@ -29,6 +29,10 @@ COPY icon.svg og.png manifest.webmanifest sw.js sitemap.xml llms.txt ./
 # site is that route. Serving a public key is what a public key is for. The PRIVATE half
 # lives outside the repository and is never built into anything.
 COPY SIGNING-KEY.pub.pem ./SIGNING-KEY.pub.pem
+
+# iOS Universal Links / Android App Links verification, read by Apple and Google from
+# https://playbookbp.com/.well-known/. See NATIVE-APPS.md for the two values to fill in.
+COPY .well-known/apple-app-site-association .well-known/assetlinks.json ./.well-known/
 
 # App code
 COPY css/   ./css/
@@ -48,10 +52,10 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Fail the build rather than the audit: if a private file ever reaches the image,
 # stop here instead of discovering it with curl in production.
 RUN set -eu; \
-    for bad in AUDIT.md ARCHITECTURE.md README.md LAUNCH-READINESS.md AUDIT-WALKTHROUGH.md supabase .env .claude; do \
+    for bad in AUDIT.md ARCHITECTURE.md README.md LAUNCH-READINESS.md AUDIT-WALKTHROUGH.md NATIVE-APPS.md supabase .env .claude node_modules ios android store; do \
       if [ -e "/srv/$bad" ]; then echo "REFUSING TO SHIP: /srv/$bad is private"; exit 1; fi; \
     done; \
-    for good in index.html 404.html friday-demo.html company-persistence-demo.html company-composition-demo.html company-sdk-demo.html sdk-demo.mjs company-persistence-demo.mjs company-composition-demo.mjs sw.js manifest.webmanifest css/app.css js/maturity.js emails/invite.html; do \
+    for good in index.html 404.html app-return.html .well-known/apple-app-site-association .well-known/assetlinks.json friday-demo.html company-persistence-demo.html company-composition-demo.html company-sdk-demo.html sdk-demo.mjs company-persistence-demo.mjs company-composition-demo.mjs sw.js manifest.webmanifest css/app.css js/maturity.js emails/invite.html; do \
       if [ ! -e "/srv/$good" ]; then echo "MISSING: /srv/$good"; exit 1; fi; \
     done; \
     echo "asset allowlist verified"

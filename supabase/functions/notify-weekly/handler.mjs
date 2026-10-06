@@ -24,7 +24,7 @@ export function weeklyMessage(names) {
 
 const unique = values => [...new Set(values)];
 
-export function createNotifyWeeklyHandler({ db, push, env = {}, now = () => new Date() } = {}) {
+export function createNotifyWeeklyHandler({ db, push, native = null, env = {}, now = () => new Date() } = {}) {
   if (!db || !push) throw new TypeError('createNotifyWeeklyHandler needs db and push');
 
   return async function handle(req) {
@@ -56,7 +56,7 @@ export function createNotifyWeeklyHandler({ db, push, env = {}, now = () => new 
       const capped = await overCap(db, guardianIds, at);
       const declined = await optedOut(db, guardianIds, 'weekly');
       const tally = await deliver({
-        db, push, subscriptions, dry, url: '/#week', kind: 'weekly', vapid,
+        db, push, native, subscriptions, dry, url: '/#week', kind: 'weekly', vapid,
         skip: id => (capped.has(id) ? 'capped' : declined.has(id) ? 'opted_out' : null),
         message: id => weeklyMessage(names.get(id) || []),
       });

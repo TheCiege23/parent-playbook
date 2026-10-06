@@ -41,6 +41,9 @@
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
         || navigator.standalone === true;
   }
+  // The App Store / Play Store build never shows the marketing page: whoever opened it has
+  // already installed the app.
+  function isNativeShell(){ return typeof isNativeApp==='function' && isNativeApp(); }
   // Every in-app tab, not just '#app'. Without the rest of these, opening
   // /#journey while signed in fell through to hasStoredSession(), and enterApp then
   // REPLACED the hash with '#app' — so #journey and #profile both silently landed on
@@ -53,6 +56,7 @@
     return APP_HASHES.indexOf(h) !== -1
         || h.indexOf('type=recovery') !== -1
         || h.indexOf('access_token=') !== -1     // Supabase drops its auth hash here
+        || s.indexOf('token_hash=') !== -1       // an email sign-in link verified in boot()
         || s.indexOf('invite=') !== -1
         || s.indexOf('source=pwa') !== -1        // the manifest's start_url
         || s.indexOf('paid=') !== -1 || s.indexOf('paycancel=') !== -1 || s.indexOf('stripe=') !== -1
@@ -73,6 +77,9 @@
     }catch(e){}
     return false;
   }
+  // A first launch of the app goes where "Start free" goes: account-last setup, which has its own
+  // "Already have an account? Log in" for someone reinstalling.
+  if(isNativeShell()){ enterApp(hasStoredSession() || isAppLink() ? undefined : 'signup'); return; }
   if(isInstalledMode() || isAppLink() || hasStoredSession()){ enterApp(); return; }
 
   // ---- CTAs ----

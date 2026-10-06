@@ -1,13 +1,52 @@
 // ===================================================================
 //  BOOT
 // ===================================================================
+// An email link that carries its own one-time token: https://playbookbp.com/?token_hash=…&type=…
+// (emails/confirm-email.html, emails/reset-password.html). It is verified here instead of by a
+// redirect through Supabase, because a redirect never opens the iOS / Android app: the link has to
+// point straight at playbookbp.com for the phone to hand it to the app.
+const PP_EMAIL_LINK_TYPES = ['email','signup','recovery','invite','magiclink','email_change'];
+const PP_EMAIL_LINK = (function(){
+  try{
+    const p=new URLSearchParams(location.search), token_hash=p.get('token_hash'), type=p.get('type');
+    return token_hash && PP_EMAIL_LINK_TYPES.includes(type) ? { token_hash, type } : null;
+  }catch(e){ return null; }
+})();
 // Capture a password-recovery link before Supabase clears the URL hash.
-const PP_RECOVERY = (typeof location!=='undefined' && location.hash && location.hash.indexOf('type=recovery')!==-1);
+const PP_RECOVERY = (typeof location!=='undefined' && location.hash && location.hash.indexOf('type=recovery')!==-1)
+  || !!(PP_EMAIL_LINK && PP_EMAIL_LINK.type==='recovery');
+
+// Verify the one-time token, then take it out of the address so a reload cannot replay it. The
+// link is built from the site URL, so an ?invite= or ?team= the signup started from is not in it;
+// authRedirectUrl() kept them on this device and they are put back before boot routes on them.
+async function ppVerifyEmailLink(link){
+  try{
+    const p=new URLSearchParams(location.search);
+    p.delete('token_hash'); p.delete('type');
+    if(!p.has('invite') && !p.has('team')){
+      const saved=JSON.parse(localStorage.getItem('pp_auth_return')||'null');
+      if(saved && saved.q && Date.now()-saved.at < 30*864e5) new URLSearchParams(saved.q).forEach((v,k)=>{ if(!p.has(k)) p.set(k,v); });
+    }
+    const q=p.toString();
+    history.replaceState(null,'',location.pathname+(q?'?'+q:'')+location.hash);
+  }catch(e){}
+  const { error } = await sb.auth.verifyOtp(link);
+  if(error){
+    console.error(error);
+    toast(link.type==='recovery'
+      ? 'That reset link has expired or was already used. Request a new one.'
+      : 'That link has expired or was already used. Log in, or ask for a new one.');
+    return false;
+  }
+  try{ localStorage.removeItem('pp_auth_return'); }catch(e){}
+  return true;
+}
 
 // Everything that runs on load lives here — see ARCHITECTURE.md.
 // The service worker registers on every visit, marketing page included: it is what
 // makes the install prompt available in the first place.
 registerServiceWorker();
+if(typeof initNativeShell==='function') initNativeShell();
 if(typeof owInit==='function') owInit();
 
 // boot() no longer self-invokes. index.html now paints a marketing landing page
@@ -16,9 +55,11 @@ if(typeof owInit==='function') owInit();
 // `mode` is 'signup' or 'login': which form a brand-new visitor lands on.
 async function boot(mode){
   try{
+    let recovery = PP_RECOVERY;
+    if(PP_EMAIL_LINK && !(await ppVerifyEmailLink(PP_EMAIL_LINK))) recovery = false;
     const { data:{ session } } = await sb.auth.getSession();
     state.user = session?.user || null;
-    if(PP_RECOVERY){ return renderResetPassword(); }
+    if(recovery){ return renderResetPassword(); }
     const token = inviteTokenFromUrl();
     if(token){ return renderRedeem(token); }
     if(!state.user){

@@ -187,5 +187,6 @@ async function screenProfile(){
   });
 }
 
-function inviteLink(token){ return `${location.origin}${location.pathname}?invite=${token}`; }
+// Sent to someone else, so it must be the website's address even from inside the iOS / Android app.
+function inviteLink(token){ return typeof isNativeApp==='function' && isNativeApp() ? `${publicOrigin()}/?invite=${token}` : `${location.origin}${location.pathname}?invite=${token}`; }
 function trainerStatusLabel(s){ return ({draft:'In progress — tap to finish',submitted:'Submitted — under review',in_review:'Under review',needs_info:'Needs your attention',approved:'Approved ✓',suspended:'Paused',rejected:'Not approved'})[s]||'Submitted'; }

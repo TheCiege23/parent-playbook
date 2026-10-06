@@ -12,6 +12,7 @@ don't hoist across separate `<script>` tags).
 
 | Module | Responsibility (one thing) | Key things it defines |
 |---|---|---|
+| `js/native.js` | App Store / Play Store builds (Capacitor): outbound links, incoming Universal/App Links, APNs/FCM push, share-sheet file saving, Stripe in a browser sheet. A no-op on the website; loaded first. See NATIVE-APPS.md | `isNativeApp`, `publicOrigin`, `saveFile`, `openCheckoutUrl`, `initNativeShell`, `nativePushEnable` |
 | `js/core.js` | Client + primitives + shared state | `sb`, `$`, `root`, `esc`, `H`, `uuid`, `toast`, `ageFrom`, `state` |
 | `js/background.js` | Rotating per-sport photo background | `BG`, `SPORT_BG`, `pickBg`, `setAppBg`, `inviteTokenFromUrl` |
 | `js/reference.js` | Load sports/positions/metrics config **+ the `drills` content library** | `loadRef` |

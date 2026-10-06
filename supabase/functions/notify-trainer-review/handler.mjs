@@ -9,6 +9,8 @@
 // negative outcomes: a push notification lands on a lock screen other people can read, and the detail belongs
 // behind the login. Runtime error text is no longer echoed to the caller.
 
+import { sendPush } from '../_shared/native-push.mjs';
+
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -23,7 +25,7 @@ export const REVIEW_MESSAGES = Object.freeze({
   suspended: ['Your profile is paused', 'Your listing is temporarily unlisted.'],
 });
 
-export function createNotifyTrainerReviewHandler({ callerClient, db, push, env = {} } = {}) {
+export function createNotifyTrainerReviewHandler({ callerClient, db, push, native = null, env = {} } = {}) {
   if (typeof callerClient !== 'function' || !db || !push) throw new TypeError('createNotifyTrainerReviewHandler needs callerClient, db and push');
 
   return async function handle(req) {
@@ -53,7 +55,7 @@ export function createNotifyTrainerReviewHandler({ callerClient, db, push, env =
       let sent = 0;
       for (const subscription of subscriptions || []) {
         try {
-          await push.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify({ title, body: text, url: '/' }));
+          await sendPush({ push, native }, subscription, { title, body: text, url: '/' });
           sent++;
         } catch (error) {
           if (error?.statusCode === 404 || error?.statusCode === 410) await db.from('push_subscriptions').delete().eq('id', subscription.id);

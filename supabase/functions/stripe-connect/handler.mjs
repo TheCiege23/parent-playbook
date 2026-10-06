@@ -8,6 +8,8 @@
 // created a second Stripe account for the same trainer. Now the account is created with an idempotency key,
 // so a retry returns the same one, and a failed save answers 500 before any onboarding link is issued.
 
+import { stripeReturnBase } from '../_shared/stripe-return.mjs';
+
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -24,6 +26,7 @@ export function createStripeConnectHandler({ callerClient, db, stripe, appUrl = 
       const caller = callerClient(req.headers.get('Authorization') || '');
       const { data: { user } } = await caller.auth.getUser();
       if (!user) return json({ error: 'unauthorized' }, 401);
+      const back = stripeReturnBase(appUrl, await req.json().catch(() => ({})));
 
       const { data: profile, error: profileError } = await db.from('trainer_profiles').select('id,stripe_account_id').eq('id', user.id).maybeSingle();
       if (profileError) return json({ error: 'Could not start payout setup' }, 500);
@@ -43,8 +46,8 @@ export function createStripeConnectHandler({ callerClient, db, stripe, appUrl = 
 
       const link = await stripe.accountLinks.create({
         account,
-        refresh_url: appUrl + '/?stripe=refresh',
-        return_url: appUrl + '/?stripe=return',
+        refresh_url: back + '?stripe=refresh',
+        return_url: back + '?stripe=return',
         type: 'account_onboarding',
       });
       return json({ url: link.url });

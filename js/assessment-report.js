@@ -1,5 +1,7 @@
 // Portable, self-contained exports. No remote fonts, analytics, media URLs or scripts.
 function assessmentDownload(text,type,filename){
+  // The iOS / Android app cannot download; saveFile (js/native.js) opens the share sheet there.
+  if(typeof saveFile==='function') return saveFile(new Blob([text],{type}),filename);
   const url=URL.createObjectURL(new Blob([text],{type}));
   const link=document.createElement('a');link.href=url;link.download=filename;link.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);

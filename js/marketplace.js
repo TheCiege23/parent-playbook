@@ -19,17 +19,17 @@ async function notifyBooking(bookingId,kind){ try{ await sb.functions.invoke('no
 async function payBooking(bookingId){
   toast('Opening secure checkout…');
   try{
-    const { data, error }=await sb.functions.invoke('stripe-checkout',{ body:{ booking_id:bookingId } });
+    const { data, error }=await sb.functions.invoke('stripe-checkout',{ body:{ booking_id:bookingId, ...(typeof nativeReturnTo==='function'?nativeReturnTo():{}) } });
     if(error){ toast(await fnError(error,'Payment unavailable')); return; }
-    if(data&&data.url){ location.href=data.url; } else { toast((data&&data.error)||'Payment unavailable'); }
+    if(data&&data.url){ if(typeof openCheckoutUrl==='function') openCheckoutUrl(data.url); else location.href=data.url; } else { toast((data&&data.error)||'Payment unavailable'); }
   }catch(e){ console.error(e); toast('Payment unavailable'); }
 }
 async function startPayout(){
   toast('Opening Stripe…');
   try{
-    const { data, error }=await sb.functions.invoke('stripe-connect',{ body:{} });
+    const { data, error }=await sb.functions.invoke('stripe-connect',{ body:(typeof nativeReturnTo==='function'?nativeReturnTo():{}) });
     if(error){ toast(await fnError(error,'Could not open Stripe')); return; }
-    if(data&&data.url){ location.href=data.url; } else { toast('Could not open Stripe'); }
+    if(data&&data.url){ if(typeof openCheckoutUrl==='function') openCheckoutUrl(data.url); else location.href=data.url; } else { toast('Could not open Stripe'); }
   }catch(e){ console.error(e); toast('Could not open Stripe'); }
 }
 

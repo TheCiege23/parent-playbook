@@ -106,9 +106,9 @@ async function openPaywall(reason){
     e.target.innerHTML='<span class="spinner" role="status" aria-label="Loading"></span>'; e.target.disabled=true;
     const err=bg.querySelector('#pwErr'); err.textContent='';
     try{
-      const { data, error } = await sb.functions.invoke('stripe-subscribe',{ body:{} });
+      const { data, error } = await sb.functions.invoke('stripe-subscribe',{ body:(typeof nativeReturnTo==='function'?nativeReturnTo():{}) });
       if(error){ err.textContent=await fnError(error,'Could not start checkout'); e.target.innerHTML='Upgrade'; e.target.disabled=false; return; }
-      if(data&&data.url){ location.href=data.url; } else { err.textContent=(data&&data.error)||'Could not start checkout'; e.target.innerHTML='Upgrade'; e.target.disabled=false; }
+      if(data&&data.url){ if(typeof openCheckoutUrl==='function') openCheckoutUrl(data.url); else location.href=data.url; } else { err.textContent=(data&&data.error)||'Could not start checkout'; e.target.innerHTML='Upgrade'; e.target.disabled=false; }
     }catch(ex){ console.error(ex); err.textContent='Could not start checkout'; e.target.innerHTML='Upgrade'; e.target.disabled=false; }
   };
 }

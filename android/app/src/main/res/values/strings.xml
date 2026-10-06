@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Parent Playbook</string>
+    <string name="title_activity_main">Parent Playbook</string>
+    <string name="package_name">com.brownpig.parentplaybook</string>
+    <string name="custom_url_scheme">com.brownpig.parentplaybook</string>
+</resources>

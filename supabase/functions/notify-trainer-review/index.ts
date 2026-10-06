@@ -2,6 +2,7 @@
 import webpush from 'npm:web-push@3';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { createNotifyTrainerReviewHandler } from './handler.mjs';
+import { createNativePush, readNativeEnv } from '../_shared/native-push.mjs';
 
 const URL = Deno.env.get('SUPABASE_URL')!;
 // The PUBLISHABLE key, not the legacy anon JWT. It only creates a client that carries the CALLER's Authorization
@@ -13,6 +14,7 @@ Deno.serve(createNotifyTrainerReviewHandler({
   callerClient: (auth: string) => createClient(URL, PUBLISHABLE, { global: { headers: { Authorization: auth } } }),
   db: createClient(URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!),
   push: webpush,
+  native: createNativePush({ config: readNativeEnv(name => Deno.env.get(name)) }),
   env: {
     VAPID_PUBLIC_KEY: Deno.env.get('VAPID_PUBLIC_KEY'),
     VAPID_PRIVATE_KEY: Deno.env.get('VAPID_PRIVATE_KEY'),

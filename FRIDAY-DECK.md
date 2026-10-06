@@ -14,7 +14,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 | Claim | Command | Result |
 | --- | --- | --- |
 | Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v149`; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 1109/1109 declared; 1108 passed, 1 skipped |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 1131/1131 declared; 1130 passed, 1 skipped |
 | Database suite | `node tests/db/run.cjs` | 556/556 on a disposable cluster built from the real migrations: 535 security cases plus a 21-case restore and deletion rehearsal |
 | Buyer package | `node tools/acceptance.cjs` inside the extracted package | Unsigned candidate: 229 payload files; contracts 335/335; repository database 556/556, package replay pending |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |

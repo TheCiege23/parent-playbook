@@ -15,6 +15,8 @@
 // Still true and recorded, not fixed: "paid" is reported by the parent's browser on return from Checkout, not by
 // Stripe. The line only says a payment is complete; stripe-webhook is what records it.
 
+import { sendPush } from '../_shared/native-push.mjs';
+
 export const CORS = Object.freeze({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -39,7 +41,7 @@ export function bookingMessage(kind, { childName, trainerName, serviceTitle }) {
   }[kind];
 }
 
-export function createNotifyBookingHandler({ callerClient, db, push, env = {} } = {}) {
+export function createNotifyBookingHandler({ callerClient, db, push, native = null, env = {} } = {}) {
   if (typeof callerClient !== 'function' || !db || !push) throw new TypeError('createNotifyBookingHandler needs callerClient, db and push');
 
   return async function handle(req) {
@@ -75,7 +77,7 @@ export function createNotifyBookingHandler({ callerClient, db, push, env = {} } 
       let sent = 0;
       for (const subscription of subscriptions || []) {
         try {
-          await push.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify({ title, body: text, url: '/' }));
+          await sendPush({ push, native }, subscription, { title, body: text, url: '/' });
           sent++;
         } catch (error) {
           if (error?.statusCode === 404 || error?.statusCode === 410) await db.from('push_subscriptions').delete().eq('id', subscription.id);

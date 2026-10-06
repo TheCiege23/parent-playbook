@@ -44,6 +44,12 @@
 	@static path /css/* /js/* /assets/* /img/*
 	header @static Cache-Control "public, max-age=0, must-revalidate"
 
+	# iOS Universal Links and Android App Links. Apple fetches this file with no extension and
+	# requires application/json; both must be served directly, never redirected.
+	@applinks path /.well-known/apple-app-site-association /.well-known/assetlinks.json
+	header @applinks Content-Type "application/json"
+	header @applinks Cache-Control "public, max-age=3600"
+
 	# Caddy has no built-in type for .webmanifest, and a wrong type makes Chrome
 	# ignore the manifest entirely — no install prompt, no screenshots.
 	@manifest path *.webmanifest
