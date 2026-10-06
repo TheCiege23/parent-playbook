@@ -9,7 +9,7 @@ build step, and `package.json` exists only for the app shells.
 | Piece | What it does |
 |---|---|
 | `capacitor.config.json` | Name, splash and push options. Its `appId` (`com.brownpig.parentplaybook`) is the Android package; the iOS bundle ID is `com.playbookbp.app`, set in the Xcode project |
-| `codemagic.yaml` | Cloud iOS build: builds `www/`, signs, and uploads to TestFlight. See step 5 |
+| `.github/workflows/ios-testflight.yml` | Cloud iOS build on a GitHub macOS runner: builds `www/`, archives, signs through the App Store Connect API key and uploads to TestFlight. See step 5 |
 | `tools/native/build-www.mjs` | Builds `www/` (gitignored): the app's files plus npm-pinned copies of Supabase, three.js, the HEIC decoder and MediaPipe, with every CDN URL rewritten to the local copy. It fails if any CDN code is left. |
 | `js/native.js` | Runs in both places. It does nothing on the website. In the app it handles links, push, downloads (share sheet), Stripe in a browser sheet, and incoming Universal Links / App Links. |
 | `ios/`, `android/` | The native projects. Edit freely. `cap sync` only replaces `public/` and generated config inside them. |
@@ -81,26 +81,26 @@ password". Their links now go straight to `playbookbp.com/?token_hash=…` inste
 redirect. A phone only opens the app for a link to playbookbp.com itself. The web app verifies the
 token too, so the website keeps working with the new templates.
 
-### 5. Codemagic (iOS builds without a Mac)
+### 5. GitHub Actions (iOS builds without a Mac)
 
-iOS builds need Xcode, so they run on Codemagic's Macs. `codemagic.yaml` is the whole build.
-Android builds work anywhere with Android Studio.
+iOS builds need Xcode, so they run on a GitHub macOS runner: `.github/workflows/ios-testflight.yml`,
+the same pipeline Café Con Chimmy and AllFantasy ship with. Nothing is stored but the API key. The
+archive is signed ad hoc and the export re-signs it for the App Store, creating the distribution
+certificate and profile itself. Android builds work anywhere with Android Studio.
 
-1. **App Store Connect → Users and Access → Integrations → App Store Connect API → +**. Name it
-   "Codemagic", access **App Manager**. Download the `.p8` (one download only) and note the
-   **Issuer ID** and **Key ID**.
-2. **codemagic.io** → sign up with GitHub → **Add application** → `TheCiege23/parent-playbook`,
-   type **Capacitor**, and pick "codemagic.yaml" as the configuration.
-3. **Team settings → Integrations → Developer Portal → Connect**: give the Issuer ID, Key ID and
-   `.p8`, and save the key under the name **Parent Playbook ASC**. The name must match
-   `integrations.app_store_connect` in `codemagic.yaml`.
-4. **Code signing identities → iOS certificates → Generate certificate** (Apple Distribution).
-   Codemagic then creates the App Store profile for `com.playbookbp.app` on each build. The App ID
-   must have **Push Notifications** and **Associated Domains** turned on, because the entitlements
-   ask for both.
-5. **Start new build** → branch → workflow **iOS → TestFlight**. It takes about 15 minutes. The
-   build then shows up in App Store Connect → TestFlight after Apple's processing (another 5–30
-   minutes), and you pick it under **Build** on the version page.
+1. **App Store Connect → Users and Access → Integrations → App Store Connect API → Team Keys → +**.
+   Access **App Manager**. Download the `.p8` (one download only) and note the **Issuer ID** (above the
+   list) and **Key ID**. The key the other Brown Pig apps use works too.
+2. **GitHub → TheCiege23/parent-playbook → Settings → Secrets and variables → Actions → New repository
+   secret**, three times: `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8` (the whole `.p8` file,
+   including the BEGIN and END lines).
+3. The App ID `com.playbookbp.app` must have **Push Notifications** and **Associated Domains** turned
+   on, because the entitlements ask for both.
+4. **Actions → iOS → TestFlight**. Until this branch is on `main` the workflow runs on every push to
+   `ios-codemagic`; open the latest run and **Re-run all jobs** to build again. Once it is on `main`,
+   use **Run workflow**. A run takes about 15 minutes. The build then shows up in App Store Connect →
+   TestFlight after Apple's processing (another 5–30 minutes), and you pick it under **Build** on the
+   version page. Each run number becomes the build number.
 
 ## Building
 
