@@ -31,7 +31,7 @@ test('every cron.schedule call in the migrations is the named form, so the check
   assert.equal(scheduleCalls().length, total, 'an unnamed cron.schedule(schedule, command) call would be invisible to these checks');
 });
 
-test('the four push jobs are scheduled by migrations, at the times production runs them, reading the key from Vault', () => {
+test('the four push jobs and the report sweep are scheduled by migrations, at the times production runs them, reading the key from Vault', () => {
   const latest = new Map();
   for (const call of scheduleCalls()) latest.set(call.name, call);
   const pushJobs = [...latest.values()]
@@ -42,6 +42,7 @@ test('the four push jobs are scheduled by migrations, at the times production ru
     ['daily-nudge', '12 20 * * *', 'notify-daily'],
     ['gameday-push', '0 23 * * *', 'notify-gameday'],
     ['measure-nudge', '14 14 * * 0', 'notify-measure'],
+    ['report-alert-sweep', '*/15 * * * *', 'notify-report'],
     ['weekly-plan-push', '0 22 * * 0', 'notify-weekly'],
   ]);
   for (const call of latest.values()) {

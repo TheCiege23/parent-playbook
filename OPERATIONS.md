@@ -17,6 +17,7 @@ schedule stated here stops matching the workflow.
 | Retention sweeps | `cron.job` in the live project | `biometric-retention` 03:20 UTC, `company-body-assessment-retention` 03:35, `company-reference-assessment-retention` 03:40, `company-composition-result-retention` 03:50, `external-composition-retention` 03:55 | All five observed succeeding. By 2026-09-13 each had run at least once; `external-composition-retention` first ran at 03:55 UTC that day |
 | Report files behind due composition records | `cron.job` in the live project, calling the `composition-report-retention` edge function through `net.http_post` | `external-composition-report-retention` 03:45 UTC, before `external-composition-retention` | **Not yet running.** Added by migration `20260915200000`, which also needs the function deployed. The SQL sweep cannot remove a stored report (Supabase refuses a DELETE on `storage.objects` from SQL), so it leaves such a record; this job removes the file through the Storage API and runs the sweep again. A failure leaves the record past its date, which the posture check's `nothing_retained_past_its_retention_date` reports |
 | Notification pushes | `cron.job` in the live project | `weekly-plan-push` (Sundays 22:00 UTC), `gameday-push` (nightly 23:00), `daily-nudge` (daily 20:12) and `measure-nudge` (Sundays 14:14; `notify-measure` sends only in the first week of the month), which call edge functions through `net.http_post` | Running in production; they message real families. `daily-nudge` and `measure-nudge` existed only in the live project until migration `20260913140500`. Until that migration is applied, the live `measure-nudge` still runs `14 14 1-7 * 0` |
+| Report alerts to support | Trigger `coach_update_reports_alert_support` and `cron.job` `report-alert-sweep` (every 15 minutes), both calling `notify-report` | Emails support@playbookbp.com about each parent report of a coach's message, once, stamped in `coach_update_reports.support_alerted_at`; App Review was told every report is reviewed within 24 hours. A row still unstamped after 15 minutes means Resend refused it: check `RESEND_API_KEY` and the function's logs | Added by migration `20261007120000`, which also needs `notify-report` deployed |
 
 Nothing else is scheduled. The database posture check, restore drills and key rotation are manual.
 
@@ -102,7 +103,7 @@ The purpose is to prove that a backup made by the hosting provider comes back as
 
 1. Restore the backup, or a point-in-time recovery, into a **new** project or database. Never restore over
    production. Check which restore options the Supabase plan provides.
-2. **Before the restored copy runs anything, disable its jobs that call edge functions** (`weekly-plan-push`, `gameday-push`, `daily-nudge`, `measure-nudge`, `external-composition-report-retention`).
+2. **Before the restored copy runs anything, disable its jobs that call edge functions** (`weekly-plan-push`, `gameday-push`, `daily-nudge`, `measure-nudge`, `external-composition-report-retention`, `report-alert-sweep`), and drop the `coach_update_reports_alert_support` trigger.
    A restored copy keeps the schedules, and they would message real families or remove production files.
 3. Run the comparison, with owner-role connection strings in the environment:
 
