@@ -326,7 +326,8 @@ add('C20', 'rls-admin', 'org A admin DELETE of its own row succeeds', {
 
 // =========================================================== D. retention behaviour and sweep
 const seedExpired = `select public.test_seed_row('expired-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-001',null,'2026-06-01T00:00:00Z','2026-07-01T00:00:00Z');`;
-const seedLive = `select public.test_seed_row('live-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-002',null,'2026-09-01T00:00:00Z','2026-10-01T00:00:00Z');`;
+// Relative to now(): the sweep compares against the clock, so a fixed date here goes stale.
+const seedLive = `select public.test_seed_row('live-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-002',null,date_trunc('second',now()) - interval '1 day',date_trunc('second',now()) + interval '30 days');`;
 
 add('D01', 'retention', 'an expired row is STILL SELECT-visible to the org admin until the sweep runs', {
   setup: seedExpired, role: 'authenticated', claims: ADMIN_A,
