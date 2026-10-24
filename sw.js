@@ -1,9 +1,9 @@
 // Parent Playbook — service worker: installable + offline, network-first so deploys land immediately
-const CACHE = 'pp-v151';
+const CACHE = 'pp-v152';
 // /privacy, /terms, /datadeletion, /coaches and /organizations are standalone pages, not
 // part of the SPA. Precached so an offline navigation to them serves the real page
 // instead of the index.html fallback.
-const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coaches', '/organizations', '/friday-demo', '/company-persistence-demo', '/company-composition-demo', '/company-sdk-demo', '/sdk-demo.mjs', '/company-persistence-demo.mjs', '/company-composition-demo.mjs', '/manifest.webmanifest', '/icon.svg', '/css/landing.css', '/css/app.css',
+const ASSETS = ['/', '/index.html', '/privacy', '/terms', '/datadeletion', '/coaches', '/organizations', '/friday-demo', '/company-persistence-demo', '/company-composition-demo', '/company-sdk-demo', '/sdk-demo.mjs', '/company-persistence-demo.mjs', '/company-composition-demo.mjs', '/manifest.webmanifest', '/icon.svg', '/img/icon-192.png', '/img/icon-512.png', '/css/landing.css', '/css/app.css',
   '/js/org-insights.js','/js/body-sdk.mjs','/js/body-sdk-surface.mjs','/js/body-sdk-record.mjs','/js/body-sdk-report.mjs','/js/body-sdk-supabase.mjs','/js/body-sdk-reference-supabase.mjs','/js/body-sdk-reference-import.mjs','/js/body-sdk-reference-history.mjs','/js/body-composition-contract.mjs','/js/body-composition-validation.mjs','/js/body-composition-record.mjs','/js/body-composition-supabase.mjs','/js/reference-cohort.mjs','/js/body-surface-report.mjs','/js/body-surface-repeat.mjs','/js/surface-section.js','/js/body-section-worker.js','/js/mesh-section.js',
   '/js/surface-review.mjs','/js/surface-worker.js','/js/visual-hull.js','/js/device-evidence.js',
   '/js/photo-import.mjs','/js/photo-import-worker.js','/js/heic-decode.js',
