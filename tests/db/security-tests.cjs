@@ -1350,10 +1350,10 @@ add('S10', 'stripe-webhook', 'a signed-in guardian calling it directly to mark t
 //
 // The replayed migrations alone must schedule every push job production runs. The harness's cron stub records a job
 // without ever firing it, which is all this needs.
-add('T01', 'notification-schedules', 'the migrations schedule all four push jobs, each once, reading the key from Vault',
+add('T01', 'notification-schedules', 'the migrations schedule the four push jobs and the report sweep, each once, reading the key from Vault',
   { sql: `select string_agg(jobname || '=' || schedule, ',' order by jobname) from cron.job
       where command like '%/functions/v1/notify-%' and command like '%vault.decrypted_secrets%';`,
-    expect: 'ok', expectOut: 'daily-nudge=12 20 * * *,gameday-push=0 23 * * *,measure-nudge=14 14 * * 0,weekly-plan-push=0 22 * * 0' });
+    expect: 'ok', expectOut: 'daily-nudge=12 20 * * *,gameday-push=0 23 * * *,measure-nudge=14 14 * * 0,report-alert-sweep=*/15 * * * *,weekly-plan-push=0 22 * * 0' });
 
 // =========================================================== U. parent body scan records
 //
