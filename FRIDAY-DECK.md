@@ -13,10 +13,10 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
 
 | Claim | Command | Result |
 | --- | --- | --- |
-| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v150`; live verification pending deployment |
-| JavaScript suite | `node --test "tests/*.test.cjs"` | 1131/1131 declared; 1130 passed, 1 skipped |
+| Release candidate | local Docker deployment smoke, then `node tools/deployment-smoke.cjs https://playbookbp.com/` | service worker `pp-v151`; live verification pending deployment |
+| JavaScript suite | `node --test "tests/*.test.cjs"` | 1137/1137 declared; 1136 passed, 1 skipped |
 | Database suite | `node tests/db/run.cjs` | 556/556 on a disposable cluster built from the real migrations: 535 security cases plus a 21-case restore and deletion rehearsal |
-| Buyer package | `node tools/acceptance.cjs` inside the extracted package | Unsigned candidate: 229 payload files; contracts 335/335; repository database 556/556, package replay pending |
+| Buyer package | `node tools/acceptance.cjs` inside the extracted package | Unsigned candidate: 230 payload files; contracts 335/335; repository database 556/556, package replay pending |
 | Archive exclusions | `node tools/package-scan.cjs <package>` | no excluded content |
 | Weighted parity | `node tools/parity-progress.cjs` | 40.75%, 41% rounded, 0 of 16 categories fully accepted |
 
@@ -31,7 +31,7 @@ Evidence baseline for this revision, all re-run on September 10, 2026:
   predicted adult height.
 - An organization side: rostered athletes, consent, an organization-scoped record with audit and
   retention, and an SDK a company can host itself.
-- Build `pp-v150` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
+- Build `pp-v151` is the tested release candidate; verify playbookbp.com with the production smoke after deployment.
 
 *Speaker notes.* Lead with the journey, not the measurement — the measurement is a feature of a
 product parents already use for training, rest and schedule. Do not open on parity percentages.
@@ -101,7 +101,7 @@ against anyone.
   were not.
 - **Every mutation is audited**; every record carries a bounded retention date and a scheduled
   deletion sweep.
-- **The buyer archive stands alone**: 229 files, checksummed, one command to verify it, and its own
+- **The buyer archive stands alone**: 230 files, checksummed, one command to verify it, and its own
   bundled migrations rebuild the schema and pass all 552 cases on a clean database.
 
 *Speaker notes.* This is the strongest slide — it is the one claim backed by executed tests rather
