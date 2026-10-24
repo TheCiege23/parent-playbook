@@ -326,7 +326,12 @@ add('C20', 'rls-admin', 'org A admin DELETE of its own row succeeds', {
 
 // =========================================================== D. retention behaviour and sweep
 const seedExpired = `select public.test_seed_row('expired-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-001',null,'2026-06-01T00:00:00Z','2026-07-01T00:00:00Z');`;
-const seedLive = `select public.test_seed_row('live-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-002',null,'2026-09-01T00:00:00Z','2026-10-01T00:00:00Z');`;
+// The live row's dates are relative to the run. They were fixed at 2026-09-01 to 2026-10-01, so from 1 October the
+// "live" row was itself past retention and D02 failed on every branch. Retention must stay within 400 days of capture.
+const DAY_MS = 86400000;
+const LIVE_CAPTURED = new Date(Date.now() - 30 * DAY_MS).toISOString();
+const LIVE_RETAINED = new Date(Date.now() + 300 * DAY_MS).toISOString();
+const seedLive = `select public.test_seed_row('live-a','adult_reference','${ORG_A}','${ADMIN_A}','synthetic-subject-002',null,'${LIVE_CAPTURED}','${LIVE_RETAINED}');`;
 
 add('D01', 'retention', 'an expired row is STILL SELECT-visible to the org admin until the sweep runs', {
   setup: seedExpired, role: 'authenticated', claims: ADMIN_A,
