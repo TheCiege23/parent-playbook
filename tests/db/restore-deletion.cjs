@@ -89,7 +89,11 @@ const ASSESSMENT_ID = 'rehearsal-assessment-001';
 // The table requires retention_until > captured_at and no more than 400 days after it,
 // so an already-expired row is made by dating the whole record in the past — not by
 // pointing retention backwards, which the schema rightly refuses.
-const LIVE = { captured: '2026-09-10T04:00:00Z', created: '2026-09-10T04:00:00Z', saved: '2026-09-10T04:05:00Z', retention: '2026-10-10T04:00:00Z' };
+// LIVE is dated from the clock because the sweep compares against now(); a fixed date goes stale.
+const DAY = 86400000;
+const iso = (ms) => new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z');
+const NOW = Date.now();
+const LIVE = { captured: iso(NOW - DAY), created: iso(NOW - DAY), saved: iso(NOW - DAY + 300000), retention: iso(NOW + 30 * DAY) };
 const EXPIRED = { captured: '2024-01-01T00:00:00Z', created: '2024-01-01T00:00:00Z', saved: '2024-01-01T00:05:00Z', retention: '2024-02-01T00:00:00Z' };
 
 function insertRecord({ result = RESULT_ID, assessment = ASSESSMENT_ID, team = ORG_A, dates = LIVE } = {}) {
